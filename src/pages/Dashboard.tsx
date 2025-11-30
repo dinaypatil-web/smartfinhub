@@ -146,12 +146,18 @@ export default function Dashboard() {
 
   const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
+  // Calculate total accrued interest across all loans
+  const totalAccruedInterest = Object.values(loanCalculations).reduce(
+    (sum, calc) => sum + calc.accruedInterest,
+    0
+  );
+
   if (loading) {
     return (
       <div className="container mx-auto p-6 space-y-6">
         <Skeleton className="h-12 w-64 bg-muted" />
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          {[1, 2, 3, 4].map(i => (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
+          {[1, 2, 3, 4, 5].map(i => (
             <Skeleton key={i} className="h-32 bg-muted" />
           ))}
         </div>
@@ -182,7 +188,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Assets</CardTitle>
@@ -239,6 +245,21 @@ export default function Dashboard() {
             </div>
             <p className="text-xs text-muted-foreground">
               Assets minus liabilities
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Accrued Interest</CardTitle>
+            <TrendingUp className="h-4 w-4 text-amber-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-amber-600">
+              {formatCurrency(totalAccruedInterest, currency)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Total on all loans
             </p>
           </CardContent>
         </Card>

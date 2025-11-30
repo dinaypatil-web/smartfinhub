@@ -1,7 +1,7 @@
 # Loan Management Enhancements
 
 ## Overview
-This document describes the enhancements made to the loan management system in SmartFinHub, including due date tracking, interest rate history tables, and accrued interest calculations.
+This document describes the enhancements made to the loan management system in SmartFinHub, including due date tracking, interest rate history tables, accrued interest calculations, and prominent display of total accrued interest.
 
 ## New Features
 
@@ -112,7 +112,39 @@ await interestRateApi.addInterestRate({
 });
 ```
 
-### 5. Future Enhancement: Automatic Interest Posting
+### 5. Total Accrued Interest Display
+
+#### Dashboard Enhancement
+Added a prominent summary card showing **Total Accrued Interest** across all loan accounts.
+
+**Features**:
+- Fifth summary card in top metrics row
+- Displays total accrued interest from all loans
+- Amber color scheme for visual distinction
+- Updates automatically with loan data
+- Shows amount in user's default currency
+
+**Location**: Top row alongside Total Assets, Total Liabilities, Liquid Assets, and Working Capital
+
+#### Accounts Page Enhancement
+Added a summary badge at the top of the Loan Accounts section.
+
+**Features**:
+- Displays total accrued interest for all loans
+- Amber background with border for emphasis
+- Only shows when accrued interest > 0
+- Positioned next to "Loan Accounts" heading
+- Responsive design for all screen sizes
+
+**Benefits**:
+- Quick visibility of total interest obligations
+- No manual calculation needed
+- Better financial planning and tracking
+- Consistent visual design across pages
+
+**See**: `ACCRUED_INTEREST_DISPLAY.md` for detailed documentation
+
+### 6. Future Enhancement: Automatic Interest Posting
 
 #### Planned Feature
 On the due date each month, the system should:
@@ -257,15 +289,17 @@ const accruedInterest = (principal * rate * days) / (365 * 100);
 ## Files Modified
 
 ### New Files
-1. `supabase/migrations/00006_add_loan_due_date.sql` - Database migration
+1. `supabase/migrations/00006_add_loan_due_date.sql` - Database migration for due_date field
 2. `src/components/InterestRateTable.tsx` - Interest rate history table component
 3. `LOAN_ENHANCEMENTS.md` - This documentation file
+4. `ACCRUED_INTEREST_DISPLAY.md` - Detailed documentation for total accrued interest display
+5. `INTEREST_START_DATE_UPDATE.md` - Documentation for interest start date feature
 
 ### Modified Files
 1. `src/types/types.ts` - Added due_date to Account interface
 2. `src/pages/AccountForm.tsx` - Added due_date input field and interest start date logic
-3. `src/pages/Accounts.tsx` - Display due_date on loan cards
-4. `src/pages/Dashboard.tsx` - Added InterestRateTable section
+3. `src/pages/Accounts.tsx` - Display due_date on loan cards + total accrued interest summary badge
+4. `src/pages/Dashboard.tsx` - Added InterestRateTable section + total accrued interest summary card
 
 ## Future Enhancements
 
@@ -327,6 +361,12 @@ For questions or issues related to these features:
 4. Verify database migrations applied correctly
 
 ## Version History
+
+- **v1.1** (2025-11-30): Total Accrued Interest Display
+  - Added total accrued interest summary card to Dashboard
+  - Added total accrued interest summary badge to Accounts page
+  - Enhanced visual prominence of interest tracking
+  - Updated grid layout to accommodate new summary card
 
 - **v1.0** (2025-11-30): Initial implementation
   - Added due_date field to track monthly payment due date
