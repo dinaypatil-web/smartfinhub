@@ -339,19 +339,21 @@ export default function AccountForm() {
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label htmlFor="last_4_digits">Last 4 Digits (Optional)</Label>
-              <Input
-                id="last_4_digits"
-                value={formData.last_4_digits}
-                onChange={(e) => setFormData({ ...formData, last_4_digits: e.target.value.slice(0, 4) })}
-                placeholder="1234"
-                maxLength={4}
-              />
-              <p className="text-sm text-muted-foreground">
-                Only the last 4 digits will be displayed for security
-              </p>
-            </div>
+            {formData.account_type !== 'cash' && (
+              <div className="space-y-2">
+                <Label htmlFor="last_4_digits">Last 4 Digits (Optional)</Label>
+                <Input
+                  id="last_4_digits"
+                  value={formData.last_4_digits}
+                  onChange={(e) => setFormData({ ...formData, last_4_digits: e.target.value.slice(0, 4) })}
+                  placeholder="1234"
+                  maxLength={4}
+                />
+                <p className="text-sm text-muted-foreground">
+                  Only the last 4 digits will be displayed for security
+                </p>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="balance">

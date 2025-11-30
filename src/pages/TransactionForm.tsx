@@ -180,7 +180,9 @@ export default function TransactionForm() {
               formData.transaction_type === 'transfer' || formData.transaction_type === 'loan_payment' || 
               formData.transaction_type === 'credit_card_payment') && (
               <div className="space-y-2">
-                <Label htmlFor="from_account_id">From Account *</Label>
+                <Label htmlFor="from_account_id">
+                  {formData.transaction_type === 'withdrawal' ? 'From Bank/Credit Card *' : 'From Account *'}
+                </Label>
                 <Select
                   value={formData.from_account_id}
                   onValueChange={(value) => setFormData({ ...formData, from_account_id: value })}
@@ -189,20 +191,30 @@ export default function TransactionForm() {
                     <SelectValue placeholder="Select account" />
                   </SelectTrigger>
                   <SelectContent>
-                    {accounts.map(account => (
-                      <SelectItem key={account.id} value={account.id}>
-                        {account.account_name} ({account.account_type})
-                      </SelectItem>
-                    ))}
+                    {formData.transaction_type === 'withdrawal'
+                      ? accounts.filter(a => a.account_type === 'bank' || a.account_type === 'credit_card').map(account => (
+                          <SelectItem key={account.id} value={account.id}>
+                            {account.account_name} ({account.account_type})
+                          </SelectItem>
+                        ))
+                      : accounts.map(account => (
+                          <SelectItem key={account.id} value={account.id}>
+                            {account.account_name} ({account.account_type})
+                          </SelectItem>
+                        ))
+                    }
                   </SelectContent>
                 </Select>
               </div>
             )}
 
             {(formData.transaction_type === 'income' || formData.transaction_type === 'transfer' || 
-              formData.transaction_type === 'loan_payment' || formData.transaction_type === 'credit_card_payment') && (
+              formData.transaction_type === 'withdrawal' || formData.transaction_type === 'loan_payment' || 
+              formData.transaction_type === 'credit_card_payment') && (
               <div className="space-y-2">
-                <Label htmlFor="to_account_id">To Account *</Label>
+                <Label htmlFor="to_account_id">
+                  {formData.transaction_type === 'withdrawal' ? 'To Cash Account *' : 'To Account *'}
+                </Label>
                 <Select
                   value={formData.to_account_id}
                   onValueChange={(value) => setFormData({ ...formData, to_account_id: value })}
@@ -211,11 +223,18 @@ export default function TransactionForm() {
                     <SelectValue placeholder="Select account" />
                   </SelectTrigger>
                   <SelectContent>
-                    {accounts.map(account => (
-                      <SelectItem key={account.id} value={account.id}>
-                        {account.account_name} ({account.account_type})
-                      </SelectItem>
-                    ))}
+                    {formData.transaction_type === 'withdrawal' 
+                      ? accounts.filter(a => a.account_type === 'cash').map(account => (
+                          <SelectItem key={account.id} value={account.id}>
+                            {account.account_name}
+                          </SelectItem>
+                        ))
+                      : accounts.map(account => (
+                          <SelectItem key={account.id} value={account.id}>
+                            {account.account_name} ({account.account_type})
+                          </SelectItem>
+                        ))
+                    }
                   </SelectContent>
                 </Select>
               </div>
