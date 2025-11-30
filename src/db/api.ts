@@ -349,13 +349,20 @@ export const transactionApi = {
         break;
       
       case 'withdrawal':
+        // Deduct from source account (bank/credit card)
         if (transaction.from_account_id) {
           const account = await accountApi.getAccountById(transaction.from_account_id);
           if (account?.account_type === 'credit_card') {
+            // Credit card: withdrawal increases balance (debt)
             await this.adjustBalance(transaction.from_account_id, amount);
           } else {
+            // Bank account: withdrawal decreases balance
             await this.adjustBalance(transaction.from_account_id, -amount);
           }
+        }
+        // Add to destination cash account
+        if (transaction.to_account_id) {
+          await this.adjustBalance(transaction.to_account_id, amount);
         }
         break;
       
@@ -397,13 +404,20 @@ export const transactionApi = {
         break;
       
       case 'withdrawal':
+        // Reverse: Add back to source account (bank/credit card)
         if (transaction.from_account_id) {
           const account = await accountApi.getAccountById(transaction.from_account_id);
           if (account?.account_type === 'credit_card') {
+            // Credit card: reverse withdrawal decreases balance (debt)
             await this.adjustBalance(transaction.from_account_id, -amount);
           } else {
+            // Bank account: reverse withdrawal increases balance
             await this.adjustBalance(transaction.from_account_id, amount);
           }
+        }
+        // Reverse: Deduct from destination cash account
+        if (transaction.to_account_id) {
+          await this.adjustBalance(transaction.to_account_id, -amount);
         }
         break;
       
