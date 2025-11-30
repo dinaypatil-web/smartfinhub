@@ -26,6 +26,7 @@ export interface Account {
   currency: string;
   loan_principal: number | null;
   loan_tenure_months: number | null;
+  loan_start_date: string | null;
   interest_rate_type: InterestRateType | null;
   current_interest_rate: number | null;
   created_at: string;

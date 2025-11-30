@@ -33,6 +33,7 @@ export default function AccountForm() {
     currency: profile?.default_currency || 'USD',
     loan_principal: '',
     loan_tenure_months: '',
+    loan_start_date: '',
     interest_rate_type: 'fixed' as InterestRateType,
     current_interest_rate: '',
   });
@@ -72,6 +73,7 @@ export default function AccountForm() {
           currency: account.currency,
           loan_principal: account.loan_principal?.toString() || '',
           loan_tenure_months: account.loan_tenure_months?.toString() || '',
+          loan_start_date: account.loan_start_date || '',
           interest_rate_type: account.interest_rate_type || 'fixed',
           current_interest_rate: account.current_interest_rate?.toString() || '',
         });
@@ -93,10 +95,10 @@ export default function AccountForm() {
     if (!user) return;
 
     if (formData.account_type === 'loan') {
-      if (!formData.loan_principal || !formData.loan_tenure_months || !formData.current_interest_rate) {
+      if (!formData.loan_principal || !formData.loan_tenure_months || !formData.current_interest_rate || !formData.loan_start_date) {
         toast({
           title: 'Error',
-          description: 'Please fill in all loan details',
+          description: 'Please fill in all loan details including start date',
           variant: 'destructive',
         });
         return;
@@ -118,6 +120,7 @@ export default function AccountForm() {
         currency: formData.currency,
         loan_principal: formData.account_type === 'loan' ? parseFloat(formData.loan_principal) : null,
         loan_tenure_months: formData.account_type === 'loan' ? parseInt(formData.loan_tenure_months) : null,
+        loan_start_date: formData.account_type === 'loan' ? formData.loan_start_date : null,
         interest_rate_type: formData.account_type === 'loan' ? formData.interest_rate_type : null,
         current_interest_rate: formData.account_type === 'loan' ? parseFloat(formData.current_interest_rate) : null,
       };
@@ -366,6 +369,17 @@ export default function AccountForm() {
                     value={formData.loan_tenure_months}
                     onChange={(e) => setFormData({ ...formData, loan_tenure_months: e.target.value })}
                     placeholder="12"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="loan_start_date">Loan Start Date *</Label>
+                  <Input
+                    id="loan_start_date"
+                    type="date"
+                    value={formData.loan_start_date}
+                    onChange={(e) => setFormData({ ...formData, loan_start_date: e.target.value })}
                     required
                   />
                 </div>

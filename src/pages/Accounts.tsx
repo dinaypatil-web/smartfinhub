@@ -10,6 +10,7 @@ import { formatCurrency, formatAccountNumber } from '@/utils/format';
 import { Plus, Edit, Trash2, Building2, CreditCard, Wallet } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
+import InterestRateManager from '@/components/InterestRateManager';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -434,6 +435,14 @@ export default function Accounts() {
                           {formatCurrency(Number(account.balance), account.currency)}
                         </p>
                       </div>
+                      {account.interest_rate_type === 'floating' && (
+                        <InterestRateManager
+                          accountId={account.id}
+                          accountName={account.account_name}
+                          currentRate={account.current_interest_rate || 0}
+                          onRateUpdated={loadAccounts}
+                        />
+                      )}
                       <div className="flex gap-2">
                         <Button
                           variant="outline"
