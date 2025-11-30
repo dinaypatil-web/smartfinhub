@@ -6,44 +6,66 @@
 
 ## Solutions Implemented
 
-### Issue 1: Manual Bank Name Entry Fixed
-**Problem**: The input field was clearing the value when "Other" was selected, preventing manual entry.
+### Issue 1: Manual Bank Name Entry Fixed (FINAL FIX)
+**Problem**: The Select dropdown and Input field were both rendering at the same time, causing conflicts and preventing typing.
+
+**Root Cause**: The condition for showing/hiding the Select vs Input was not mutually exclusive, leading to both components being rendered simultaneously.
 
 **Solution**:
-- Modified the Select component's `onValueChange` handler to set `institution_name` to empty string (`''`) when "other" is selected
-- Updated the Input field condition to show when:
-  - No banks are available, OR
-  - `institution_name` is empty, OR
-  - Current `institution_name` is not in the available banks list
-- Changed the Input field's `value` prop to directly use `formData.institution_name` instead of conditionally clearing it
+- Added a `manualEntry` state variable to explicitly track when the user wants to enter a bank name manually
+- Modified the rendering logic to be mutually exclusive:
+  - Show Select dropdown ONLY when: `availableBanks.length > 0 && !manualEntry`
+  - Show Input field when: `availableBanks.length === 0 || manualEntry`
+- When "Other (Enter manually)" is selected, set `manualEntry = true` to hide the Select and show the Input
+- Added a "Back to bank selection" button to allow users to return to the dropdown if needed
 
 **Code Changes** (`src/pages/AccountForm.tsx`):
 ```typescript
-// Select value now properly handles "other" selection
-value={formData.institution_name === 'other' ? 'other' : formData.institution_name}
+// Added state to track manual entry mode
+const [manualEntry, setManualEntry] = useState(false);
 
-// When "other" is selected, clear the institution_name to show input field
-onValueChange={(value) => {
-  if (value === 'other') {
-    setFormData({
-      ...formData,
-      institution_name: '',
-      institution_logo: ''
-    });
-  } else {
-    // ... handle bank selection
-  }
-}}
-
-// Input field now shows when institution_name is empty or not in list
-{(availableBanks.length === 0 || formData.institution_name === '' || !availableBanks.find(b => b.name === formData.institution_name)) && (
-  <Input
-    id="institution_name"
-    value={formData.institution_name}  // Direct value, no conditional clearing
-    onChange={(e) => setFormData({ ...formData, institution_name: e.target.value })}
-    placeholder="Enter bank name"
-    required
-  />
+// Mutually exclusive rendering
+{availableBanks.length > 0 && !manualEntry ? (
+  <Select
+    value={formData.institution_name}
+    onValueChange={(value) => {
+      if (value === 'other') {
+        setManualEntry(true);  // Switch to manual entry mode
+        setFormData({
+          ...formData,
+          institution_name: '',
+          institution_logo: ''
+        });
+      } else {
+        // ... handle bank selection
+      }
+    }}
+  >
+    {/* ... Select options ... */}
+  </Select>
+) : (
+  <div className="space-y-2">
+    <Input
+      id="institution_name"
+      value={formData.institution_name}
+      onChange={(e) => setFormData({ ...formData, institution_name: e.target.value })}
+      placeholder="Enter bank name"
+      required
+    />
+    {availableBanks.length > 0 && manualEntry && (
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={() => {
+          setManualEntry(false);  // Switch back to dropdown
+          setFormData({ ...formData, institution_name: '' });
+        }}
+      >
+        ← Back to bank selection
+      </Button>
+    )}
+  </div>
 )}
 ```
 

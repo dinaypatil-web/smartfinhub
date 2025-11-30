@@ -20,6 +20,7 @@ export default function AccountForm() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [loadingAccount, setLoadingAccount] = useState(!!id);
+  const [manualEntry, setManualEntry] = useState(false);
 
   const [formData, setFormData] = useState({
     account_type: 'bank' as AccountType,
@@ -45,7 +46,12 @@ export default function AccountForm() {
   }, [id, user]);
 
   useEffect(() => {
-    setAvailableBanks(getBanksByCountry(formData.country));
+    const banks = getBanksByCountry(formData.country);
+    setAvailableBanks(banks);
+    // Reset manual entry mode when country changes
+    if (banks.length > 0 && !manualEntry) {
+      setManualEntry(false);
+    }
   }, [formData.country]);
 
   const loadAccount = async () => {
@@ -246,11 +252,12 @@ export default function AccountForm() {
             {formData.account_type !== 'cash' && (
               <div className="space-y-2">
                 <Label htmlFor="institution_name">Bank/Institution Name *</Label>
-                {availableBanks.length > 0 ? (
+                {availableBanks.length > 0 && !manualEntry ? (
                   <Select
-                    value={formData.institution_name === 'other' ? 'other' : formData.institution_name}
+                    value={formData.institution_name}
                     onValueChange={(value) => {
                       if (value === 'other') {
+                        setManualEntry(true);
                         setFormData({
                           ...formData,
                           institution_name: '',
@@ -278,15 +285,29 @@ export default function AccountForm() {
                       <SelectItem value="other">Other (Enter manually)</SelectItem>
                     </SelectContent>
                   </Select>
-                ) : null}
-                {(availableBanks.length === 0 || formData.institution_name === '' || !availableBanks.find(b => b.name === formData.institution_name)) && (
-                  <Input
-                    id="institution_name"
-                    value={formData.institution_name}
-                    onChange={(e) => setFormData({ ...formData, institution_name: e.target.value })}
-                    placeholder="Enter bank name"
-                    required
-                  />
+                ) : (
+                  <div className="space-y-2">
+                    <Input
+                      id="institution_name"
+                      value={formData.institution_name}
+                      onChange={(e) => setFormData({ ...formData, institution_name: e.target.value })}
+                      placeholder="Enter bank name"
+                      required
+                    />
+                    {availableBanks.length > 0 && manualEntry && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setManualEntry(false);
+                          setFormData({ ...formData, institution_name: '' });
+                        }}
+                      >
+                        ← Back to bank selection
+                      </Button>
+                    )}
+                  </div>
                 )}
               </div>
             )}
