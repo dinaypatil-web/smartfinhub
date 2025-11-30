@@ -12,6 +12,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recha
 import { calculateEMI, calculateAccruedInterest } from '@/utils/loanCalculations';
 import InterestRateChart from '@/components/InterestRateChart';
 import InterestRateTable from '@/components/InterestRateTable';
+import BankLogo from '@/components/BankLogo';
 
 export default function Dashboard() {
   const { user, profile } = useAuth();
@@ -345,9 +346,7 @@ export default function Dashboard() {
               {summary?.accounts_by_type.bank.map(account => (
                 <div key={account.id} className="flex items-center justify-between p-4 border rounded-lg">
                   <div className="flex items-center gap-3">
-                    {account.institution_logo && (
-                      <img src={account.institution_logo} alt={account.institution_name} className="h-8 w-8 rounded" />
-                    )}
+                    <BankLogo src={account.institution_logo} alt={account.institution_name || 'Bank'} />
                     <div>
                       <p className="font-medium">{account.account_name}</p>
                       <p className="text-sm text-muted-foreground">
@@ -363,9 +362,7 @@ export default function Dashboard() {
               {summary?.accounts_by_type.credit_card.map(account => (
                 <div key={account.id} className="flex items-center justify-between p-4 border rounded-lg">
                   <div className="flex items-center gap-3">
-                    {account.institution_logo && (
-                      <img src={account.institution_logo} alt={account.institution_name} className="h-8 w-8 rounded" />
-                    )}
+                    <BankLogo src={account.institution_logo} alt={account.institution_name || 'Credit Card'} />
                     <div>
                       <p className="font-medium">{account.account_name}</p>
                       <p className="text-sm text-muted-foreground">
@@ -381,9 +378,7 @@ export default function Dashboard() {
               {summary?.accounts_by_type.loan.map(account => (
                 <div key={account.id} className="flex items-center justify-between p-4 border rounded-lg">
                   <div className="flex items-center gap-3">
-                    {account.institution_logo && (
-                      <img src={account.institution_logo} alt={account.institution_name} className="h-8 w-8 rounded" />
-                    )}
+                    <BankLogo src={account.institution_logo} alt={account.institution_name || 'Loan'} />
                     <div>
                       <p className="font-medium">{account.account_name}</p>
                       <p className="text-sm text-muted-foreground">

@@ -37,6 +37,16 @@ export function getBankLogo(bankName: string): string {
   const bank = banks.find(b => b.name.toLowerCase() === bankName.toLowerCase());
   if (bank) return bank.logo;
   
-  const domain = bankName.toLowerCase().replace(/\s+/g, '').replace(/bank|financial|group/gi, '');
-  return `https://logo.clearbit.com/${domain}.com`;
+  // Try to generate a domain from the bank name
+  const cleanName = bankName.toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/bank|financial|group|ltd|limited|inc|corporation|corp/gi, '');
+  
+  // Try Clearbit API first
+  return `https://logo.clearbit.com/${cleanName}.com`;
+}
+
+export function getDefaultBankLogo(): string {
+  // Fallback icon for banks without logos
+  return 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0OCIgaGVpZ2h0PSI0OCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiMxRTNBOEEiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMyAyMWgxOCIvPjxwYXRoIGQ9Ik0zIDEwaDE4Ii8+PHBhdGggZD0iTTUgNmgxNGwtNy03eiIvPjxwYXRoIGQ9Ik00IDEwdjExIi8+PHBhdGggZD0iTTggMTB2MTEiLz48cGF0aCBkPSJNMTIgMTB2MTEiLz48cGF0aCBkPSJNMTYgMTB2MTEiLz48cGF0aCBkPSJNMjAgMTB2MTEiLz48L3N2Zz4=';
 }

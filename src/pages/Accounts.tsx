@@ -12,6 +12,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import InterestRateManager from '@/components/InterestRateManager';
 import { calculateEMI, calculateAccruedInterest } from '@/utils/loanCalculations';
+import BankLogo from '@/components/BankLogo';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -291,16 +292,11 @@ export default function Accounts() {
                   <Card key={account.id} className="hover:shadow-lg transition-shadow">
                     <CardHeader className="flex flex-row items-start justify-between space-y-0">
                       <div className="flex items-center gap-3">
-                        {account.institution_logo && (
-                          <img 
-                            src={account.institution_logo} 
-                            alt={account.institution_name} 
-                            className="h-10 w-10 rounded object-contain"
-                            onError={(e) => {
-                              e.currentTarget.style.display = 'none';
-                            }}
-                          />
-                        )}
+                        <BankLogo 
+                          src={account.institution_logo} 
+                          alt={account.institution_name || 'Bank'} 
+                          className="h-10 w-10"
+                        />
                         <div>
                           <CardTitle className="text-lg">{account.account_name}</CardTitle>
                           <p className="text-sm text-muted-foreground">{account.institution_name}</p>
@@ -360,16 +356,11 @@ export default function Accounts() {
                   <Card key={account.id} className="hover:shadow-lg transition-shadow">
                     <CardHeader className="flex flex-row items-start justify-between space-y-0">
                       <div className="flex items-center gap-3">
-                        {account.institution_logo && (
-                          <img 
-                            src={account.institution_logo} 
-                            alt={account.institution_name} 
-                            className="h-10 w-10 rounded object-contain"
-                            onError={(e) => {
-                              e.currentTarget.style.display = 'none';
-                            }}
-                          />
-                        )}
+                        <BankLogo 
+                          src={account.institution_logo} 
+                          alt={account.institution_name || 'Credit Card'} 
+                          className="h-10 w-10"
+                        />
                         <div>
                           <CardTitle className="text-lg">{account.account_name}</CardTitle>
                           <p className="text-sm text-muted-foreground">{account.institution_name}</p>
@@ -429,16 +420,11 @@ export default function Accounts() {
                   <Card key={account.id} className="hover:shadow-lg transition-shadow">
                     <CardHeader className="flex flex-row items-start justify-between space-y-0">
                       <div className="flex items-center gap-3">
-                        {account.institution_logo && (
-                          <img 
-                            src={account.institution_logo} 
-                            alt={account.institution_name} 
-                            className="h-10 w-10 rounded object-contain"
-                            onError={(e) => {
-                              e.currentTarget.style.display = 'none';
-                            }}
-                          />
-                        )}
+                        <BankLogo 
+                          src={account.institution_logo} 
+                          alt={account.institution_name || 'Loan'} 
+                          className="h-10 w-10"
+                        />
                         <div>
                           <CardTitle className="text-lg">{account.account_name}</CardTitle>
                           <p className="text-sm text-muted-foreground">{account.institution_name}</p>
