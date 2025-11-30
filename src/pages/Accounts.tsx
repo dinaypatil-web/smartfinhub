@@ -1,16 +1,17 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { accountApi } from '@/db/api';
+import { accountApi, interestRateApi } from '@/db/api';
 import type { Account } from '@/types/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency, formatAccountNumber } from '@/utils/format';
-import { Plus, Edit, Trash2, Building2, CreditCard, Wallet } from 'lucide-react';
+import { Plus, Edit, Trash2, Building2, CreditCard, Wallet, TrendingUp } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import InterestRateManager from '@/components/InterestRateManager';
+import { calculateEMI, calculateAccruedInterest } from '@/utils/loanCalculations';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,6 +31,7 @@ export default function Accounts() {
   const [loading, setLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
+  const [loanCalculations, setLoanCalculations] = useState<Record<string, { emi: number; accruedInterest: number }>>({});
 
   const currency = profile?.default_currency || 'USD';
 
@@ -46,6 +48,40 @@ export default function Accounts() {
     try {
       const data = await accountApi.getAccounts(user.id);
       setAccounts(data);
+
+      // Calculate loan metrics for all loan accounts
+      const calculations: Record<string, { emi: number; accruedInterest: number }> = {};
+      
+      for (const account of data) {
+        if (account.account_type === 'loan' && account.loan_principal && account.current_interest_rate && account.loan_tenure_months) {
+          // Calculate EMI
+          const emi = calculateEMI(
+            Number(account.loan_principal),
+            Number(account.current_interest_rate),
+            Number(account.loan_tenure_months)
+          );
+
+          // Calculate accrued interest
+          let accruedInterest = 0;
+          if (account.loan_start_date) {
+            try {
+              const history = await interestRateApi.getInterestRateHistory(account.id);
+              accruedInterest = calculateAccruedInterest(
+                account.loan_start_date,
+                Number(account.balance),
+                history,
+                Number(account.current_interest_rate)
+              );
+            } catch (error) {
+              console.error('Error calculating accrued interest:', error);
+            }
+          }
+
+          calculations[account.id] = { emi, accruedInterest };
+        }
+      }
+
+      setLoanCalculations(calculations);
     } catch (error) {
       console.error('Error loading accounts:', error);
       toast({
@@ -425,15 +461,38 @@ export default function Accounts() {
                           <p className="font-medium">{account.loan_tenure_months} months</p>
                         </div>
                       </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Interest Rate ({account.interest_rate_type})</p>
-                        <p className="font-medium">{account.current_interest_rate}% APR</p>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm text-muted-foreground">Interest Rate ({account.interest_rate_type})</p>
+                          <p className="font-medium">{account.current_interest_rate}% APR</p>
+                        </div>
+                        {loanCalculations[account.id] && (
+                          <div>
+                            <p className="text-sm text-muted-foreground">Monthly EMI</p>
+                            <p className="font-medium text-primary">
+                              {formatCurrency(loanCalculations[account.id].emi, account.currency)}
+                            </p>
+                          </div>
+                        )}
                       </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Outstanding Balance</p>
-                        <p className="text-2xl font-bold text-danger">
-                          {formatCurrency(Number(account.balance), account.currency)}
-                        </p>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm text-muted-foreground">Outstanding Balance</p>
+                          <p className="text-xl font-bold text-danger">
+                            {formatCurrency(Number(account.balance), account.currency)}
+                          </p>
+                        </div>
+                        {loanCalculations[account.id] && loanCalculations[account.id].accruedInterest > 0 && (
+                          <div>
+                            <p className="text-sm text-muted-foreground flex items-center gap-1">
+                              <TrendingUp className="h-3 w-3" />
+                              Accrued Interest
+                            </p>
+                            <p className="text-xl font-bold text-amber-600">
+                              {formatCurrency(loanCalculations[account.id].accruedInterest, account.currency)}
+                            </p>
+                          </div>
+                        )}
                       </div>
                       {account.interest_rate_type === 'floating' && (
                         <InterestRateManager

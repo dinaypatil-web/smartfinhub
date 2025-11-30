@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { accountApi, transactionApi } from '@/db/api';
+import { accountApi, transactionApi, interestRateApi } from '@/db/api';
 import type { Account, Transaction, FinancialSummary } from '@/types/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,12 +9,14 @@ import { formatCurrency, formatAccountNumber } from '@/utils/format';
 import { Plus, Wallet, CreditCard, TrendingUp, TrendingDown, Building2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
+import { calculateEMI, calculateAccruedInterest } from '@/utils/loanCalculations';
 
 export default function Dashboard() {
   const { user, profile } = useAuth();
   const [summary, setSummary] = useState<FinancialSummary | null>(null);
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loanCalculations, setLoanCalculations] = useState<Record<string, { emi: number; accruedInterest: number }>>({});
 
   const currency = profile?.default_currency || 'USD';
 
@@ -36,6 +38,42 @@ export default function Dashboard() {
       
       setSummary(summaryData);
       setRecentTransactions(transactions);
+
+      // Calculate loan metrics for all loan accounts
+      const calculations: Record<string, { emi: number; accruedInterest: number }> = {};
+      
+      if (summaryData?.accounts_by_type.loan) {
+        for (const account of summaryData.accounts_by_type.loan) {
+          if (account.loan_principal && account.current_interest_rate && account.loan_tenure_months) {
+            // Calculate EMI
+            const emi = calculateEMI(
+              Number(account.loan_principal),
+              Number(account.current_interest_rate),
+              Number(account.loan_tenure_months)
+            );
+
+            // Calculate accrued interest
+            let accruedInterest = 0;
+            if (account.loan_start_date) {
+              try {
+                const history = await interestRateApi.getInterestRateHistory(account.id);
+                accruedInterest = calculateAccruedInterest(
+                  account.loan_start_date,
+                  Number(account.balance),
+                  history,
+                  Number(account.current_interest_rate)
+                );
+              } catch (error) {
+                console.error('Error calculating accrued interest:', error);
+              }
+            }
+
+            calculations[account.id] = { emi, accruedInterest };
+          }
+        }
+      }
+
+      setLoanCalculations(calculations);
     } catch (error) {
       console.error('Error loading dashboard:', error);
     } finally {
@@ -349,6 +387,11 @@ export default function Dashboard() {
                       <p className="text-sm text-muted-foreground">
                         {getAccountTypeLabel(account.account_type)} • {account.interest_rate_type}
                       </p>
+                      {loanCalculations[account.id] && (
+                        <p className="text-xs text-primary font-medium mt-1">
+                          EMI: {formatCurrency(loanCalculations[account.id].emi, account.currency)}
+                        </p>
+                      )}
                     </div>
                   </div>
                   <div className="text-right">
@@ -358,6 +401,11 @@ export default function Dashboard() {
                     <div className="text-xs text-muted-foreground">
                       {account.current_interest_rate}% APR
                     </div>
+                    {loanCalculations[account.id] && loanCalculations[account.id].accruedInterest > 0 && (
+                      <div className="text-xs text-amber-600 font-medium mt-1">
+                        Interest: {formatCurrency(loanCalculations[account.id].accruedInterest, account.currency)}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}

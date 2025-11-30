@@ -33,6 +33,13 @@ export interface Account {
   updated_at: string;
 }
 
+export interface LoanAccountWithCalculations extends Account {
+  emi: number;
+  accrued_interest: number;
+  total_interest_payable: number;
+  remaining_tenure_months: number;
+}
+
 export interface InterestRateHistory {
   id: string;
   account_id: string;

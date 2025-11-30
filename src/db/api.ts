@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import type {
   Profile,
   Account,
+  LoanAccountWithCalculations,
   InterestRateHistory,
   Transaction,
   Budget,
@@ -160,6 +161,34 @@ export const accountApi = {
         loan: loanAccounts
       }
     };
+  },
+
+  async getLoanWithCalculations(accountId: string): Promise<any> {
+    const { data, error } = await supabase
+      .rpc('get_loan_details_with_calculations', { p_account_id: accountId });
+    
+    if (error) throw error;
+    return Array.isArray(data) && data.length > 0 ? data[0] : null;
+  },
+
+  async calculateLoanEMI(principal: number, annualRate: number, tenureMonths: number): Promise<number> {
+    const { data, error } = await supabase
+      .rpc('calculate_loan_emi', {
+        p_principal: principal,
+        p_annual_rate: annualRate,
+        p_tenure_months: tenureMonths
+      });
+    
+    if (error) throw error;
+    return data || 0;
+  },
+
+  async calculateLoanAccruedInterest(accountId: string): Promise<number> {
+    const { data, error } = await supabase
+      .rpc('calculate_loan_accrued_interest', { p_account_id: accountId });
+    
+    if (error) throw error;
+    return data || 0;
   }
 };
 

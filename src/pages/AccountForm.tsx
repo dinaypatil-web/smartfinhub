@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, ArrowLeft } from 'lucide-react';
 import { countries } from '@/utils/countries';
 import { getBanksByCountry, getBankLogo } from '@/utils/banks';
+import { calculateEMI, formatLoanAmount } from '@/utils/loanCalculations';
 
 export default function AccountForm() {
   const { id } = useParams();
@@ -38,7 +39,27 @@ export default function AccountForm() {
     current_interest_rate: '',
   });
 
+  const [calculatedEMI, setCalculatedEMI] = useState<number>(0);
   const [availableBanks, setAvailableBanks] = useState(getBanksByCountry(formData.country));
+
+  // Calculate EMI whenever loan details change
+  useEffect(() => {
+    if (
+      formData.account_type === 'loan' &&
+      formData.loan_principal &&
+      formData.current_interest_rate &&
+      formData.loan_tenure_months
+    ) {
+      const emi = calculateEMI(
+        parseFloat(formData.loan_principal),
+        parseFloat(formData.current_interest_rate),
+        parseInt(formData.loan_tenure_months)
+      );
+      setCalculatedEMI(emi);
+    } else {
+      setCalculatedEMI(0);
+    }
+  }, [formData.loan_principal, formData.current_interest_rate, formData.loan_tenure_months, formData.account_type]);
 
   useEffect(() => {
     if (id && user) {
@@ -412,6 +433,18 @@ export default function AccountForm() {
                     required
                   />
                 </div>
+
+                {calculatedEMI > 0 && (
+                  <div className="space-y-2 bg-muted p-4 rounded-lg">
+                    <Label className="text-sm font-medium">Calculated EMI</Label>
+                    <div className="text-2xl font-bold text-primary">
+                      {formatLoanAmount(calculatedEMI, formData.currency)}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Monthly payment based on principal, interest rate, and tenure
+                    </p>
+                  </div>
+                )}
               </>
             )}
 
