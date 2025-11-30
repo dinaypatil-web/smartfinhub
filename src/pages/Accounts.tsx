@@ -176,12 +176,6 @@ export default function Accounts() {
     loan: accounts.filter(a => a.account_type === 'loan'),
   };
 
-  // Calculate total accrued interest across all loans
-  const totalAccruedInterest = Object.values(loanCalculations).reduce(
-    (sum, calc) => sum + calc.accruedInterest,
-    0
-  );
-
   if (loading) {
     return (
       <div className="container mx-auto p-6 space-y-6">
@@ -426,25 +420,10 @@ export default function Accounts() {
 
           {groupedAccounts.loan.length > 0 && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-semibold flex items-center gap-2">
-                  <Wallet className="h-6 w-6" />
-                  Loan Accounts
-                </h2>
-                {totalAccruedInterest > 0 && (
-                  <Card className="px-4 py-2 bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800">
-                    <div className="flex items-center gap-2">
-                      <TrendingUp className="h-4 w-4 text-amber-600" />
-                      <div>
-                        <p className="text-xs text-muted-foreground">Total Accrued Interest</p>
-                        <p className="text-lg font-bold text-amber-600">
-                          {formatCurrency(totalAccruedInterest, currency)}
-                        </p>
-                      </div>
-                    </div>
-                  </Card>
-                )}
-              </div>
+              <h2 className="text-2xl font-semibold flex items-center gap-2">
+                <Wallet className="h-6 w-6" />
+                Loan Accounts
+              </h2>
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {groupedAccounts.loan.map(account => (
                   <Card key={account.id} className="hover:shadow-lg transition-shadow">
@@ -502,24 +481,11 @@ export default function Accounts() {
                           </div>
                         )}
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-sm text-muted-foreground">Outstanding Balance</p>
-                          <p className="text-xl font-bold text-danger">
-                            {formatCurrency(Number(account.balance), account.currency)}
-                          </p>
-                        </div>
-                        {loanCalculations[account.id] && loanCalculations[account.id].accruedInterest > 0 && (
-                          <div>
-                            <p className="text-sm text-muted-foreground flex items-center gap-1">
-                              <TrendingUp className="h-3 w-3" />
-                              Accrued Interest
-                            </p>
-                            <p className="text-xl font-bold text-amber-600">
-                              {formatCurrency(loanCalculations[account.id].accruedInterest, account.currency)}
-                            </p>
-                          </div>
-                        )}
+                      <div>
+                        <p className="text-sm text-muted-foreground">Outstanding Balance</p>
+                        <p className="text-xl font-bold text-danger">
+                          {formatCurrency(Number(account.balance), account.currency)}
+                        </p>
                       </div>
                       {account.interest_rate_type === 'floating' && (
                         <InterestRateManager
