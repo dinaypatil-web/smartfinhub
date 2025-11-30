@@ -537,14 +537,21 @@ export const budgetApi = {
       .filter(t => t.transaction_type === 'expense')
       .reduce((sum, t) => sum + Number(t.amount), 0);
 
+    // Fetch categories to map ID to name
+    const categories = await categoryApi.getCategories(userId);
+    const categoryMap = new Map(categories.map(c => [c.id, c.name]));
+
     const category_analysis: Record<string, { budgeted: number; actual: number; variance: number }> = {};
     
-    for (const [category, budgeted] of Object.entries(budget.category_budgets)) {
+    for (const [categoryId, budgeted] of Object.entries(budget.category_budgets)) {
+      const categoryName = categoryMap.get(categoryId);
+      if (!categoryName) continue;
+      
       const actual = transactions
-        .filter(t => t.category === category && t.transaction_type === 'expense')
+        .filter(t => t.category === categoryName && t.transaction_type === 'expense')
         .reduce((sum, t) => sum + Number(t.amount), 0);
       
-      category_analysis[category] = {
+      category_analysis[categoryId] = {
         budgeted: Number(budgeted),
         actual,
         variance: Number(budgeted) - actual
