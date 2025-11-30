@@ -1,0 +1,386 @@
+import { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { accountApi, interestRateApi } from '@/db/api';
+import type { Account, AccountType, InterestRateType } from '@/types/types';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
+import { Loader2, ArrowLeft } from 'lucide-react';
+import { countries } from '@/utils/countries';
+import { getBanksByCountry, getBankLogo } from '@/utils/banks';
+
+export default function AccountForm() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { user, profile } = useAuth();
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+  const [loadingAccount, setLoadingAccount] = useState(!!id);
+
+  const [formData, setFormData] = useState({
+    account_type: 'bank' as AccountType,
+    account_name: '',
+    country: profile?.default_country || 'US',
+    institution_name: '',
+    institution_logo: '',
+    last_4_digits: '',
+    balance: '0',
+    currency: profile?.default_currency || 'USD',
+    loan_principal: '',
+    loan_tenure_months: '',
+    interest_rate_type: 'fixed' as InterestRateType,
+    current_interest_rate: '',
+  });
+
+  const [availableBanks, setAvailableBanks] = useState(getBanksByCountry(formData.country));
+
+  useEffect(() => {
+    if (id && user) {
+      loadAccount();
+    }
+  }, [id, user]);
+
+  useEffect(() => {
+    setAvailableBanks(getBanksByCountry(formData.country));
+  }, [formData.country]);
+
+  const loadAccount = async () => {
+    if (!id) return;
+    
+    setLoadingAccount(true);
+    try {
+      const account = await accountApi.getAccountById(id);
+      if (account) {
+        setFormData({
+          account_type: account.account_type,
+          account_name: account.account_name,
+          country: account.country,
+          institution_name: account.institution_name,
+          institution_logo: account.institution_logo || '',
+          last_4_digits: account.last_4_digits || '',
+          balance: account.balance.toString(),
+          currency: account.currency,
+          loan_principal: account.loan_principal?.toString() || '',
+          loan_tenure_months: account.loan_tenure_months?.toString() || '',
+          interest_rate_type: account.interest_rate_type || 'fixed',
+          current_interest_rate: account.current_interest_rate?.toString() || '',
+        });
+      }
+    } catch (error) {
+      console.error('Error loading account:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load account',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingAccount(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+
+    if (formData.account_type === 'loan') {
+      if (!formData.loan_principal || !formData.loan_tenure_months || !formData.current_interest_rate) {
+        toast({
+          title: 'Error',
+          description: 'Please fill in all loan details',
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
+    setLoading(true);
+
+    try {
+      const accountData: any = {
+        user_id: user.id,
+        account_type: formData.account_type,
+        account_name: formData.account_name,
+        country: formData.country,
+        institution_name: formData.institution_name,
+        institution_logo: formData.institution_logo || getBankLogo(formData.institution_name),
+        last_4_digits: formData.last_4_digits || null,
+        balance: parseFloat(formData.balance) || 0,
+        currency: formData.currency,
+        loan_principal: formData.account_type === 'loan' ? parseFloat(formData.loan_principal) : null,
+        loan_tenure_months: formData.account_type === 'loan' ? parseInt(formData.loan_tenure_months) : null,
+        interest_rate_type: formData.account_type === 'loan' ? formData.interest_rate_type : null,
+        current_interest_rate: formData.account_type === 'loan' ? parseFloat(formData.current_interest_rate) : null,
+      };
+
+      if (id) {
+        await accountApi.updateAccount(id, accountData);
+        toast({
+          title: 'Success',
+          description: 'Account updated successfully',
+        });
+      } else {
+        const newAccount = await accountApi.createAccount(accountData);
+        
+        if (formData.account_type === 'loan' && formData.current_interest_rate) {
+          await interestRateApi.addInterestRate({
+            account_id: newAccount.id,
+            interest_rate: parseFloat(formData.current_interest_rate),
+            effective_date: new Date().toISOString().split('T')[0],
+          });
+        }
+
+        toast({
+          title: 'Success',
+          description: 'Account created successfully',
+        });
+      }
+
+      navigate('/accounts');
+    } catch (error: any) {
+      console.error('Error saving account:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to save account',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loadingAccount) {
+    return (
+      <div className="container mx-auto p-6 flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto p-6 max-w-2xl">
+      <Button variant="ghost" onClick={() => navigate('/accounts')} className="mb-4">
+        <ArrowLeft className="mr-2 h-4 w-4" />
+        Back to Accounts
+      </Button>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{id ? 'Edit Account' : 'Add New Account'}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="account_type">Account Type *</Label>
+              <Select
+                value={formData.account_type}
+                onValueChange={(value: AccountType) => setFormData({ ...formData, account_type: value })}
+                disabled={!!id}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bank">Bank Account</SelectItem>
+                  <SelectItem value="credit_card">Credit Card</SelectItem>
+                  <SelectItem value="loan">Loan Account</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="account_name">Account Name *</Label>
+              <Input
+                id="account_name"
+                value={formData.account_name}
+                onChange={(e) => setFormData({ ...formData, account_name: e.target.value })}
+                placeholder="e.g., My Savings Account"
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="country">Country *</Label>
+                <Select
+                  value={formData.country}
+                  onValueChange={(value) => setFormData({ ...formData, country: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {countries.map(country => (
+                      <SelectItem key={country.code} value={country.code}>
+                        {country.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="currency">Currency *</Label>
+                <Select
+                  value={formData.currency}
+                  onValueChange={(value) => setFormData({ ...formData, currency: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {countries.map(country => (
+                      <SelectItem key={country.currency} value={country.currency}>
+                        {country.currency}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="institution_name">Bank/Institution Name *</Label>
+              {availableBanks.length > 0 ? (
+                <Select
+                  value={formData.institution_name}
+                  onValueChange={(value) => {
+                    const bank = availableBanks.find(b => b.name === value);
+                    setFormData({
+                      ...formData,
+                      institution_name: value,
+                      institution_logo: bank?.logo || ''
+                    });
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a bank" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableBanks.map(bank => (
+                      <SelectItem key={bank.name} value={bank.name}>
+                        {bank.name}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="other">Other (Enter manually)</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : null}
+              {(availableBanks.length === 0 || formData.institution_name === 'other') && (
+                <Input
+                  id="institution_name"
+                  value={formData.institution_name === 'other' ? '' : formData.institution_name}
+                  onChange={(e) => setFormData({ ...formData, institution_name: e.target.value })}
+                  placeholder="Enter bank name"
+                  required
+                />
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="last_4_digits">Last 4 Digits (Optional)</Label>
+              <Input
+                id="last_4_digits"
+                value={formData.last_4_digits}
+                onChange={(e) => setFormData({ ...formData, last_4_digits: e.target.value.slice(0, 4) })}
+                placeholder="1234"
+                maxLength={4}
+              />
+              <p className="text-sm text-muted-foreground">
+                Only the last 4 digits will be displayed for security
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="balance">
+                {formData.account_type === 'loan' || formData.account_type === 'credit_card' 
+                  ? 'Outstanding Balance *' 
+                  : 'Current Balance *'}
+              </Label>
+              <Input
+                id="balance"
+                type="number"
+                step="0.01"
+                value={formData.balance}
+                onChange={(e) => setFormData({ ...formData, balance: e.target.value })}
+                placeholder="0.00"
+                required
+              />
+            </div>
+
+            {formData.account_type === 'loan' && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="loan_principal">Loan Principal Amount *</Label>
+                  <Input
+                    id="loan_principal"
+                    type="number"
+                    step="0.01"
+                    value={formData.loan_principal}
+                    onChange={(e) => setFormData({ ...formData, loan_principal: e.target.value })}
+                    placeholder="0.00"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="loan_tenure_months">Loan Tenure (Months) *</Label>
+                  <Input
+                    id="loan_tenure_months"
+                    type="number"
+                    value={formData.loan_tenure_months}
+                    onChange={(e) => setFormData({ ...formData, loan_tenure_months: e.target.value })}
+                    placeholder="12"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="interest_rate_type">Interest Rate Type *</Label>
+                  <Select
+                    value={formData.interest_rate_type}
+                    onValueChange={(value: InterestRateType) => setFormData({ ...formData, interest_rate_type: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="fixed">Fixed</SelectItem>
+                      <SelectItem value="floating">Floating</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="current_interest_rate">Current Interest Rate (%) *</Label>
+                  <Input
+                    id="current_interest_rate"
+                    type="number"
+                    step="0.01"
+                    value={formData.current_interest_rate}
+                    onChange={(e) => setFormData({ ...formData, current_interest_rate: e.target.value })}
+                    placeholder="5.00"
+                    required
+                  />
+                </div>
+              </>
+            )}
+
+            <div className="flex gap-4">
+              <Button type="submit" disabled={loading} className="flex-1">
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {id ? 'Update Account' : 'Create Account'}
+              </Button>
+              <Button type="button" variant="outline" onClick={() => navigate('/accounts')}>
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
