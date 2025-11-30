@@ -26,7 +26,7 @@ export default function Budgets() {
   });
   const [categoryBudgets, setCategoryBudgets] = useState<Record<string, string>>({});
 
-  const currency = profile?.default_currency || 'USD';
+  const currency = profile?.default_currency || 'INR';
 
   useEffect(() => {
     if (user) {

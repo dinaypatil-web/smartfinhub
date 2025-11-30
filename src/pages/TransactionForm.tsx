@@ -27,7 +27,7 @@ export default function TransactionForm() {
     from_account_id: '',
     to_account_id: '',
     amount: '',
-    currency: profile?.default_currency || 'USD',
+    currency: profile?.default_currency || 'INR',
     category: '',
     description: '',
     transaction_date: new Date().toISOString().split('T')[0],

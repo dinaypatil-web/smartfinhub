@@ -21,7 +21,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [loanCalculations, setLoanCalculations] = useState<Record<string, { emi: number; accruedInterest: number }>>({});
 
-  const currency = profile?.default_currency || 'USD';
+  const currency = profile?.default_currency || 'INR';
 
   useEffect(() => {
     if (user) {

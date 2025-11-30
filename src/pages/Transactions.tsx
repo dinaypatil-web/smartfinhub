@@ -38,7 +38,7 @@ export default function Transactions() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
 
-  const currency = profile?.default_currency || 'USD';
+  const currency = profile?.default_currency || 'INR';
 
   useEffect(() => {
     if (user) {

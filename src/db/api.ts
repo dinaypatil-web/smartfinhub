@@ -102,7 +102,7 @@ export const accountApi = {
       .insert({
         ...account,
         balance: account.balance || 0,
-        currency: account.currency || 'USD'
+        currency: account.currency || 'INR'
       })
       .select()
       .maybeSingle();
@@ -275,7 +275,7 @@ export const transactionApi = {
       .from('transactions')
       .insert({
         ...transaction,
-        currency: transaction.currency || 'USD'
+        currency: transaction.currency || 'INR'
       })
       .select()
       .maybeSingle();
@@ -496,7 +496,7 @@ export const budgetApi = {
         .from('budgets')
         .insert({
           ...budget,
-          currency: budget.currency || 'USD',
+          currency: budget.currency || 'INR',
           budgeted_income: budget.budgeted_income || 0,
           budgeted_expenses: budget.budgeted_expenses || 0,
           category_budgets: budget.category_budgets || {}

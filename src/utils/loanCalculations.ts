@@ -135,7 +135,7 @@ export function calculateRemainingTenure(
 /**
  * Format currency for display
  */
-export function formatLoanAmount(amount: number, currency: string = 'USD'): string {
+export function formatLoanAmount(amount: number, currency: string = 'INR'): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: currency,

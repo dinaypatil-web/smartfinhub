@@ -1,6 +1,6 @@
 import { getCurrencySymbol } from './countries';
 
-export function formatCurrency(amount: number, currency: string = 'USD'): string {
+export function formatCurrency(amount: number, currency: string = 'INR'): string {
   const symbol = getCurrencySymbol(currency);
   const formatted = Math.abs(amount).toLocaleString('en-US', {
     minimumFractionDigits: 2,

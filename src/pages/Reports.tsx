@@ -24,7 +24,7 @@ export default function Reports() {
     transactionType: 'all',
   });
 
-  const currency = profile?.default_currency || 'USD';
+  const currency = profile?.default_currency || 'INR';
 
   useEffect(() => {
     if (user) {

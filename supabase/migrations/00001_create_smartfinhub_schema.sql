@@ -11,8 +11,8 @@ User profile and settings table
 - `id` (uuid, primary key, references auth.users): User identifier
 - `email` (text, unique): User email address
 - `phone` (text, unique): User phone number
-- `default_country` (text): User's default country for dashboard
-- `default_currency` (text, default 'USD'): User's default currency
+- `default_country` (text, default 'IN'): User's default country for dashboard
+- `default_currency` (text, default 'INR'): User's default currency
 - `role` (user_role enum, default 'user'): User role (user/admin)
 - `created_at` (timestamptz): Profile creation timestamp
 
@@ -109,8 +109,8 @@ CREATE TABLE IF NOT EXISTS profiles (
   id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email text UNIQUE,
   phone text UNIQUE,
-  default_country text DEFAULT 'US',
-  default_currency text DEFAULT 'USD',
+  default_country text DEFAULT 'IN',
+  default_currency text DEFAULT 'INR',
   role user_role DEFAULT 'user'::user_role NOT NULL,
   created_at timestamptz DEFAULT now()
 );
@@ -126,7 +126,7 @@ CREATE TABLE IF NOT EXISTS accounts (
   institution_logo text,
   last_4_digits text,
   balance decimal(15, 2) DEFAULT 0 NOT NULL,
-  currency text DEFAULT 'USD' NOT NULL,
+  currency text DEFAULT 'INR' NOT NULL,
   loan_principal decimal(15, 2),
   loan_tenure_months integer,
   interest_rate_type interest_rate_type,
@@ -152,7 +152,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   from_account_id uuid REFERENCES accounts(id) ON DELETE SET NULL,
   to_account_id uuid REFERENCES accounts(id) ON DELETE SET NULL,
   amount decimal(15, 2) NOT NULL,
-  currency text DEFAULT 'USD' NOT NULL,
+  currency text DEFAULT 'INR' NOT NULL,
   category text,
   description text,
   transaction_date date NOT NULL,
@@ -169,7 +169,7 @@ CREATE TABLE IF NOT EXISTS budgets (
   budgeted_income decimal(15, 2) DEFAULT 0,
   budgeted_expenses decimal(15, 2) DEFAULT 0,
   category_budgets jsonb DEFAULT '{}',
-  currency text DEFAULT 'USD' NOT NULL,
+  currency text DEFAULT 'INR' NOT NULL,
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now(),
   UNIQUE(user_id, month, year)

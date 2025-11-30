@@ -14,8 +14,8 @@ export default function Settings() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    default_country: profile?.default_country || 'US',
-    default_currency: profile?.default_currency || 'USD',
+    default_country: profile?.default_country || 'IN',
+    default_currency: profile?.default_currency || 'INR',
   });
 
   useEffect(() => {
