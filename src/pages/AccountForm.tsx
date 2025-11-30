@@ -105,8 +105,8 @@ export default function AccountForm() {
         account_type: formData.account_type,
         account_name: formData.account_name,
         country: formData.country,
-        institution_name: formData.institution_name,
-        institution_logo: formData.institution_logo || getBankLogo(formData.institution_name),
+        institution_name: formData.account_type === 'cash' ? 'Cash' : formData.institution_name,
+        institution_logo: formData.account_type === 'cash' ? null : (formData.institution_logo || getBankLogo(formData.institution_name)),
         last_4_digits: formData.last_4_digits || null,
         balance: parseFloat(formData.balance) || 0,
         currency: formData.currency,
@@ -243,45 +243,53 @@ export default function AccountForm() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="institution_name">
-                Bank/Institution Name {formData.account_type !== 'cash' && '*'}
-              </Label>
-              {availableBanks.length > 0 ? (
-                <Select
-                  value={formData.institution_name}
-                  onValueChange={(value) => {
-                    const bank = availableBanks.find(b => b.name === value);
-                    setFormData({
-                      ...formData,
-                      institution_name: value,
-                      institution_logo: bank?.logo || ''
-                    });
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a bank" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableBanks.map(bank => (
-                      <SelectItem key={bank.name} value={bank.name}>
-                        {bank.name}
-                      </SelectItem>
-                    ))}
-                    <SelectItem value="other">Other (Enter manually)</SelectItem>
-                  </SelectContent>
-                </Select>
-              ) : null}
-              {(availableBanks.length === 0 || formData.institution_name === 'other') && (
-                <Input
-                  id="institution_name"
-                  value={formData.institution_name === 'other' ? '' : formData.institution_name}
-                  onChange={(e) => setFormData({ ...formData, institution_name: e.target.value })}
-                  placeholder={formData.account_type === 'cash' ? 'Optional' : 'Enter bank name'}
-                  required={formData.account_type !== 'cash'}
-                />
-              )}
-            </div>
+            {formData.account_type !== 'cash' && (
+              <div className="space-y-2">
+                <Label htmlFor="institution_name">Bank/Institution Name *</Label>
+                {availableBanks.length > 0 ? (
+                  <Select
+                    value={formData.institution_name === 'other' ? 'other' : formData.institution_name}
+                    onValueChange={(value) => {
+                      if (value === 'other') {
+                        setFormData({
+                          ...formData,
+                          institution_name: '',
+                          institution_logo: ''
+                        });
+                      } else {
+                        const bank = availableBanks.find(b => b.name === value);
+                        setFormData({
+                          ...formData,
+                          institution_name: value,
+                          institution_logo: bank?.logo || ''
+                        });
+                      }
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a bank" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableBanks.map(bank => (
+                        <SelectItem key={bank.name} value={bank.name}>
+                          {bank.name}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value="other">Other (Enter manually)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : null}
+                {(availableBanks.length === 0 || formData.institution_name === '' || !availableBanks.find(b => b.name === formData.institution_name)) && (
+                  <Input
+                    id="institution_name"
+                    value={formData.institution_name}
+                    onChange={(e) => setFormData({ ...formData, institution_name: e.target.value })}
+                    placeholder="Enter bank name"
+                    required
+                  />
+                )}
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="last_4_digits">Last 4 Digits (Optional)</Label>
