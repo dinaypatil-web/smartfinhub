@@ -6,8 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -51,6 +52,17 @@ export default function Login() {
 
   const handlePhoneLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validate phone number format
+    if (!phoneLogin.phone.startsWith('+')) {
+      toast({
+        title: 'Error',
+        description: 'Phone number must include country code (e.g., +1234567890)',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -59,7 +71,13 @@ export default function Login() {
         password: phoneLogin.password,
       });
 
-      if (error) throw error;
+      if (error) {
+        // Check for SMS provider error
+        if (error.message.includes('SMS') || error.message.includes('provider') || error.message.includes('phone')) {
+          throw new Error('Phone authentication is not configured. Please contact the administrator or use email login.');
+        }
+        throw error;
+      }
 
       if (data.user) {
         toast({
@@ -81,6 +99,17 @@ export default function Login() {
 
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validate phone number format
+    if (!phoneForOtp.startsWith('+')) {
+      toast({
+        title: 'Error',
+        description: 'Phone number must include country code (e.g., +1234567890)',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -88,7 +117,13 @@ export default function Login() {
         phone: phoneForOtp,
       });
 
-      if (error) throw error;
+      if (error) {
+        // Check for SMS provider error
+        if (error.message.includes('SMS') || error.message.includes('provider') || error.message.includes('phone')) {
+          throw new Error('Phone authentication is not configured. Please contact the administrator or use email login.');
+        }
+        throw error;
+      }
 
       setOtpSent(true);
       toast({
@@ -186,6 +221,12 @@ export default function Login() {
             </TabsContent>
 
             <TabsContent value="phone">
+              <Alert className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Phone authentication requires SMS provider configuration. If you encounter errors, please use email login instead.
+                </AlertDescription>
+              </Alert>
               <form onSubmit={handlePhoneLogin} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="phone-login">Phone Number</Label>
@@ -197,6 +238,7 @@ export default function Login() {
                     onChange={(e) => setPhoneLogin({ ...phoneLogin, phone: e.target.value })}
                     required
                   />
+                  <p className="text-xs text-muted-foreground">Include country code (e.g., +1 for US)</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="phone-password">Password</Label>
@@ -217,6 +259,12 @@ export default function Login() {
             </TabsContent>
 
             <TabsContent value="otp">
+              <Alert className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  OTP authentication requires SMS provider configuration. If you encounter errors, please use email login instead.
+                </AlertDescription>
+              </Alert>
               {!otpSent ? (
                 <form onSubmit={handleSendOTP} className="space-y-4">
                   <div className="space-y-2">
@@ -229,6 +277,7 @@ export default function Login() {
                       onChange={(e) => setPhoneForOtp(e.target.value)}
                       required
                     />
+                    <p className="text-xs text-muted-foreground">Include country code (e.g., +1 for US)</p>
                   </div>
                   <Button type="submit" className="w-full" disabled={loading}>
                     {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

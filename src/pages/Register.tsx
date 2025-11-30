@@ -6,8 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -92,6 +93,16 @@ export default function Register() {
       return;
     }
 
+    // Validate phone number format
+    if (!phoneRegister.phone.startsWith('+')) {
+      toast({
+        title: 'Error',
+        description: 'Phone number must include country code (e.g., +1234567890)',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -100,7 +111,13 @@ export default function Register() {
         password: phoneRegister.password,
       });
 
-      if (error) throw error;
+      if (error) {
+        // Check for SMS provider error
+        if (error.message.includes('SMS') || error.message.includes('provider') || error.message.includes('phone')) {
+          throw new Error('Phone authentication is not configured. Please contact the administrator or use email registration.');
+        }
+        throw error;
+      }
 
       if (data.user) {
         toast({
@@ -212,6 +229,12 @@ export default function Register() {
               </TabsContent>
 
               <TabsContent value="phone">
+                <Alert className="mb-4">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Phone authentication requires SMS provider configuration. If you encounter errors, please use email registration instead.
+                  </AlertDescription>
+                </Alert>
                 <form onSubmit={handlePhoneRegister} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="phone-register">Phone Number</Label>
@@ -223,6 +246,7 @@ export default function Register() {
                       onChange={(e) => setPhoneRegister({ ...phoneRegister, phone: e.target.value })}
                       required
                     />
+                    <p className="text-xs text-muted-foreground">Include country code (e.g., +1 for US)</p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="phone-password">Password</Label>
