@@ -37,6 +37,7 @@ export default function AccountForm() {
     loan_start_date: '',
     interest_rate_type: 'fixed' as InterestRateType,
     current_interest_rate: '',
+    due_date: '',
   });
 
   const [calculatedEMI, setCalculatedEMI] = useState<number>(0);
@@ -97,6 +98,7 @@ export default function AccountForm() {
           loan_start_date: account.loan_start_date || '',
           interest_rate_type: account.interest_rate_type || 'fixed',
           current_interest_rate: account.current_interest_rate?.toString() || '',
+          due_date: account.due_date?.toString() || '',
         });
       }
     } catch (error) {
@@ -116,10 +118,10 @@ export default function AccountForm() {
     if (!user) return;
 
     if (formData.account_type === 'loan') {
-      if (!formData.loan_principal || !formData.loan_tenure_months || !formData.current_interest_rate || !formData.loan_start_date) {
+      if (!formData.loan_principal || !formData.loan_tenure_months || !formData.current_interest_rate || !formData.loan_start_date || !formData.due_date) {
         toast({
           title: 'Error',
-          description: 'Please fill in all loan details including start date',
+          description: 'Please fill in all loan details including start date and due date',
           variant: 'destructive',
         });
         return;
@@ -144,6 +146,7 @@ export default function AccountForm() {
         loan_start_date: formData.account_type === 'loan' ? formData.loan_start_date : null,
         interest_rate_type: formData.account_type === 'loan' ? formData.interest_rate_type : null,
         current_interest_rate: formData.account_type === 'loan' ? parseFloat(formData.current_interest_rate) : null,
+        due_date: formData.account_type === 'loan' ? parseInt(formData.due_date) : null,
       };
 
       if (id) {
@@ -403,6 +406,28 @@ export default function AccountForm() {
                     onChange={(e) => setFormData({ ...formData, loan_start_date: e.target.value })}
                     required
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="due_date">Payment Due Date (Day of Month) *</Label>
+                  <Select
+                    value={formData.due_date}
+                    onValueChange={(value) => setFormData({ ...formData, due_date: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select day of month" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
+                        <SelectItem key={day} value={day.toString()}>
+                          {day}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Day of month when loan payment is due (e.g., 15 for 15th of every month)
+                  </p>
                 </div>
 
                 <div className="space-y-2">

@@ -466,6 +466,12 @@ export default function Accounts() {
                           <p className="text-sm text-muted-foreground">Interest Rate ({account.interest_rate_type})</p>
                           <p className="font-medium">{account.current_interest_rate}% APR</p>
                         </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Payment Due Date</p>
+                          <p className="font-medium">{account.due_date ? `${account.due_date} of each month` : 'Not set'}</p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
                         {loanCalculations[account.id] && (
                           <div>
                             <p className="text-sm text-muted-foreground">Monthly EMI</p>

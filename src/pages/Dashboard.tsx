@@ -11,6 +11,7 @@ import { Link } from 'react-router-dom';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { calculateEMI, calculateAccruedInterest } from '@/utils/loanCalculations';
 import InterestRateChart from '@/components/InterestRateChart';
+import InterestRateTable from '@/components/InterestRateTable';
 
 export default function Dashboard() {
   const { user, profile } = useAuth();
@@ -470,6 +471,25 @@ export default function Dashboard() {
                   accountName={account.account_name}
                 />
               ))}
+          </div>
+        </div>
+      )}
+
+      {/* Interest Rate History Tables for All Loans */}
+      {summary?.accounts_by_type.loan.length > 0 && (
+        <div className="space-y-6">
+          <h2 className="text-2xl font-bold">Interest Rate History & Accrued Interest</h2>
+          <div className="grid gap-6 xl:grid-cols-1">
+            {summary.accounts_by_type.loan.map(account => (
+              <InterestRateTable
+                key={account.id}
+                accountId={account.id}
+                accountName={account.account_name}
+                loanPrincipal={account.loan_principal || 0}
+                loanStartDate={account.loan_start_date || new Date().toISOString().split('T')[0]}
+                currency={account.currency}
+              />
+            ))}
           </div>
         </div>
       )}

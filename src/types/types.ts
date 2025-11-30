@@ -29,6 +29,7 @@ export interface Account {
   loan_start_date: string | null;
   interest_rate_type: InterestRateType | null;
   current_interest_rate: number | null;
+  due_date: number | null;
   created_at: string;
   updated_at: string;
 }
