@@ -6,6 +6,7 @@ import AccountForm from './pages/AccountForm';
 import Transactions from './pages/Transactions';
 import TransactionForm from './pages/TransactionForm';
 import Budgets from './pages/Budgets';
+import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -84,6 +85,13 @@ const routes: RouteConfig[] = [
     name: 'Budgets',
     path: '/budgets',
     element: <ProtectedRoute><Budgets /></ProtectedRoute>,
+    visible: true,
+    protected: true,
+  },
+  {
+    name: 'Reports',
+    path: '/reports',
+    element: <ProtectedRoute><Reports /></ProtectedRoute>,
     visible: true,
     protected: true,
   },
