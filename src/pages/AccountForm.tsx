@@ -158,11 +158,11 @@ export default function AccountForm() {
       } else {
         const newAccount = await accountApi.createAccount(accountData);
         
-        if (formData.account_type === 'loan' && formData.current_interest_rate) {
+        if (formData.account_type === 'loan' && formData.current_interest_rate && formData.loan_start_date) {
           await interestRateApi.addInterestRate({
             account_id: newAccount.id,
             interest_rate: parseFloat(formData.current_interest_rate),
-            effective_date: new Date().toISOString().split('T')[0],
+            effective_date: formData.loan_start_date,
           });
         }
 

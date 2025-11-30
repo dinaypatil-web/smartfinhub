@@ -85,7 +85,34 @@ The system now calculates interest for each rate period separately:
    - Displayed in table footer
    - Matches the accrued interest shown on account cards
 
-### 4. Future Enhancement: Automatic Interest Posting
+### 4. Interest Start Date
+
+#### Implementation
+When creating a new loan account, the initial interest rate entry uses the **loan start date** as the effective date, not the current date.
+
+**Key Points**:
+- Interest rate history starts from loan start date
+- Ensures accurate interest calculation from loan inception
+- No interest is calculated before the loan start date
+- Aligns with real-world loan practices
+
+**Example**:
+- Loan Start Date: January 1, 2025
+- Account Created: January 15, 2025
+- Interest Rate Effective Date: January 1, 2025 (not January 15)
+- Interest accrues from January 1, 2025
+
+#### Code Implementation
+In `AccountForm.tsx`, when creating a loan account:
+```typescript
+await interestRateApi.addInterestRate({
+  account_id: newAccount.id,
+  interest_rate: parseFloat(formData.current_interest_rate),
+  effective_date: formData.loan_start_date, // Uses loan start date
+});
+```
+
+### 5. Future Enhancement: Automatic Interest Posting
 
 #### Planned Feature
 On the due date each month, the system should:
@@ -115,14 +142,15 @@ Users can manually:
 3. Fill in loan details:
    - Principal amount
    - Tenure in months
-   - Start date
+   - **Start date** (e.g., January 1, 2025)
    - **Due date** (e.g., 15 for 15th of each month)
    - Interest rate type (Fixed/Floating)
    - Current interest rate
 4. System automatically:
    - Calculates EMI
-   - Creates initial interest rate history entry
+   - Creates initial interest rate history entry **with effective date = loan start date**
    - Displays due date on account card
+   - Interest calculation begins from loan start date, not account creation date
 
 ### Scenario 2: Viewing Interest Rate History
 1. Navigate to Dashboard
@@ -213,6 +241,12 @@ const accruedInterest = (principal * rate * days) / (365 * 100);
 - ✅ Handles multiple rate changes
 - ✅ Considers loan start date
 
+### Interest Start Date
+- ✅ Initial interest rate uses loan start date
+- ✅ Interest calculation starts from loan start date
+- ✅ Not affected by account creation date
+- ✅ Accurate historical interest calculation
+
 ### Integration
 - ✅ Dashboard shows tables for all loans
 - ✅ Tables update after rate changes
@@ -229,7 +263,7 @@ const accruedInterest = (principal * rate * days) / (365 * 100);
 
 ### Modified Files
 1. `src/types/types.ts` - Added due_date to Account interface
-2. `src/pages/AccountForm.tsx` - Added due_date input field
+2. `src/pages/AccountForm.tsx` - Added due_date input field and interest start date logic
 3. `src/pages/Accounts.tsx` - Display due_date on loan cards
 4. `src/pages/Dashboard.tsx` - Added InterestRateTable section
 
@@ -295,7 +329,9 @@ For questions or issues related to these features:
 ## Version History
 
 - **v1.0** (2025-11-30): Initial implementation
-  - Added due_date field
-  - Created InterestRateTable component
-  - Integrated into Dashboard
-  - Updated Account forms and displays
+  - Added due_date field to track monthly payment due date
+  - Created InterestRateTable component with per-period interest calculation
+  - Integrated interest rate history tables into Dashboard
+  - Updated Account forms and displays to show due date
+  - Implemented interest start date = loan start date for accurate calculations
+  - All interest calculations now start from loan inception date
