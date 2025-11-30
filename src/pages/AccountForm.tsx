@@ -184,6 +184,7 @@ export default function AccountForm() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="cash">Cash</SelectItem>
                   <SelectItem value="bank">Bank Account</SelectItem>
                   <SelectItem value="credit_card">Credit Card</SelectItem>
                   <SelectItem value="loan">Loan Account</SelectItem>
@@ -243,7 +244,9 @@ export default function AccountForm() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="institution_name">Bank/Institution Name *</Label>
+              <Label htmlFor="institution_name">
+                Bank/Institution Name {formData.account_type !== 'cash' && '*'}
+              </Label>
               {availableBanks.length > 0 ? (
                 <Select
                   value={formData.institution_name}
@@ -274,8 +277,8 @@ export default function AccountForm() {
                   id="institution_name"
                   value={formData.institution_name === 'other' ? '' : formData.institution_name}
                   onChange={(e) => setFormData({ ...formData, institution_name: e.target.value })}
-                  placeholder="Enter bank name"
-                  required
+                  placeholder={formData.account_type === 'cash' ? 'Optional' : 'Enter bank name'}
+                  required={formData.account_type !== 'cash'}
                 />
               )}
             </div>

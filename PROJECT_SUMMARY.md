@@ -13,17 +13,19 @@ SmartFinHub is a comprehensive financial management web application designed to 
 
 ### 2. Account Management
 - **Multiple Account Types**:
+  - Cash Accounts (physical cash tracking)
   - Bank Accounts
   - Credit Card Accounts
   - Loan Accounts (with fixed or floating interest rates)
   
 - **Account Features**:
   - Country and bank/institution selection
-  - Automatic logo fetching for financial institutions
+  - Automatic logo fetching for financial institutions (optional for cash accounts)
   - Secure storage (only last 4 digits of account numbers displayed)
   - Real-time balance tracking
   - Floating interest rate history for loans
   - Automatic EMI calculation for loan accounts
+  - Cash accounts don't require institution names or account numbers
 
 ### 3. Transaction Management
 - **Transaction Types**:
@@ -45,11 +47,11 @@ SmartFinHub is a comprehensive financial management web application designed to 
 - **Financial Overview**:
   - Current Assets (Cash and Bank Accounts)
   - Current Liabilities (Credit Card balances)
-  - Liquid Assets
+  - Liquid Assets (Cash and Bank Accounts)
   - Net Worth calculation
 
 - **Visual Reports**:
-  - Pie charts for bank account distribution
+  - Pie charts for cash and bank account distribution
   - Expense breakdown by category
   - Recent transactions list
   - Account cards with real-time balances

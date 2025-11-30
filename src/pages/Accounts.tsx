@@ -82,6 +82,8 @@ export default function Accounts() {
 
   const getAccountTypeIcon = (type: string) => {
     switch (type) {
+      case 'cash':
+        return <Wallet className="h-5 w-5" />;
       case 'bank':
         return <Building2 className="h-5 w-5" />;
       case 'credit_card':
@@ -95,6 +97,8 @@ export default function Accounts() {
 
   const getAccountTypeLabel = (type: string) => {
     switch (type) {
+      case 'cash':
+        return 'Cash';
       case 'bank':
         return 'Bank Account';
       case 'credit_card':
@@ -108,6 +112,8 @@ export default function Accounts() {
 
   const getAccountTypeBadgeVariant = (type: string) => {
     switch (type) {
+      case 'cash':
+        return 'default';
       case 'bank':
         return 'default';
       case 'credit_card':
@@ -127,6 +133,7 @@ export default function Accounts() {
   };
 
   const groupedAccounts = {
+    cash: accounts.filter(a => a.account_type === 'cash'),
     bank: accounts.filter(a => a.account_type === 'bank'),
     credit_card: accounts.filter(a => a.account_type === 'credit_card'),
     loan: accounts.filter(a => a.account_type === 'loan'),
@@ -176,6 +183,66 @@ export default function Accounts() {
         </Card>
       ) : (
         <>
+          {groupedAccounts.cash.length > 0 && (
+            <div className="space-y-4">
+              <h2 className="text-2xl font-semibold flex items-center gap-2">
+                <Wallet className="h-6 w-6" />
+                Cash Accounts
+              </h2>
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {groupedAccounts.cash.map(account => (
+                  <Card key={account.id} className="hover:shadow-lg transition-shadow">
+                    <CardHeader className="flex flex-row items-start justify-between space-y-0">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded bg-primary/10 flex items-center justify-center">
+                          <Wallet className="h-6 w-6 text-primary" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-lg">{account.account_name}</CardTitle>
+                          <p className="text-sm text-muted-foreground">Physical Cash</p>
+                        </div>
+                      </div>
+                      <Badge variant={getAccountTypeBadgeVariant(account.account_type)}>
+                        {getAccountTypeLabel(account.account_type)}
+                      </Badge>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Balance</p>
+                        <p className={`text-2xl font-bold ${getBalanceColor(account)}`}>
+                          {formatCurrency(Number(account.balance), account.currency)}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => navigate(`/accounts/edit/${account.id}`)}
+                          className="flex-1"
+                        >
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setAccountToDelete(account);
+                            setDeleteDialogOpen(true);
+                          }}
+                          className="flex-1"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2 text-danger" />
+                          Delete
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
           {groupedAccounts.bank.length > 0 && (
             <div className="space-y-4">
               <h2 className="text-2xl font-semibold flex items-center gap-2">

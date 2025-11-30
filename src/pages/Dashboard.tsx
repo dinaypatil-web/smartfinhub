@@ -45,6 +45,8 @@ export default function Dashboard() {
 
   const getAccountTypeIcon = (type: string) => {
     switch (type) {
+      case 'cash':
+        return <Wallet className="h-5 w-5" />;
       case 'bank':
         return <Building2 className="h-5 w-5" />;
       case 'credit_card':
@@ -58,6 +60,8 @@ export default function Dashboard() {
 
   const getAccountTypeLabel = (type: string) => {
     switch (type) {
+      case 'cash':
+        return 'Cash';
       case 'bank':
         return 'Bank Account';
       case 'credit_card':
@@ -76,10 +80,16 @@ export default function Dashboard() {
     return Number(account.balance) >= 0 ? 'text-success' : 'text-danger';
   };
 
-  const bankAccountsData = summary?.accounts_by_type.bank.map(acc => ({
-    name: acc.account_name,
-    value: Number(acc.balance)
-  })) || [];
+  const bankAccountsData = [
+    ...(summary?.accounts_by_type.cash.map(acc => ({
+      name: acc.account_name,
+      value: Number(acc.balance)
+    })) || []),
+    ...(summary?.accounts_by_type.bank.map(acc => ({
+      name: acc.account_name,
+      value: Number(acc.balance)
+    })) || [])
+  ];
 
   const expenseData = recentTransactions
     .filter(t => t.transaction_type === 'expense')
@@ -197,7 +207,7 @@ export default function Dashboard() {
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Bank Accounts Distribution</CardTitle>
+            <CardTitle>Cash & Bank Accounts Distribution</CardTitle>
           </CardHeader>
           <CardContent>
             {bankAccountsData.length > 0 ? (
@@ -274,6 +284,24 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
+              {summary?.accounts_by_type.cash.map(account => (
+                <div key={account.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded bg-primary/10 flex items-center justify-center">
+                      <Wallet className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-medium">{account.account_name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {getAccountTypeLabel(account.account_type)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className={`text-right font-semibold ${getBalanceColor(account)}`}>
+                    {formatCurrency(Number(account.balance), account.currency)}
+                  </div>
+                </div>
+              ))}
               {summary?.accounts_by_type.bank.map(account => (
                 <div key={account.id} className="flex items-center justify-between p-4 border rounded-lg">
                   <div className="flex items-center gap-3">

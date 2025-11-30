@@ -136,11 +136,14 @@ export const accountApi = {
   async getFinancialSummary(userId: string): Promise<FinancialSummary> {
     const accounts = await this.getAccounts(userId);
     
+    const cashAccounts = accounts.filter(a => a.account_type === 'cash');
     const bankAccounts = accounts.filter(a => a.account_type === 'bank');
     const creditCards = accounts.filter(a => a.account_type === 'credit_card');
     const loanAccounts = accounts.filter(a => a.account_type === 'loan');
     
-    const total_assets = bankAccounts.reduce((sum, acc) => sum + Number(acc.balance), 0);
+    const cash_total = cashAccounts.reduce((sum, acc) => sum + Number(acc.balance), 0);
+    const bank_total = bankAccounts.reduce((sum, acc) => sum + Number(acc.balance), 0);
+    const total_assets = cash_total + bank_total;
     const total_liabilities = creditCards.reduce((sum, acc) => sum + Number(acc.balance), 0);
     const liquid_assets = total_assets;
     const net_worth = total_assets - total_liabilities;
@@ -151,6 +154,7 @@ export const accountApi = {
       liquid_assets,
       net_worth,
       accounts_by_type: {
+        cash: cashAccounts,
         bank: bankAccounts,
         credit_card: creditCards,
         loan: loanAccounts

@@ -1,5 +1,5 @@
 export type UserRole = 'user' | 'admin';
-export type AccountType = 'bank' | 'credit_card' | 'loan';
+export type AccountType = 'cash' | 'bank' | 'credit_card' | 'loan';
 export type InterestRateType = 'fixed' | 'floating';
 export type TransactionType = 'income' | 'expense' | 'withdrawal' | 'transfer' | 'loan_payment' | 'credit_card_payment';
 
@@ -106,6 +106,7 @@ export interface FinancialSummary {
   liquid_assets: number;
   net_worth: number;
   accounts_by_type: {
+    cash: Account[];
     bank: Account[];
     credit_card: Account[];
     loan: Account[];
