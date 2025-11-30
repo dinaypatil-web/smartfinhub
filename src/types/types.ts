@@ -112,7 +112,7 @@ export interface FinancialSummary {
   total_assets: number;
   total_liabilities: number;
   liquid_assets: number;
-  net_worth: number;
+  working_capital: number;
   accounts_by_type: {
     cash: Account[];
     bank: Account[];

@@ -147,13 +147,13 @@ export const accountApi = {
     const total_assets = cash_total + bank_total;
     const total_liabilities = creditCards.reduce((sum, acc) => sum + Number(acc.balance), 0);
     const liquid_assets = total_assets;
-    const net_worth = total_assets - total_liabilities;
+    const working_capital = total_assets - total_liabilities;
     
     return {
       total_assets,
       total_liabilities,
       liquid_assets,
-      net_worth,
+      working_capital,
       accounts_by_type: {
         cash: cashAccounts,
         bank: bankAccounts,

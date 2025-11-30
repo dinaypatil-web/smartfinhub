@@ -10,6 +10,7 @@ import { Plus, Wallet, CreditCard, TrendingUp, TrendingDown, Building2 } from 'l
 import { Link } from 'react-router-dom';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { calculateEMI, calculateAccruedInterest } from '@/utils/loanCalculations';
+import InterestRateChart from '@/components/InterestRateChart';
 
 export default function Dashboard() {
   const { user, profile } = useAuth();
@@ -228,12 +229,12 @@ export default function Dashboard() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Net Worth</CardTitle>
+            <CardTitle className="text-sm font-medium">Working Capital</CardTitle>
             <TrendingUp className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${(summary?.net_worth || 0) >= 0 ? 'text-success' : 'text-danger'}`}>
-              {formatCurrency(summary?.net_worth || 0, currency)}
+            <div className={`text-2xl font-bold ${(summary?.working_capital || 0) >= 0 ? 'text-success' : 'text-danger'}`}>
+              {formatCurrency(summary?.working_capital || 0, currency)}
             </div>
             <p className="text-xs text-muted-foreground">
               Assets minus liabilities
@@ -454,6 +455,24 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Interest Rate Charts for Floating Rate Loans */}
+      {summary?.accounts_by_type.loan.filter(account => account.interest_rate_type === 'floating').length > 0 && (
+        <div className="space-y-6">
+          <h2 className="text-2xl font-bold">Floating Interest Rate Trends</h2>
+          <div className="grid gap-6 xl:grid-cols-1">
+            {summary.accounts_by_type.loan
+              .filter(account => account.interest_rate_type === 'floating')
+              .map(account => (
+                <InterestRateChart
+                  key={account.id}
+                  accountId={account.id}
+                  accountName={account.account_name}
+                />
+              ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
