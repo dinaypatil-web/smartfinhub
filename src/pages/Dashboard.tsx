@@ -145,7 +145,31 @@ export default function Dashboard() {
       return acc;
     }, [] as { name: string; value: number }[]);
 
-  const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
+  const COLORS = [
+    '#3b82f6', // Blue
+    '#10b981', // Green
+    '#f59e0b', // Amber
+    '#ef4444', // Red
+    '#8b5cf6', // Purple
+    '#ec4899', // Pink
+    '#14b8a6', // Teal
+    '#f97316', // Orange
+  ];
+
+  const getAccountTypeColor = (type: string) => {
+    switch (type) {
+      case 'cash':
+        return 'from-emerald-500 to-teal-600';
+      case 'bank':
+        return 'from-blue-500 to-indigo-600';
+      case 'credit_card':
+        return 'from-purple-500 to-pink-600';
+      case 'loan':
+        return 'from-orange-500 to-red-600';
+      default:
+        return 'from-gray-500 to-gray-600';
+    }
+  };
 
   if (loading) {
     return (
@@ -184,61 +208,69 @@ export default function Dashboard() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+        <Card className="border-l-4 border-l-emerald-500 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Assets</CardTitle>
-            <TrendingUp className="h-4 w-4 text-success" />
+            <div className="h-10 w-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
+              <TrendingUp className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-success">
+            <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
               {formatCurrency(summary?.total_assets || 0, currency)}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               Cash and bank accounts
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-l-4 border-l-red-500 bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-950/20 dark:to-orange-950/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Liabilities</CardTitle>
-            <TrendingDown className="h-4 w-4 text-danger" />
+            <div className="h-10 w-10 rounded-full bg-red-500/20 flex items-center justify-center">
+              <TrendingDown className="h-5 w-5 text-red-600 dark:text-red-400" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-danger">
+            <div className="text-2xl font-bold text-red-600 dark:text-red-400">
               {formatCurrency(summary?.total_liabilities || 0, currency)}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               Credit card balances
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-l-4 border-l-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Liquid Assets</CardTitle>
-            <Wallet className="h-4 w-4 text-primary" />
+            <div className="h-10 w-10 rounded-full bg-blue-500/20 flex items-center justify-center">
+              <Wallet className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
               {formatCurrency(summary?.liquid_assets || 0, currency)}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               Available funds
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={`border-l-4 ${(summary?.working_capital || 0) >= 0 ? 'border-l-purple-500 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/20 dark:to-pink-950/20' : 'border-l-amber-500 bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20'}`}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Working Capital</CardTitle>
-            <TrendingUp className="h-4 w-4 text-primary" />
+            <div className={`h-10 w-10 rounded-full ${(summary?.working_capital || 0) >= 0 ? 'bg-purple-500/20' : 'bg-amber-500/20'} flex items-center justify-center`}>
+              <TrendingUp className={`h-5 w-5 ${(summary?.working_capital || 0) >= 0 ? 'text-purple-600 dark:text-purple-400' : 'text-amber-600 dark:text-amber-400'}`} />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${(summary?.working_capital || 0) >= 0 ? 'text-success' : 'text-danger'}`}>
+            <div className={`text-2xl font-bold ${(summary?.working_capital || 0) >= 0 ? 'text-purple-600 dark:text-purple-400' : 'text-amber-600 dark:text-amber-400'}`}>
               {formatCurrency(summary?.working_capital || 0, currency)}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               Assets minus liabilities
             </p>
           </CardContent>
@@ -326,10 +358,10 @@ export default function Dashboard() {
           <CardContent>
             <div className="space-y-4">
               {summary?.accounts_by_type.cash.map(account => (
-                <div key={account.id} className="flex items-center justify-between p-4 border rounded-lg">
+                <div key={account.id} className="flex items-center justify-between p-4 border-l-4 border-l-emerald-500 rounded-lg bg-gradient-to-r from-emerald-50/50 to-transparent dark:from-emerald-950/20 hover:shadow-md transition-shadow">
                   <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded bg-primary/10 flex items-center justify-center">
-                      <Wallet className="h-5 w-5 text-primary" />
+                    <div className="h-10 w-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg">
+                      <Wallet className="h-5 w-5 text-white" />
                     </div>
                     <div>
                       <p className="font-medium">{account.account_name}</p>
@@ -338,15 +370,17 @@ export default function Dashboard() {
                       </p>
                     </div>
                   </div>
-                  <div className={`text-right font-semibold ${getBalanceColor(account)}`}>
+                  <div className="text-right font-semibold text-emerald-600 dark:text-emerald-400">
                     {formatCurrency(Number(account.balance), account.currency)}
                   </div>
                 </div>
               ))}
               {summary?.accounts_by_type.bank.map(account => (
-                <div key={account.id} className="flex items-center justify-between p-4 border rounded-lg">
+                <div key={account.id} className="flex items-center justify-between p-4 border-l-4 border-l-blue-500 rounded-lg bg-gradient-to-r from-blue-50/50 to-transparent dark:from-blue-950/20 hover:shadow-md transition-shadow">
                   <div className="flex items-center gap-3">
-                    <BankLogo src={account.institution_logo} alt={account.institution_name || 'Bank'} />
+                    <div className="h-10 w-10 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center shadow-md border-2 border-blue-200 dark:border-blue-800">
+                      <BankLogo src={account.institution_logo} alt={account.institution_name || 'Bank'} bankName={account.institution_name || undefined} className="h-8 w-8" />
+                    </div>
                     <div>
                       <p className="font-medium">{account.account_name}</p>
                       <p className="text-sm text-muted-foreground">
@@ -354,15 +388,17 @@ export default function Dashboard() {
                       </p>
                     </div>
                   </div>
-                  <div className={`text-right font-semibold ${getBalanceColor(account)}`}>
+                  <div className="text-right font-semibold text-blue-600 dark:text-blue-400">
                     {formatCurrency(Number(account.balance), account.currency)}
                   </div>
                 </div>
               ))}
               {summary?.accounts_by_type.credit_card.map(account => (
-                <div key={account.id} className="flex items-center justify-between p-4 border rounded-lg">
+                <div key={account.id} className="flex items-center justify-between p-4 border-l-4 border-l-purple-500 rounded-lg bg-gradient-to-r from-purple-50/50 to-transparent dark:from-purple-950/20 hover:shadow-md transition-shadow">
                   <div className="flex items-center gap-3">
-                    <BankLogo src={account.institution_logo} alt={account.institution_name || 'Credit Card'} />
+                    <div className="h-10 w-10 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center shadow-md border-2 border-purple-200 dark:border-purple-800">
+                      <BankLogo src={account.institution_logo} alt={account.institution_name || 'Credit Card'} bankName={account.institution_name || undefined} className="h-8 w-8" />
+                    </div>
                     <div>
                       <p className="font-medium">{account.account_name}</p>
                       <p className="text-sm text-muted-foreground">
@@ -370,29 +406,31 @@ export default function Dashboard() {
                       </p>
                     </div>
                   </div>
-                  <div className={`text-right font-semibold ${getBalanceColor(account)}`}>
+                  <div className="text-right font-semibold text-purple-600 dark:text-purple-400">
                     {formatCurrency(Number(account.balance), account.currency)}
                   </div>
                 </div>
               ))}
               {summary?.accounts_by_type.loan.map(account => (
-                <div key={account.id} className="flex items-center justify-between p-4 border rounded-lg">
+                <div key={account.id} className="flex items-center justify-between p-4 border-l-4 border-l-orange-500 rounded-lg bg-gradient-to-r from-orange-50/50 to-transparent dark:from-orange-950/20 hover:shadow-md transition-shadow">
                   <div className="flex items-center gap-3">
-                    <BankLogo src={account.institution_logo} alt={account.institution_name || 'Loan'} />
+                    <div className="h-10 w-10 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center shadow-md border-2 border-orange-200 dark:border-orange-800">
+                      <BankLogo src={account.institution_logo} alt={account.institution_name || 'Loan'} bankName={account.institution_name || undefined} className="h-8 w-8" />
+                    </div>
                     <div>
                       <p className="font-medium">{account.account_name}</p>
                       <p className="text-sm text-muted-foreground">
                         {getAccountTypeLabel(account.account_type)} • {account.interest_rate_type}
                       </p>
                       {loanCalculations[account.id] && (
-                        <p className="text-xs text-primary font-medium mt-1">
+                        <p className="text-xs text-orange-600 dark:text-orange-400 font-medium mt-1">
                           EMI: {formatCurrency(loanCalculations[account.id].emi, account.currency)}
                         </p>
                       )}
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="font-semibold text-danger">
+                    <div className="font-semibold text-orange-600 dark:text-orange-400">
                       {formatCurrency(Number(account.balance), account.currency)}
                     </div>
                     <div className="text-xs text-muted-foreground">
