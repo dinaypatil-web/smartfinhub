@@ -13,6 +13,10 @@ A comprehensive financial management web application designed for tracking and m
 - Mobile number verification via OTP (One-Time Password)
 - **Twilio Integration**: Use Twilio API for sending OTP to mobile numbers during sign-up process
 - Verified email or mobile number serves as username for secure data retrieval
+- **Mobile Number Update**: After registration through email ID, users can update their mobile number in account settings
+- Updated mobile number requires OTP verification via Twilio before activation
+- Once verified, users can login using either their registered email or updated mobile number
+- Mobile number update feature accessible from user profile settings
 
 ## 2. Core Features
 
