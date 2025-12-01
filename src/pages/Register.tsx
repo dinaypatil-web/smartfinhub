@@ -6,19 +6,23 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle, CheckCircle } from 'lucide-react';
+import { generateOTP, sendOTP, storeOTP, verifyOTP, formatPhoneNumber, isValidPhoneNumber } from '@/utils/otp';
 
 export default function Register() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [emailRegister, setEmailRegister] = useState({ email: '', password: '', confirmPassword: '' });
-  const [phoneRegister, setPhoneRegister] = useState({ phone: '', password: '', confirmPassword: '' });
+  const [phoneRegister, setPhoneRegister] = useState({ phone: '', password: '', confirmPassword: '', countryCode: '+91' });
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState('');
   const [phoneForOtp, setPhoneForOtp] = useState('');
+  const [generatedOTP, setGeneratedOTP] = useState('');
+  const [otpVerified, setOtpVerified] = useState(false);
 
   const handleEmailRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,11 +97,11 @@ export default function Register() {
       return;
     }
 
-    // Validate phone number format
-    if (!phoneRegister.phone.startsWith('+')) {
+    // Validate phone number
+    if (!isValidPhoneNumber(phoneRegister.phone)) {
       toast({
         title: 'Error',
-        description: 'Phone number must include country code (e.g., +1234567890)',
+        description: 'Please enter a valid phone number',
         variant: 'destructive',
       });
       return;
@@ -106,31 +110,34 @@ export default function Register() {
     setLoading(true);
 
     try {
-      const { data, error } = await supabase.auth.signUp({
-        phone: phoneRegister.phone,
-        password: phoneRegister.password,
+      // Format phone number with country code
+      const formattedPhone = formatPhoneNumber(phoneRegister.phone, phoneRegister.countryCode.replace('+', ''));
+      
+      // Generate OTP
+      const newOTP = generateOTP();
+      setGeneratedOTP(newOTP);
+      
+      // Send OTP via Twilio
+      const result = await sendOTP(formattedPhone, newOTP);
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to send OTP');
+      }
+
+      // Store OTP locally for verification
+      storeOTP(formattedPhone, newOTP);
+      
+      setPhoneForOtp(formattedPhone);
+      setOtpSent(true);
+      
+      toast({
+        title: 'OTP Sent',
+        description: 'Please check your phone for the verification code.',
       });
-
-      if (error) {
-        // Check for SMS provider error
-        if (error.message.includes('SMS') || error.message.includes('provider') || error.message.includes('phone')) {
-          throw new Error('Phone authentication is not configured. Please contact the administrator or use email registration.');
-        }
-        throw error;
-      }
-
-      if (data.user) {
-        toast({
-          title: 'Success',
-          description: 'Please check your phone for the verification code.',
-        });
-        setPhoneForOtp(phoneRegister.phone);
-        setOtpSent(true);
-      }
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to register',
+        description: error.message || 'Failed to send OTP',
         variant: 'destructive',
       });
     } finally {
@@ -143,25 +150,77 @@ export default function Register() {
     setLoading(true);
 
     try {
-      const { data, error } = await supabase.auth.verifyOtp({
+      // Verify OTP
+      const verification = verifyOTP(phoneForOtp, otp);
+      
+      if (!verification.valid) {
+        throw new Error(verification.error || 'Invalid OTP');
+      }
+
+      // OTP verified, now create the account
+      const { data, error } = await supabase.auth.signUp({
         phone: phoneForOtp,
-        token: otp,
-        type: 'sms',
+        password: phoneRegister.password,
+        options: {
+          data: {
+            phone_verified: true,
+          },
+        },
       });
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
       if (data.user) {
+        setOtpVerified(true);
         toast({
           title: 'Success',
-          description: 'Account verified successfully!',
+          description: 'Account created successfully!',
         });
-        navigate('/');
+        
+        // Auto-login after successful registration
+        setTimeout(() => {
+          navigate('/');
+        }, 1500);
       }
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error.message || 'Invalid OTP',
+        description: error.message || 'Failed to verify OTP',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOTP = async () => {
+    setLoading(true);
+    
+    try {
+      // Generate new OTP
+      const newOTP = generateOTP();
+      setGeneratedOTP(newOTP);
+      
+      // Send OTP via Twilio
+      const result = await sendOTP(phoneForOtp, newOTP);
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to send OTP');
+      }
+
+      // Store OTP locally for verification
+      storeOTP(phoneForOtp, newOTP);
+      
+      toast({
+        title: 'OTP Resent',
+        description: 'A new verification code has been sent to your phone.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to resend OTP',
         variant: 'destructive',
       });
     } finally {
@@ -229,24 +288,47 @@ export default function Register() {
               </TabsContent>
 
               <TabsContent value="phone">
-                <Alert className="mb-4">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    Phone authentication requires SMS provider configuration. If you encounter errors, please use email registration instead.
+                <Alert className="mb-4 border-blue-500 bg-blue-50 dark:bg-blue-950/20">
+                  <CheckCircle className="h-4 w-4 text-blue-600" />
+                  <AlertDescription className="text-blue-900 dark:text-blue-100">
+                    We'll send you a verification code via SMS using Twilio.
                   </AlertDescription>
                 </Alert>
                 <form onSubmit={handlePhoneRegister} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="country-code">Country Code</Label>
+                    <Select
+                      value={phoneRegister.countryCode}
+                      onValueChange={(value) => setPhoneRegister({ ...phoneRegister, countryCode: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="+91">🇮🇳 India (+91)</SelectItem>
+                        <SelectItem value="+1">🇺🇸 USA (+1)</SelectItem>
+                        <SelectItem value="+44">🇬🇧 UK (+44)</SelectItem>
+                        <SelectItem value="+61">🇦🇺 Australia (+61)</SelectItem>
+                        <SelectItem value="+86">🇨🇳 China (+86)</SelectItem>
+                        <SelectItem value="+81">🇯🇵 Japan (+81)</SelectItem>
+                        <SelectItem value="+82">🇰🇷 South Korea (+82)</SelectItem>
+                        <SelectItem value="+65">🇸🇬 Singapore (+65)</SelectItem>
+                        <SelectItem value="+971">🇦🇪 UAE (+971)</SelectItem>
+                        <SelectItem value="+966">🇸🇦 Saudi Arabia (+966)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="phone-register">Phone Number</Label>
                     <Input
                       id="phone-register"
                       type="tel"
-                      placeholder="+1234567890"
+                      placeholder="1234567890"
                       value={phoneRegister.phone}
-                      onChange={(e) => setPhoneRegister({ ...phoneRegister, phone: e.target.value })}
+                      onChange={(e) => setPhoneRegister({ ...phoneRegister, phone: e.target.value.replace(/\D/g, '') })}
                       required
                     />
-                    <p className="text-xs text-muted-foreground">Include country code (e.g., +1 for US)</p>
+                    <p className="text-xs text-muted-foreground">Enter your phone number without country code</p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="phone-password">Password</Label>
@@ -272,32 +354,77 @@ export default function Register() {
                   </div>
                   <Button type="submit" className="w-full" disabled={loading}>
                     {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Sign Up
+                    Send Verification Code
                   </Button>
                 </form>
               </TabsContent>
             </Tabs>
           ) : (
-            <form onSubmit={handleVerifyOTP} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="otp">Verification Code</Label>
-                <Input
-                  id="otp"
-                  type="text"
-                  placeholder="123456"
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value)}
-                  required
-                />
-                <p className="text-sm text-muted-foreground">
-                  Enter the verification code sent to {phoneForOtp}
-                </p>
-              </div>
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Verify & Complete Registration
-              </Button>
-            </form>
+            <div className="space-y-4">
+              {!otpVerified ? (
+                <>
+                  <Alert className="border-blue-500 bg-blue-50 dark:bg-blue-950/20">
+                    <CheckCircle className="h-4 w-4 text-blue-600" />
+                    <AlertDescription className="text-blue-900 dark:text-blue-100">
+                      A 6-digit verification code has been sent to {phoneForOtp}
+                    </AlertDescription>
+                  </Alert>
+                  <form onSubmit={handleVerifyOTP} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="otp">Verification Code</Label>
+                      <Input
+                        id="otp"
+                        type="text"
+                        placeholder="123456"
+                        maxLength={6}
+                        value={otp}
+                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                        required
+                        className="text-center text-2xl tracking-widest"
+                      />
+                      <p className="text-xs text-muted-foreground text-center">
+                        Code expires in 10 minutes
+                      </p>
+                    </div>
+                    <Button type="submit" className="w-full" disabled={loading || otp.length !== 6}>
+                      {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Verify & Complete Registration
+                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={handleResendOTP}
+                        disabled={loading}
+                      >
+                        {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Resend Code
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => {
+                          setOtpSent(false);
+                          setOtp('');
+                          setOtpVerified(false);
+                        }}
+                      >
+                        Back
+                      </Button>
+                    </div>
+                  </form>
+                </>
+              ) : (
+                <Alert className="border-emerald-500 bg-emerald-50 dark:bg-emerald-950/20">
+                  <CheckCircle className="h-4 w-4 text-emerald-600" />
+                  <AlertDescription className="text-emerald-900 dark:text-emerald-100">
+                    Account created successfully! Redirecting to dashboard...
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
           )}
         </CardContent>
         <CardFooter className="flex flex-col space-y-2">
