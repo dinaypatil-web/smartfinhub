@@ -7,8 +7,7 @@ SmartFinHub
 
 ### 1.2 Application Description
 A comprehensive financial management web application designed for tracking and managing multiple financial accounts including cash, bank accounts, credit cards, and loans. The platform provides real-time balance updates, transaction recording, budget analysis, and detailed financial reporting.
-
-### 1.3 Authentication System
+\n### 1.3 Authentication System
 - Login using email address or mobile number
 - Email verification via verification link
 - Mobile number verification via OTP (One-Time Password)
@@ -18,11 +17,10 @@ A comprehensive financial management web application designed for tracking and m
 \n### 2.1 User Preferences
 - Select default country from dropdown list
 - Choose preferred currency for dashboard display
-- Country and currency settings saved to user profile
-- Settings apply across all dashboard views and reports
+- Country and currency settings saved to user profile\n- Settings apply across all dashboard views and reports
 
 ### 2.2 Account Management
-\n####2.2.1 Account Types
+\n#### 2.2.1 Account Types
 - Cash accounts
 - Bank accounts
 - Credit card accounts
@@ -30,17 +28,18 @@ A comprehensive financial management web application designed for tracking and m
 #### 2.2.2 Account Setup
 - Country selection from dropdown menu
 - Bank or financial institution selection based on chosen country
-- Display bank/financial institution logo on account pages and dashboard
-- Manual bank name entry option if institution not listed, with automatic logo fetching\n- Optional account number entry (encrypted storage, only last 4 digits visible on dashboard)
+- Display bank/financial institution logo on account pages and dashboard\n- Manual bank name entry option if institution not listed, with automatic logo fetching
+- Optional account number entry (encrypted storage, only last 4 digits visible on dashboard)
 \n#### 2.2.3Loan Account Configuration
 - Select interest rate type: Fixed or Floating
 - Input total principal loan amount
 - Auto-calculate EMI based on principal, interest rate, and tenure
-\n#### 2.2.4 Floating Interest Rate Management
+
+#### 2.2.4 Floating Interest Rate Management
 - Record all interest rate changes from loan inception to current date
 - User can update floating interest rate at any time
-- System maintains complete historical record of rate changes
-- Auto-calculate total accrued interest till date\n- Display accrued interest on dashboard and account detail page
+- System maintains complete historical record of rate changes\n- Auto-calculate total accrued interest till date
+- Display accrued interest on dashboard and account detail page
 - Chart visualization showing floating interest rate history over time
 
 #### 2.2.5 Data Security
@@ -52,13 +51,14 @@ A comprehensive financial management web application designed for tracking and m
 #### 2.2.6 Account Modification
 - Edit any account information at any time
 - Delete accounts with user confirmation
-\n### 2.3 Transaction Management
 
-#### 2.3.1 Transaction Types\n- Income transactions
+### 2.3 Transaction Management
+
+#### 2.3.1 Transaction Types
+- Income transactions
 - Expense transactions
 - Cash withdrawals (from bank account or credit card)
-- Bank-to-bank transfers
-- Loan payments
+- Bank-to-bank transfers\n- Loan payments
 - Credit card payments
 
 #### 2.3.2 Transaction Processing Logic
@@ -67,29 +67,34 @@ A comprehensive financial management web application designed for tracking and m
 - Cash withdrawal from credit card increases card balance (more negative)
 - Payments to loan accounts decrease loan balance (less negative)
 - Payments to credit card decrease card balance (less negative)
+- During expense transaction entry, display remaining budget for the selected budget category for current month
+- Show budget balance information before transaction confirmation
 - Dashboard auto-updates after each transaction
 - Screen refreshes automatically after transaction entry
 
-#### 2.3.3 Transaction Modification
-- Edit any transaction record
+#### 2.3.3 Transaction Modification\n- Edit any transaction record
 - Delete transactions with automatic balance recalculation
 
-### 2.4 Dashboard Display\n
+### 2.4 Dashboard Display
+
 #### 2.4.1 Financial Summary
 - Current Assets: Sum of Cash and Bank Account balances
 - Current Liabilities: Sum of Credit Card balances only
-- Liquid Assets: Sum of Cash and Bank Account balances\n- Loan accounts excluded from Current Liabilities calculation
+- Liquid Assets: Sum of Cash and Bank Account balances
+- Loan accounts excluded from Current Liabilities calculation
 - Loan accounts excluded from Liquid Assets calculation
 - Total accrued interest displayed for each loan account
 
 #### 2.4.2 Visual Analytics
 - 3D pie chart showing Cash and Bank Account balance distribution
 - 3D pie chart showing Expenses breakdown by category
-- Line chart displaying Floating Interest Rate history for loan accounts
-\n#### 2.4.3 Account Display Cards
+- Line chart displaying Floating Interest Rate history for loan accounts\n
+#### 2.4.3 Account Display Cards
 - Bank or financial institution logo
-- Account type indicator\n- Last 4 digits of account number only
-- Real-time current balance\n- For loan accounts: Total accrued interest till date
+- Account type indicator
+- Last 4 digits of account number only
+- Real-time current balance
+- For loan accounts: Total accrued interest till date
 
 ### 2.5 Budget Management
 - Input monthly budgeted income amounts
@@ -97,22 +102,24 @@ A comprehensive financial management web application designed for tracking and m
 - Compare actual expenses against budgeted amounts
 - Display budget variance (over/under budget) on dashboard
 - Monthly budget tracking and analysis
+- Editing or saving budget automatically updates Budget vs. Actual analysis
+- Real-time recalculation of budget variance when budget values are modified
+- Updated analysis immediately reflected on dashboard and reports
 
 ### 2.6 Reporting
 - Transaction history reports with date range filters
 - Income and expense summary reports
-- Account balance reports across all accounts
-- Budget vs. actual analysis reports
+- Account balance reports across all accounts\n- Budget vs. actual analysis reports
 - Export reports functionality
 
 ## 3. Design Style
 
-### 3.1 Color Scheme\n- Primary color: Deep blue (#1E3A8A) conveying trust and financial stability
+### 3.1 Color Scheme
+- Primary color: Deep blue (#1E3A8A) conveying trust and financial stability
 - Secondary color: Emerald green (#10B981) for positive balances and income indicators
 - Accent color: Amber (#F59E0B) for alerts and important notifications
 - Negative indicator: Coral red (#EF4444) for liabilities and overspending
-
-### 3.2 Visual Details
+\n### 3.2 Visual Details
 - Card-based layout with subtle drop shadows for depth
 - Rounded corners (8px radius) for modern, approachable aesthetic
 - Smooth hover transitions on interactive elements

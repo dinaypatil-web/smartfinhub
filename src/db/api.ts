@@ -566,6 +566,35 @@ export const budgetApi = {
       expense_variance: Number(budget.budgeted_expenses) - actual_expenses,
       category_analysis
     };
+  },
+
+  async getCategoryBudgetInfo(userId: string, categoryName: string, month: number, year: number): Promise<{ budgeted: number; spent: number; remaining: number } | null> {
+    const budget = await this.getBudget(userId, month, year);
+    if (!budget) return null;
+
+    // Find category ID by name
+    const categories = await categoryApi.getCategories(userId);
+    const category = categories.find(c => c.name === categoryName);
+    if (!category) return null;
+
+    const budgeted = Number(budget.category_budgets[category.id] || 0);
+    if (budgeted === 0) return null;
+
+    // Calculate spent amount for this category in the current month
+    const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+    const transactions = await transactionApi.getTransactionsByDateRange(userId, startDate, endDate);
+    const spent = transactions
+      .filter(t => t.category === categoryName && t.transaction_type === 'expense')
+      .reduce((sum, t) => sum + Number(t.amount), 0);
+
+    return {
+      budgeted,
+      spent,
+      remaining: budgeted - spent
+    };
   }
 };
 

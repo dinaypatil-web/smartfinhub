@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { transactionApi, accountApi, categoryApi } from '@/db/api';
+import { transactionApi, accountApi, categoryApi, budgetApi } from '@/db/api';
 import type { TransactionType } from '@/types/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, ArrowLeft } from 'lucide-react';
+import { Loader2, ArrowLeft, TrendingDown, AlertCircle } from 'lucide-react';
+import { formatCurrency } from '@/utils/format';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function TransactionForm() {
   const { id } = useParams();
@@ -21,6 +23,8 @@ export default function TransactionForm() {
   const [loadingData, setLoadingData] = useState(true);
   const [accounts, setAccounts] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
+  const [budgetInfo, setBudgetInfo] = useState<{ budgeted: number; spent: number; remaining: number } | null>(null);
+  const [loadingBudget, setLoadingBudget] = useState(false);
 
   const [formData, setFormData] = useState({
     transaction_type: 'expense' as TransactionType,
@@ -38,6 +42,34 @@ export default function TransactionForm() {
       loadData();
     }
   }, [user]);
+
+  useEffect(() => {
+    // Load budget info when category changes and transaction type is expense
+    if (user && formData.category && formData.transaction_type === 'expense' && formData.transaction_date) {
+      loadBudgetInfo();
+    } else {
+      setBudgetInfo(null);
+    }
+  }, [user, formData.category, formData.transaction_type, formData.transaction_date]);
+
+  const loadBudgetInfo = async () => {
+    if (!user || !formData.category || formData.transaction_type !== 'expense') return;
+
+    setLoadingBudget(true);
+    try {
+      const transactionDate = new Date(formData.transaction_date);
+      const month = transactionDate.getMonth() + 1;
+      const year = transactionDate.getFullYear();
+
+      const info = await budgetApi.getCategoryBudgetInfo(user.id, formData.category, month, year);
+      setBudgetInfo(info);
+    } catch (error) {
+      console.error('Error loading budget info:', error);
+      setBudgetInfo(null);
+    } finally {
+      setLoadingBudget(false);
+    }
+  };
 
   const loadData = async () => {
     if (!user) return;
@@ -284,6 +316,55 @@ export default function TransactionForm() {
                     ))}
                   </SelectContent>
                 </Select>
+
+                {/* Budget Information Display for Expense Transactions */}
+                {formData.transaction_type === 'expense' && formData.category && (
+                  <div className="mt-3">
+                    {loadingBudget ? (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Loading budget info...
+                      </div>
+                    ) : budgetInfo ? (
+                      <Alert className={`${budgetInfo.remaining < 0 ? 'border-red-500 bg-red-50 dark:bg-red-950/20' : budgetInfo.remaining < budgetInfo.budgeted * 0.2 ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/20' : 'border-blue-500 bg-blue-50 dark:bg-blue-950/20'}`}>
+                        <TrendingDown className={`h-4 w-4 ${budgetInfo.remaining < 0 ? 'text-red-600' : budgetInfo.remaining < budgetInfo.budgeted * 0.2 ? 'text-amber-600' : 'text-blue-600'}`} />
+                        <AlertDescription>
+                          <div className="space-y-1">
+                            <div className="font-semibold text-sm">Budget Status for {formData.category}</div>
+                            <div className="grid grid-cols-3 gap-2 text-xs">
+                              <div>
+                                <div className="text-muted-foreground">Budgeted</div>
+                                <div className="font-medium">{formatCurrency(budgetInfo.budgeted, formData.currency)}</div>
+                              </div>
+                              <div>
+                                <div className="text-muted-foreground">Spent</div>
+                                <div className="font-medium">{formatCurrency(budgetInfo.spent, formData.currency)}</div>
+                              </div>
+                              <div>
+                                <div className="text-muted-foreground">Remaining</div>
+                                <div className={`font-medium ${budgetInfo.remaining < 0 ? 'text-red-600 dark:text-red-400' : budgetInfo.remaining < budgetInfo.budgeted * 0.2 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                  {formatCurrency(budgetInfo.remaining, formData.currency)}
+                                </div>
+                              </div>
+                            </div>
+                            {budgetInfo.remaining < 0 && (
+                              <div className="flex items-center gap-1 text-red-600 dark:text-red-400 text-xs mt-2">
+                                <AlertCircle className="h-3 w-3" />
+                                <span>Budget exceeded by {formatCurrency(Math.abs(budgetInfo.remaining), formData.currency)}</span>
+                              </div>
+                            )}
+                            {budgetInfo.remaining >= 0 && budgetInfo.remaining < budgetInfo.budgeted * 0.2 && (
+                              <div className="flex items-center gap-1 text-amber-600 dark:text-amber-400 text-xs mt-2">
+                                <AlertCircle className="h-3 w-3" />
+                                <span>Low budget remaining ({((budgetInfo.remaining / budgetInfo.budgeted) * 100).toFixed(0)}%)</span>
+                              </div>
+                            )}
+                          </div>
+                        </AlertDescription>
+                      </Alert>
+                    ) : null}
+                  </div>
+                )}
               </div>
             )}
 
