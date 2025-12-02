@@ -210,7 +210,7 @@ export default function Dashboard() {
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <Card className="border-l-4 border-l-emerald-500 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Assets</CardTitle>
+            <CardTitle className="text-sm font-medium">Current Assets</CardTitle>
             <div className="h-10 w-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
               <TrendingUp className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
             </div>
@@ -227,7 +227,7 @@ export default function Dashboard() {
 
         <Card className="border-l-4 border-l-red-500 bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-950/20 dark:to-orange-950/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Liabilities</CardTitle>
+            <CardTitle className="text-sm font-medium">Current Liabilities</CardTitle>
             <div className="h-10 w-10 rounded-full bg-red-500/20 flex items-center justify-center">
               <TrendingDown className="h-5 w-5 text-red-600 dark:text-red-400" />
             </div>
