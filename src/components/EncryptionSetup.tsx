@@ -28,7 +28,7 @@ export default function EncryptionSetup() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { user, profile, refreshProfile } = useAuth();
+  const { user, profile, refreshProfile, updateEncryptionKeyStatus } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -80,13 +80,16 @@ export default function EncryptionSetup() {
       // Store key in session
       await keyManager.setKey(encryptionKey);
 
+      // Update encryption key status in AuthContext
+      updateEncryptionKeyStatus();
+
       toast({
         title: 'Encryption Enabled',
         description: 'Your data is now protected with end-to-end encryption.',
       });
 
       // Navigate to dashboard
-      navigate('/');
+      navigate('/', { replace: true });
     } catch (error) {
       console.error('Encryption setup error:', error);
       toast({

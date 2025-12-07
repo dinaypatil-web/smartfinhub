@@ -12,6 +12,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   hasEncryptionKey: boolean;
+  updateEncryptionKeyStatus: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -32,6 +33,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
   }, [user]);
+
+  const updateEncryptionKeyStatus = useCallback(() => {
+    setHasEncryptionKey(keyManager.hasKey());
+  }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -70,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signOut, refreshProfile, hasEncryptionKey }}>
+    <AuthContext.Provider value={{ user, profile, loading, signOut, refreshProfile, hasEncryptionKey, updateEncryptionKeyStatus }}>
       {children}
     </AuthContext.Provider>
   );
