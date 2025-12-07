@@ -69,7 +69,9 @@ export function getCurrentBillingCycle(statementDay: number): {
   const cycleStartDay = getSafeDayInMonth(cycleStartYear, cycleStartMonth, statementDay);
   const cycleEndDay = getSafeDayInMonth(cycleEndYear, cycleEndMonth, statementDay);
 
-  const cycleStart = new Date(cycleStartYear, cycleStartMonth, cycleStartDay, 0, 0, 0);
+  // Cycle starts from NEXT DAY of statement date of last month
+  const cycleStart = new Date(cycleStartYear, cycleStartMonth, cycleStartDay + 1, 0, 0, 0);
+  // Cycle ends on statement date of this month (inclusive)
   const cycleEnd = new Date(cycleEndYear, cycleEndMonth, cycleEndDay, 23, 59, 59);
   const statementDate = new Date(cycleEndYear, cycleEndMonth, cycleEndDay, 23, 59, 59);
 
@@ -117,20 +119,31 @@ export function isTransactionInCurrentCycle(
 
 /**
  * Calculate due amount from regular transactions in current billing cycle
+ * Excludes transactions where EMI payment option is selected
  * @param transactions - All transactions for the account
+ * @param emis - All EMI transactions (to identify which transactions are converted to EMI)
  * @param statementDay - Day of month when statement is generated
  * @returns Total amount due from transactions
  */
 export function calculateTransactionsDueAmount(
   transactions: Transaction[],
+  emis: EMITransaction[],
   statementDay: number
 ): number {
   const { cycleStart, cycleEnd } = getCurrentBillingCycle(statementDay);
   
+  // Get list of transaction IDs that are converted to EMI
+  const emiTransactionIds = new Set(
+    emis
+      .filter(emi => emi.transaction_id !== null)
+      .map(emi => emi.transaction_id as string)
+  );
+  
   return transactions
     .filter(tx => {
       const txDate = new Date(tx.transaction_date);
-      return txDate >= cycleStart && txDate <= cycleEnd;
+      // Include only transactions within billing cycle AND where EMI is NOT selected
+      return txDate >= cycleStart && txDate <= cycleEnd && !emiTransactionIds.has(tx.id);
     })
     .reduce((sum, tx) => {
       // For credit cards, expenses and withdrawals increase the balance (amount owed)
@@ -146,14 +159,25 @@ export function calculateTransactionsDueAmount(
 }
 
 /**
- * Calculate due amount from EMI installments for current month
+ * Calculate due amount from EMI installments created in current billing cycle
+ * Only includes EMIs that were created between next day of last statement and current statement date
  * @param emis - All active EMI transactions for the account
- * @returns Total EMI amount due this month
+ * @param statementDay - Day of month when statement is generated
+ * @returns Total EMI amount due for current cycle
  */
-export function calculateEMIDueAmount(emis: EMITransaction[]): number {
-  // All active EMIs have an installment due this month
+export function calculateEMIDueAmount(emis: EMITransaction[], statementDay: number): number {
+  const { cycleStart, cycleEnd } = getCurrentBillingCycle(statementDay);
+  
+  // Include only EMIs created within the current billing cycle
   return emis
-    .filter(emi => emi.status === 'active' && emi.remaining_installments > 0)
+    .filter(emi => {
+      if (emi.status !== 'active' || emi.remaining_installments <= 0) {
+        return false;
+      }
+      
+      const emiCreatedDate = new Date(emi.created_at);
+      return emiCreatedDate >= cycleStart && emiCreatedDate <= cycleEnd;
+    })
     .reduce((sum, emi) => sum + emi.monthly_emi, 0);
 }
 
@@ -169,8 +193,8 @@ export function calculateTotalDueAmount(
   emis: EMITransaction[],
   statementDay: number
 ): number {
-  const transactionsDue = calculateTransactionsDueAmount(transactions, statementDay);
-  const emisDue = calculateEMIDueAmount(emis);
+  const transactionsDue = calculateTransactionsDueAmount(transactions, emis, statementDay);
+  const emisDue = calculateEMIDueAmount(emis, statementDay);
   
   return transactionsDue + emisDue;
 }
