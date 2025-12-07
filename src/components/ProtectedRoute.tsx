@@ -1,6 +1,7 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
+import EncryptionSetup from './EncryptionSetup';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -8,7 +9,7 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRouteProps) {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, hasEncryptionKey } = useAuth();
 
   if (loading) {
     return (
@@ -20,6 +21,11 @@ export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRout
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Show encryption setup if user doesn't have encryption key
+  if (!hasEncryptionKey) {
+    return <EncryptionSetup />;
   }
 
   if (requireAdmin && profile?.role !== 'admin') {
