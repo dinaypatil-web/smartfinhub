@@ -39,6 +39,8 @@ export default function AccountForm() {
     interest_rate_type: 'fixed' as InterestRateType,
     current_interest_rate: '',
     due_date: '',
+    statement_day: '',
+    due_day: '',
   });
 
   const [calculatedEMI, setCalculatedEMI] = useState<number>(0);
@@ -100,6 +102,8 @@ export default function AccountForm() {
           interest_rate_type: account.interest_rate_type || 'fixed',
           current_interest_rate: account.current_interest_rate?.toString() || '',
           due_date: account.due_date?.toString() || '',
+          statement_day: account.statement_day?.toString() || '',
+          due_day: account.due_day?.toString() || '',
         });
       }
     } catch (error) {
@@ -148,6 +152,8 @@ export default function AccountForm() {
         interest_rate_type: formData.account_type === 'loan' ? formData.interest_rate_type : null,
         current_interest_rate: formData.account_type === 'loan' ? parseFloat(formData.current_interest_rate) : null,
         due_date: formData.account_type === 'loan' ? parseInt(formData.due_date) : null,
+        statement_day: formData.account_type === 'credit_card' && formData.statement_day ? parseInt(formData.statement_day) : null,
+        due_day: formData.account_type === 'credit_card' && formData.due_day ? parseInt(formData.due_day) : null,
       };
 
       if (id) {
@@ -407,6 +413,42 @@ export default function AccountForm() {
                 required
               />
             </div>
+
+            {formData.account_type === 'credit_card' && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="statement_day">Statement Day of Month</Label>
+                  <Input
+                    id="statement_day"
+                    type="number"
+                    min="1"
+                    max="31"
+                    value={formData.statement_day}
+                    onChange={(e) => setFormData({ ...formData, statement_day: e.target.value })}
+                    placeholder="e.g., 15"
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Day of the month when your credit card statement is generated (1-31)
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="due_day">Payment Due Day of Month</Label>
+                  <Input
+                    id="due_day"
+                    type="number"
+                    min="1"
+                    max="31"
+                    value={formData.due_day}
+                    onChange={(e) => setFormData({ ...formData, due_day: e.target.value })}
+                    placeholder="e.g., 25"
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Day of the month when your credit card payment is due (1-31)
+                  </p>
+                </div>
+              </>
+            )}
 
             {formData.account_type === 'loan' && (
               <>

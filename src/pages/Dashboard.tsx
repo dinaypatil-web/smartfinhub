@@ -13,6 +13,7 @@ import { calculateEMI, calculateAccruedInterest } from '@/utils/loanCalculations
 import InterestRateChart from '@/components/InterestRateChart';
 import InterestRateTable from '@/components/InterestRateTable';
 import BankLogo from '@/components/BankLogo';
+import { formatDayOfMonth, isComingSoon } from '@/utils/dateUtils';
 
 export default function Dashboard() {
   const { user, profile } = useAuth();
@@ -404,6 +405,20 @@ export default function Dashboard() {
                       <p className="text-sm text-muted-foreground">
                         {getAccountTypeLabel(account.account_type)} • {formatAccountNumber(account.last_4_digits)}
                       </p>
+                      {(account.statement_day || account.due_day) && (
+                        <div className="flex gap-3 mt-1 text-xs">
+                          {account.statement_day && (
+                            <span className={`${isComingSoon(account.statement_day) ? 'text-amber-600 dark:text-amber-400 font-semibold' : 'text-muted-foreground'}`}>
+                              📄 Statement: {formatDayOfMonth(account.statement_day)}
+                            </span>
+                          )}
+                          {account.due_day && (
+                            <span className={`${isComingSoon(account.due_day) ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-muted-foreground'}`}>
+                              💳 Due: {formatDayOfMonth(account.due_day)}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="text-right font-semibold text-purple-600 dark:text-purple-400">

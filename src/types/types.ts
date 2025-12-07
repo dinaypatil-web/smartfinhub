@@ -30,6 +30,8 @@ export interface Account {
   interest_rate_type: InterestRateType | null;
   current_interest_rate: number | null;
   due_date: number | null;
+  statement_day: number | null;
+  due_day: number | null;
   created_at: string;
   updated_at: string;
 }

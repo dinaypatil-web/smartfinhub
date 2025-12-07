@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import InterestRateManager from '@/components/InterestRateManager';
 import { calculateEMI, calculateAccruedInterest } from '@/utils/loanCalculations';
 import BankLogo from '@/components/BankLogo';
+import { formatDayOfMonth, isComingSoon } from '@/utils/dateUtils';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -381,6 +382,26 @@ export default function Accounts() {
                           {formatCurrency(Number(account.balance), account.currency)}
                         </p>
                       </div>
+                      {(account.statement_day || account.due_day) && (
+                        <div className="space-y-2 pt-2 border-t">
+                          {account.statement_day && (
+                            <div className="flex items-center justify-between">
+                              <p className="text-sm text-muted-foreground">Statement Date</p>
+                              <p className={`text-sm font-medium ${isComingSoon(account.statement_day) ? 'text-amber-600 dark:text-amber-400' : ''}`}>
+                                {formatDayOfMonth(account.statement_day)} of each month
+                              </p>
+                            </div>
+                          )}
+                          {account.due_day && (
+                            <div className="flex items-center justify-between">
+                              <p className="text-sm text-muted-foreground">Payment Due Date</p>
+                              <p className={`text-sm font-medium ${isComingSoon(account.due_day) ? 'text-red-600 dark:text-red-400' : ''}`}>
+                                {formatDayOfMonth(account.due_day)} of each month
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
                       <div className="flex gap-2">
                         <Button
                           variant="outline"
