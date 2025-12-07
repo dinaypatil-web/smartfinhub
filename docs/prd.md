@@ -2,8 +2,10 @@
 
 ## 1. Application Overview
 
-### 1.1 Application Name\nSmartFinHub
-\n### 1.2 Application Description
+### 1.1 Application Name
+SmartFinHub
+
+### 1.2 Application Description
 A comprehensive financial management web application designed for tracking and managing multiple financial accounts including cash, bank accounts, credit cards, and loans. The platform provides real-time balance updates, transaction recording, budget analysis, and detailed financial reporting.
 \n### 1.3 Authentication System
 - Login using email address or mobile number
@@ -41,25 +43,33 @@ A comprehensive financial management web application designed for tracking and m
 - System caches fetched logos for future use
 - Optional account number entry (encrypted storage, only last 4 digits visible on dashboard)
 
-#### 2.2.3 Loan Account Configuration
+#### 2.2.3 Credit Card Configuration
+- **Statement Day of Month**: User inputs the day of month when credit card statement is generated (1-31)
+- **Due Day of Month**: User inputs the day of month when credit card payment is due (1-31)
+- Statement day and due day saved to credit card account profile
+- System displays statement date and due date reminders on dashboard
+- Payment reminders shown on credit card account detail page
+- Visual indicators for upcoming statement dates and due dates
+
+#### 2.2.4 Loan Account Configuration
 - Select interest rate type: Fixed or Floating
 - Input total principal loan amount
 - Auto-calculate EMI based on principal, interest rate, and tenure
 
-#### 2.2.4 Floating Interest Rate Management
+#### 2.2.5 Floating Interest Rate Management
 - Record all interest rate changes from loan inception to current date
 - User can update floating interest rate at any time
 - System maintains complete historical record of rate changes\n- Auto-calculate total accrued interest till date
 - Display accrued interest on dashboard and account detail page
 - Chart visualization showing floating interest rate history over time
 
-#### 2.2.5 Data Security
+#### 2.2.6 Data Security
 - Bank account numbers encrypted in database
 - Credit card numbers encrypted in database
 - Loan account numbers encrypted in database
 - Account data accessible only by authenticated account owner
 
-#### 2.2.6 Account Modification
+#### 2.2.7 Account Modification
 - Edit any account information at any time
 - Delete accounts with user confirmation
 
@@ -105,40 +115,35 @@ A comprehensive financial management web application designed for tracking and m
 - Last 4 digits of account number only
 - Real-time current balance
 - For loan accounts: Total accrued interest till date
+- **For credit card accounts**: Display next statement date and payment due date as reminders
+- Visual indicators highlighting upcoming statement dates and due dates within7 days
 
-### 2.5 Budget Management\n- Input monthly budgeted income amounts
-- Input monthly budgeted expense amounts by category
+### 2.5 Budget Management
+- Input monthly budgeted income amounts\n- Input monthly budgeted expense amounts by category
 - Compare actual expenses against budgeted amounts
 - Display budget variance (over/under budget) on dashboard
 - Monthly budget tracking and analysis
-- Editing or saving budget automatically triggers immediate update of Budget vs. Actual analysis
-- Real-time recalculation of budget variance when budget values are modified
+- Editing or saving budget automatically triggers immediate update of Budget vs. Actual analysis\n- Real-time recalculation of budget variance when budget values are modified
 - Updated Budget vs. Actual analysis immediately reflected on dashboard and reports
 - System recalculates remaining budget for each category after budget modification
 
-### 2.6 Reporting\n- Transaction history reports with date range filters
-- Income and expense summary reports
-- Account balance reports across all accounts
+### 2.6 Reporting
+- Transaction history reports with date range filters\n- Income and expense summary reports\n- Account balance reports across all accounts
 - Budget vs. actual analysis reports
-- Export reports functionality
-
+- Export reports functionality\n
 ## 3. Design Style
 
 ### 3.1 Color Scheme
 - Primary color: Deep blue (#1E3A8A) conveying trust and financial stability
 - Secondary color: Emerald green (#10B981) for positive balances and income indicators
-- Accent color: Amber (#F59E0B) for alerts and important notifications
-- Negative indicator: Coral red (#EF4444) for liabilities and overspending
+- Accent color: Amber (#F59E0B) for alerts and important notifications\n- Negative indicator: Coral red (#EF4444) for liabilities and overspending
 
 ### 3.2 Visual Details
-- Card-based layout with subtle drop shadows for depth
-- Rounded corners (8px radius) for modern, approachable aesthetic
+- Card-based layout with subtle drop shadows for depth\n- Rounded corners (8px radius) for modern, approachable aesthetic
 - Smooth hover transitions on interactive elements
-- Clear iconography for transaction types and account categories
-- Consistent spacing and padding throughout interface
+- Clear iconography for transaction types and account categories\n- Consistent spacing and padding throughout interface
 
-### 3.3 Layout Structure\n- Grid-based dashboard for account cards with responsive columns
-- Side navigation panel for main sections: Accounts, Transactions, Reports, Budget, Settings
-- Responsive design adapting seamlessly to desktop, tablet, and mobile screens
-- Clear visual hierarchy with prominent balance displays and chart visualizations
-- Sticky header for easy navigation access
+### 3.3 Layout Structure
+- Grid-based dashboard for account cards with responsive columns
+- Side navigation panel for main sections: Accounts, Transactions, Reports, Budget, Settings\n- Responsive design adapting seamlessly to desktop, tablet, and mobile screens
+- Clear visual hierarchy with prominent balance displays and chart visualizations\n- Sticky header for easy navigation access
