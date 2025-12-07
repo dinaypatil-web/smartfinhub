@@ -226,6 +226,22 @@ export function isPaymentOverdue(statementDay: number, dueDay: number): boolean 
 }
 
 /**
+ * Check if due date has passed (today is after the due date)
+ * @param statementDay - Day of month when statement is generated
+ * @param dueDay - Day of month when payment is due
+ * @returns True if due date has passed
+ */
+export function isDueDatePassed(statementDay: number, dueDay: number): boolean {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // Reset to start of day for accurate comparison
+  
+  const dueDate = getNextDueDate(statementDay, dueDay);
+  dueDate.setHours(0, 0, 0, 0); // Reset to start of day
+  
+  return today > dueDate;
+}
+
+/**
  * Get billing cycle information as formatted strings
  * @param statementDay - Day of month when statement is generated
  * @param dueDay - Day of month when payment is due
