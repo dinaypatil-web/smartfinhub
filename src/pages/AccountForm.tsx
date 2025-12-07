@@ -355,6 +355,23 @@ export default function AccountForm() {
                     </div>
                   </div>
                 )}
+
+                {/* Custom Logo URL Input */}
+                {formData.institution_name && (
+                  <div className="space-y-2">
+                    <Label htmlFor="institution_logo">Custom Logo URL (Optional)</Label>
+                    <Input
+                      id="institution_logo"
+                      type="url"
+                      value={formData.institution_logo}
+                      onChange={(e) => setFormData({ ...formData, institution_logo: e.target.value })}
+                      placeholder="https://example.com/logo.png"
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      If the automatic logo is incorrect or unavailable, paste a logo URL from the internet here
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
