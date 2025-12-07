@@ -3,6 +3,7 @@ import { supabase } from '@/db/supabase';
 import type { User } from '@supabase/supabase-js';
 import type { Profile } from '@/types/types';
 import { profileApi } from '@/db/api';
+import { keyManager } from '@/utils/encryption';
 
 interface AuthContextType {
   user: User | null;
@@ -10,6 +11,7 @@ interface AuthContextType {
   loading: boolean;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  hasEncryptionKey: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -18,6 +20,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hasEncryptionKey, setHasEncryptionKey] = useState(false);
 
   const refreshProfile = useCallback(async () => {
     if (user) {
@@ -33,6 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
+      setHasEncryptionKey(keyManager.hasKey());
       setLoading(false);
     });
 
@@ -40,6 +44,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null);
       if (!session?.user) {
         setProfile(null);
+        keyManager.clearKey();
+        setHasEncryptionKey(false);
+      } else {
+        setHasEncryptionKey(keyManager.hasKey());
       }
       setLoading(false);
     });
@@ -55,12 +63,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    keyManager.clearKey();
     setUser(null);
     setProfile(null);
+    setHasEncryptionKey(false);
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, profile, loading, signOut, refreshProfile, hasEncryptionKey }}>
       {children}
     </AuthContext.Provider>
   );

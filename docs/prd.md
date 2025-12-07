@@ -13,12 +13,10 @@ A comprehensive financial management web application designed for tracking and m
 - Mobile number verification via OTP (One-Time Password)
 - **Twilio Integration**: Use Twilio API for sending OTP to mobile numbers during sign-up process
 - Verified email or mobile number serves as username for secure data retrieval
-- **Mobile Number Update**: After registration through email ID, users can update their mobile number in account settings without OTP verification
-- Updated mobile number immediately activated and available for login
+- **Mobile Number Update**: After registration through email ID, users can update their mobile number in account settings without OTP verification\n- Updated mobile number immediately activated and available for login
 - Once updated, users can login using either their registered email or updated mobile number
 - Mobile number update feature accessible from user profile settings
-- **Alternative Phone Verification Options** (optional implementation):
-  - Email Confirmation: Send verification link to registered email address to confirm phone number change
+- **Alternative Phone Verification Options** (optional implementation):\n  - Email Confirmation: Send verification link to registered email address to confirm phone number change
   - Security Question: User answers pre-set security questions before updating phone number
   - Password Re-entry: Require user to re-enter account password to authorize phone number change
   - Authenticator App: Use third-party authenticator apps (Google Authenticator, Microsoft Authenticator) to generate verification codes
@@ -28,11 +26,9 @@ A comprehensive financial management web application designed for tracking and m
 
 ### 2.1 User Preferences
 - Select default country from dropdown list
-- Choose preferred currency for dashboard display
-- Country and currency settings saved to user profile
+- Choose preferred currency for dashboard display\n- Country and currency settings saved to user profile
 - Settings apply across all dashboard views and reports
-
-### 2.2 Account Management
+\n### 2.2 Account Management
 \n#### 2.2.1 Account Types
 - Cash accounts
 - Bank accounts
@@ -73,26 +69,35 @@ A comprehensive financial management web application designed for tracking and m
 - Chart visualization showing floating interest rate history over time
 
 #### 2.2.6 Data Security
+- **End-to-End Encryption**: All user data encrypted in database using industry-standard encryption algorithms
+- **Zero-Knowledge Architecture**: Application creator and administrators have no access to decrypted user data
+- **Client-Side Encryption**: User data encrypted on client side before transmission to server
+- **User-Specific Encryption Keys**: Each user's data encrypted with unique encryption key derived from user credentials
+- Encryption keys never stored on server in plain text
 - Bank account numbers encrypted in database
 - Credit card numbers encrypted in database
 - Loan account numbers encrypted in database
-- Account data accessible only by authenticated account owner
+- Transaction details encrypted in database
+- Personal information encrypted in database
+- Budget data encrypted in database
+- Account balances encrypted in database
+- All financial data encrypted at rest and in transit
+- Account data accessible only by authenticated account owner with valid decryption credentials
+- **Data Privacy Guarantee**: System architecture ensures that even database administrators and application developers cannot access or view user's financial information
 
-#### 2.2.7 Account Modification
-- Edit any account information at any time
+#### 2.2.7 Account Modification\n- Edit any account information at any time
 - Delete accounts with user confirmation
 
 ### 2.3 Transaction Management
-
-#### 2.3.1 Transaction Types
+\n#### 2.3.1 Transaction Types
 - Income transactions
-- Expense transactions\n- Cash withdrawals (from bank account or credit card)
+- Expense transactions
+- Cash withdrawals (from bank account or credit card)
 - Bank-to-bank transfers
 - Loan payments
 - Credit card payments
 
-#### 2.3.2 Transaction Processing Logic
-- Credit card accounts displayed as negative balances
+#### 2.3.2 Transaction Processing Logic\n- Credit card accounts displayed as negative balances
 - Loan accounts displayed as negative balances
 - Cash withdrawal from credit card increases card balance (more negative)
 - Payments to loan accounts decrease loan balance (less negative)
