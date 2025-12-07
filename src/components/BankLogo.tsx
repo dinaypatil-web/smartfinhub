@@ -120,13 +120,6 @@ export default function BankLogo({ src, alt, className = 'h-8 w-8', bankName }: 
     setError(false);
   };
 
-  // Show loading skeleton while trying to load logos
-  if (loading && logoUrl) {
-    return (
-      <div className={`${className} rounded bg-muted animate-pulse`} />
-    );
-  }
-
   // Show fallback icon only if no logo URL or all sources failed
   if (!logoUrl || error) {
     return (
@@ -137,12 +130,17 @@ export default function BankLogo({ src, alt, className = 'h-8 w-8', bankName }: 
   }
 
   return (
-    <img
-      src={logoUrl}
-      alt={alt}
-      className={`${className} rounded object-contain`}
-      onError={handleError}
-      onLoad={handleLoad}
-    />
+    <div className="relative">
+      {loading && (
+        <div className={`${className} rounded bg-muted animate-pulse`} />
+      )}
+      <img
+        src={logoUrl}
+        alt={alt}
+        className={`${className} rounded object-contain ${loading ? 'hidden' : ''}`}
+        onError={handleError}
+        onLoad={handleLoad}
+      />
+    </div>
   );
 }
