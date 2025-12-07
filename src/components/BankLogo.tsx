@@ -57,13 +57,15 @@ const generateLogoUrls = (bankName: string): string[] => {
     domains.push(`${minimal}.co.in`);
   }
   
-  // Add Clearbit Logo API (high quality) - try first 4 domains
+  // Use multiple reliable logo APIs
   domains.slice(0, 4).forEach(domain => {
-    urls.push(`https://logo.clearbit.com/${domain}`);
-  });
-  
-  // Add Google Favicon API as fallback - try first 4 domains
-  domains.slice(0, 4).forEach(domain => {
+    // DuckDuckGo Icon API - reliable and fast
+    urls.push(`https://icons.duckduckgo.com/ip3/${domain}.ico`);
+    
+    // Favicon Kit API - good quality
+    urls.push(`https://api.faviconkit.com/${domain}/128`);
+    
+    // Google Favicon API - reliable fallback
     urls.push(`https://www.google.com/s2/favicons?domain=${domain}&sz=128`);
   });
   
