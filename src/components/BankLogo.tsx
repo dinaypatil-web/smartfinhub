@@ -99,16 +99,6 @@ export default function BankLogo({ src, alt, className = 'h-8 w-8', bankName }: 
       setLogoUrl(null);
       setLogoSources([]);
     }
-    
-    // Set a timeout to show fallback if image takes too long to load
-    const timeout = setTimeout(() => {
-      if (loading) {
-        setError(true);
-        setLoading(false);
-      }
-    }, 3000); // 3 second timeout
-    
-    return () => clearTimeout(timeout);
   }, [src, bankName]);
 
   const handleError = () => {
@@ -130,27 +120,29 @@ export default function BankLogo({ src, alt, className = 'h-8 w-8', bankName }: 
     setError(false);
   };
 
-  // Show fallback icon if no logo URL or all sources failed
+  // Show loading skeleton while trying to load logos
+  if (loading && logoUrl) {
+    return (
+      <div className={`${className} rounded bg-muted animate-pulse`} />
+    );
+  }
+
+  // Show fallback icon only if no logo URL or all sources failed
   if (!logoUrl || error) {
     return (
-      <div className={`${className} rounded bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md`}>
-        <Building2 className="h-5 w-5 text-white" />
+      <div className={`${className} rounded bg-muted flex items-center justify-center`}>
+        <Building2 className="h-5 w-5 text-muted-foreground" />
       </div>
     );
   }
 
   return (
-    <>
-      {loading && (
-        <div className={`${className} rounded bg-muted animate-pulse`} />
-      )}
-      <img
-        src={logoUrl}
-        alt={alt}
-        className={`${className} rounded object-contain ${loading ? 'hidden' : ''}`}
-        onError={handleError}
-        onLoad={handleLoad}
-      />
-    </>
+    <img
+      src={logoUrl}
+      alt={alt}
+      className={`${className} rounded object-contain`}
+      onError={handleError}
+      onLoad={handleLoad}
+    />
   );
 }
