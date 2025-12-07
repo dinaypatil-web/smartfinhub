@@ -12,27 +12,58 @@ interface BankLogoProps {
 const generateLogoUrls = (bankName: string): string[] => {
   const urls: string[] = [];
   
-  // Clean the bank name
-  const cleanName = bankName.toLowerCase()
+  // Remove extra spaces and convert to lowercase
+  const normalized = bankName.toLowerCase().trim().replace(/\s+/g, '');
+  
+  // Create variations of the bank name
+  // 1. Keep "bank" in the name (e.g., "hdfcbank" from "HDFC Bank")
+  const withBank = normalized;
+  
+  // 2. Remove common suffixes but keep "bank" if it's part of the core name
+  const cleaned = bankName.toLowerCase()
+    .trim()
+    .replace(/\s+/g, '')
+    .replace(/\s*(financial|group|ltd|limited|inc|corporation|corp|pvt|private)\s*/gi, '')
+    .replace(/\s*bank\s*$/gi, ''); // Only remove "bank" if it's at the end
+  
+  // 3. Aggressive cleaning (remove all common words)
+  const minimal = bankName.toLowerCase()
     .trim()
     .replace(/\s+/g, '')
     .replace(/bank|financial|group|ltd|limited|inc|corporation|corp|pvt|private/gi, '');
   
-  // Try with common domain extensions
-  const domains = [
-    `${cleanName}.com`,
-    `${cleanName}bank.com`,
-    `${cleanName}.co.in`,
-    `${cleanName}bank.co.in`,
-  ];
+  // Try with common domain extensions in priority order
+  const domains: string[] = [];
   
-  // Add Clearbit Logo API (high quality)
-  domains.forEach(domain => {
+  // Priority 1: Try with "bank" kept (most common for banks)
+  domains.push(`${withBank}.com`);
+  domains.push(`${withBank}.co.in`);
+  
+  // Priority 2: Try cleaned version
+  if (cleaned !== withBank) {
+    domains.push(`${cleaned}.com`);
+    domains.push(`${cleaned}.co.in`);
+  }
+  
+  // Priority 3: Try minimal + "bank"
+  if (minimal !== withBank && minimal !== cleaned) {
+    domains.push(`${minimal}bank.com`);
+    domains.push(`${minimal}bank.co.in`);
+  }
+  
+  // Priority 4: Try minimal alone
+  if (minimal !== withBank && minimal !== cleaned) {
+    domains.push(`${minimal}.com`);
+    domains.push(`${minimal}.co.in`);
+  }
+  
+  // Add Clearbit Logo API (high quality) - try first 4 domains
+  domains.slice(0, 4).forEach(domain => {
     urls.push(`https://logo.clearbit.com/${domain}`);
   });
   
-  // Add Google Favicon API as fallback
-  domains.forEach(domain => {
+  // Add Google Favicon API as fallback - try first 4 domains
+  domains.slice(0, 4).forEach(domain => {
     urls.push(`https://www.google.com/s2/favicons?domain=${domain}&sz=128`);
   });
   
