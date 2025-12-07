@@ -111,21 +111,24 @@ export default function AccountStatementDialog({
   const calculateRunningBalance = () => {
     if (!account) return [];
     
-    let balance = Number(account.balance);
+    // Start with current balance
+    let currentBalance = Number(account.balance);
     const transactionsWithBalance = [];
 
-    // Process transactions in reverse order (oldest first) to calculate running balance
-    for (let i = transactions.length - 1; i >= 0; i--) {
+    // Process transactions from newest to oldest to calculate historical balances
+    for (let i = 0; i < transactions.length; i++) {
       const transaction = transactions[i];
       const amount = getTransactionAmount(transaction);
       
-      // Subtract the transaction to get the balance before this transaction
-      balance -= amount;
-      
-      transactionsWithBalance.unshift({
+      // Store the balance AFTER this transaction (which is the current balance at this point)
+      transactionsWithBalance.push({
         transaction,
-        balanceAfter: balance + amount,
+        balanceAfter: currentBalance,
       });
+      
+      // Subtract the transaction amount to get the balance before this transaction
+      // This prepares us for the next (older) transaction
+      currentBalance -= amount;
     }
 
     return transactionsWithBalance;
