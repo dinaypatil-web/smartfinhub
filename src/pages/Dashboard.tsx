@@ -33,6 +33,7 @@ export default function Dashboard() {
   const location = useLocation();
   const [summary, setSummary] = useState<FinancialSummary | null>(null);
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
+  const [allExpenses, setAllExpenses] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [loanCalculations, setLoanCalculations] = useState<Record<string, { emi: number; accruedInterest: number }>>({});
   const [accountEMIs, setAccountEMIs] = useState<Record<string, EMITransaction[]>>({});
@@ -53,13 +54,23 @@ export default function Dashboard() {
     
     setLoading(true);
     try {
-      const [summaryData, transactions] = await Promise.all([
+      // Get current month date range for expense breakdown
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+      
+      const [summaryData, transactions, monthExpenses] = await Promise.all([
         accountApi.getFinancialSummary(user.id),
-        transactionApi.getTransactions(user.id, 10)
+        transactionApi.getTransactions(user.id, 10),
+        transactionApi.getTransactionsByDateRange(user.id, startOfMonth, endOfMonth)
       ]);
       
       setSummary(summaryData);
       setRecentTransactions(transactions);
+      
+      // Filter only expense transactions for the chart
+      const expenses = monthExpenses.filter(t => t.transaction_type === 'expense');
+      setAllExpenses(expenses);
 
       // Calculate loan metrics for all loan accounts
       const calculations: Record<string, { emi: number; accruedInterest: number }> = {};
@@ -178,8 +189,7 @@ export default function Dashboard() {
     })) || [])
   ];
 
-  const expenseData = recentTransactions
-    .filter(t => t.transaction_type === 'expense')
+  const expenseData = allExpenses
     .reduce((acc, t) => {
       const category = t.category || 'Other';
       const existing = acc.find(item => item.name === category);
@@ -360,7 +370,7 @@ export default function Dashboard() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Expenses Breakdown</CardTitle>
+            <CardTitle>Expenses Breakdown (Current Month)</CardTitle>
           </CardHeader>
           <CardContent>
             {expenseData.length > 0 ? (
