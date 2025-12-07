@@ -241,19 +241,19 @@ export default function Dashboard() {
   return (
     <div className="container mx-auto p-4 md:p-6 space-y-4 md:space-y-6 max-w-full overflow-x-auto">
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold">Dashboard</h1>
+        <div className="space-y-1">
+          <h1 className="text-3xl md:text-4xl font-bold gradient-text">Dashboard</h1>
           <p className="text-sm md:text-base text-muted-foreground">Welcome back, {profile?.email || 'User'}</p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <Link to="/accounts/new">
-            <Button size="sm" className="md:size-default">
+            <Button size="sm" className="md:size-default shadow-elegant hover:shadow-glow transition-smooth">
               <Plus className="mr-2 h-4 w-4" />
               Add Account
             </Button>
           </Link>
           <Link to="/transactions/new">
-            <Button variant="outline" size="sm" className="md:size-default">
+            <Button variant="outline" size="sm" className="md:size-default hover-lift">
               <Plus className="mr-2 h-4 w-4" />
               Add Transaction
             </Button>
@@ -262,7 +262,7 @@ export default function Dashboard() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 min-w-max md:min-w-0">
-        <Card className="border-l-4 border-l-emerald-500 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20">
+        <Card className="border-l-4 border-l-emerald-500 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20 hover-lift shadow-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Current Assets</CardTitle>
             <div className="h-10 w-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
@@ -279,7 +279,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-red-500 bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-950/20 dark:to-orange-950/20">
+        <Card className="border-l-4 border-l-red-500 bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-950/20 dark:to-orange-950/20 hover-lift shadow-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Current Liabilities</CardTitle>
             <div className="h-10 w-10 rounded-full bg-red-500/20 flex items-center justify-center">
@@ -296,7 +296,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20">
+        <Card className="border-l-4 border-l-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 hover-lift shadow-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Liquid Assets</CardTitle>
             <div className="h-10 w-10 rounded-full bg-blue-500/20 flex items-center justify-center">
@@ -313,7 +313,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className={`border-l-4 ${(summary?.working_capital || 0) >= 0 ? 'border-l-purple-500 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/20 dark:to-pink-950/20' : 'border-l-amber-500 bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20'}`}>
+        <Card className={`border-l-4 hover-lift shadow-card ${(summary?.working_capital || 0) >= 0 ? 'border-l-purple-500 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/20 dark:to-pink-950/20' : 'border-l-amber-500 bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20'}`}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Working Capital</CardTitle>
             <div className={`h-10 w-10 rounded-full ${(summary?.working_capital || 0) >= 0 ? 'bg-purple-500/20' : 'bg-amber-500/20'} flex items-center justify-center`}>
@@ -332,9 +332,14 @@ export default function Dashboard() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 min-w-max md:min-w-0">
-        <Card>
+        <Card className="shadow-card hover-lift">
           <CardHeader>
-            <CardTitle>Cash & Bank Accounts Distribution</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Wallet className="h-4 w-4 text-primary" />
+              </div>
+              Cash & Bank Accounts Distribution
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {bankAccountsData.length > 0 ? (
@@ -366,9 +371,14 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="shadow-card hover-lift">
           <CardHeader>
-            <CardTitle>Expenses Breakdown (Current Month)</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-lg bg-secondary/10 flex items-center justify-center">
+                <TrendingDown className="h-4 w-4 text-secondary" />
+              </div>
+              Expenses Breakdown (Current Month)
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {expenseData.length > 0 ? (
@@ -402,11 +412,16 @@ export default function Dashboard() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2 min-w-max lg:min-w-0">
-        <Card>
+        <Card className="shadow-card">
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Your Accounts</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Building2 className="h-4 w-4 text-primary" />
+              </div>
+              Your Accounts
+            </CardTitle>
             <Link to="/accounts">
-              <Button variant="ghost" size="sm">View All</Button>
+              <Button variant="ghost" size="sm" className="hover-lift">View All</Button>
             </Link>
           </CardHeader>
           <CardContent>
@@ -414,11 +429,11 @@ export default function Dashboard() {
               {summary?.accounts_by_type.cash.map(account => (
                 <div 
                   key={account.id} 
-                  className="flex items-center justify-between p-4 border-l-4 border-l-emerald-500 rounded-lg bg-gradient-to-r from-emerald-50/50 to-transparent dark:from-emerald-950/20 hover:shadow-md transition-shadow cursor-pointer"
+                  className="flex items-center justify-between p-4 border-l-4 border-l-emerald-500 rounded-lg bg-gradient-to-r from-emerald-50/50 to-transparent dark:from-emerald-950/20 hover-lift shadow-card cursor-pointer"
                   onClick={() => handleAccountClick(account)}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg">
+                    <div className="h-10 w-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-elegant">
                       <Wallet className="h-5 w-5 text-white" />
                     </div>
                     <div>
@@ -436,11 +451,11 @@ export default function Dashboard() {
               {summary?.accounts_by_type.bank.map(account => (
                 <div 
                   key={account.id} 
-                  className="flex items-center justify-between p-4 border-l-4 border-l-blue-500 rounded-lg bg-gradient-to-r from-blue-50/50 to-transparent dark:from-blue-950/20 hover:shadow-md transition-shadow cursor-pointer"
+                  className="flex items-center justify-between p-4 border-l-4 border-l-blue-500 rounded-lg bg-gradient-to-r from-blue-50/50 to-transparent dark:from-blue-950/20 hover-lift shadow-card cursor-pointer"
                   onClick={() => handleAccountClick(account)}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center shadow-md border-2 border-blue-200 dark:border-blue-800">
+                    <div className="h-10 w-10 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center shadow-elegant border-2 border-blue-200 dark:border-blue-800">
                       <BankLogo src={account.institution_logo} alt={account.institution_name || 'Bank'} bankName={account.institution_name || undefined} className="h-8 w-8" />
                     </div>
                     <div>

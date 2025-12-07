@@ -173,11 +173,11 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-3xl font-bold text-center">SmartFinHub</CardTitle>
-          <CardDescription className="text-center">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-muted/30 to-background p-4">
+      <Card className="w-full max-w-md shadow-elegant hover-lift">
+        <CardHeader className="space-y-1 text-center">
+          <CardTitle className="text-4xl font-bold gradient-text">SmartFinHub</CardTitle>
+          <CardDescription className="text-base">
             Sign in to manage your finances
           </CardDescription>
         </CardHeader>
@@ -213,7 +213,7 @@ export default function Login() {
                     required
                   />
                 </div>
-                <Button type="submit" className="w-full" disabled={loading}>
+                <Button type="submit" className="w-full shadow-elegant hover:shadow-glow transition-smooth" disabled={loading}>
                   {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Sign In
                 </Button>
