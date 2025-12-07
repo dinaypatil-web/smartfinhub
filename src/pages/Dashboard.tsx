@@ -221,21 +221,21 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="container mx-auto p-4 md:p-6 space-y-4 md:space-y-6 max-w-full overflow-x-hidden">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground">Welcome back, {profile?.email || 'User'}</p>
+          <h1 className="text-2xl md:text-3xl font-bold">Dashboard</h1>
+          <p className="text-sm md:text-base text-muted-foreground">Welcome back, {profile?.email || 'User'}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Link to="/accounts/new">
-            <Button>
+            <Button size="sm" className="md:size-default">
               <Plus className="mr-2 h-4 w-4" />
               Add Account
             </Button>
           </Link>
           <Link to="/transactions/new">
-            <Button variant="outline">
+            <Button variant="outline" size="sm" className="md:size-default">
               <Plus className="mr-2 h-4 w-4" />
               Add Transaction
             </Button>
@@ -537,11 +537,14 @@ export default function Dashboard() {
                     )}
 
                     {/* Due Amount Information */}
-                    {billingInfo && dueAmount > 0 && (
+                    {billingInfo && (
                       <div className="pt-2 border-t border-purple-200 dark:border-purple-800">
                         <div className="flex items-center justify-between">
                           <span className="text-sm text-muted-foreground">
-                            {formatCurrency(dueAmount, account.currency)} due on {billingInfo.dueDateStr}
+                            {dueAmount > 0 
+                              ? `${formatCurrency(dueAmount, account.currency)} due on ${billingInfo.dueDateStr}`
+                              : `No amount due for current cycle (Due: ${billingInfo.dueDateStr})`
+                            }
                           </span>
                         </div>
                       </div>
