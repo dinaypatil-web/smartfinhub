@@ -513,12 +513,12 @@ export default function Accounts() {
                         )}
 
                         {/* Due Amount Section */}
-                        {billingInfo && dueAmount > 0 && (
+                        {billingInfo && (
                           <div className="space-y-2 pt-2 border-t">
                             <div className="flex items-center justify-between">
                               <p className="text-sm text-muted-foreground">Payment Due</p>
                               <p className="text-lg font-bold text-purple-600 dark:text-purple-400">
-                                {formatCurrency(dueAmount, account.currency)}
+                                {dueAmount > 0 ? formatCurrency(dueAmount, account.currency) : formatCurrency(0, account.currency)}
                               </p>
                             </div>
                             <div className="text-xs text-muted-foreground text-right">

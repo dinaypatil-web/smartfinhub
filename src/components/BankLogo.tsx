@@ -137,7 +137,7 @@ export default function BankLogo({ src, alt, className = 'h-8 w-8', bankName }: 
       <img
         src={logoUrl}
         alt={alt}
-        className={`${className} rounded object-cover ${loading ? 'hidden' : ''}`}
+        className={`${className} rounded object-contain ${loading ? 'hidden' : ''}`}
         onError={handleError}
         onLoad={handleLoad}
       />
