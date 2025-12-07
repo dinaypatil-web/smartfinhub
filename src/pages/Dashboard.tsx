@@ -26,6 +26,7 @@ import {
 import InterestRateChart from '@/components/InterestRateChart';
 import InterestRateTable from '@/components/InterestRateTable';
 import BankLogo from '@/components/BankLogo';
+import AccountStatementDialog from '@/components/AccountStatementDialog';
 
 export default function Dashboard() {
   const { user, profile } = useAuth();
@@ -36,6 +37,8 @@ export default function Dashboard() {
   const [loanCalculations, setLoanCalculations] = useState<Record<string, { emi: number; accruedInterest: number }>>({});
   const [accountEMIs, setAccountEMIs] = useState<Record<string, EMITransaction[]>>({});
   const [accountTransactions, setAccountTransactions] = useState<Record<string, Transaction[]>>({});
+  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+  const [statementDialogOpen, setStatementDialogOpen] = useState(false);
 
   const currency = profile?.default_currency || 'INR';
 
@@ -157,6 +160,11 @@ export default function Dashboard() {
       return Number(account.balance) > 0 ? 'text-danger' : 'text-success';
     }
     return Number(account.balance) >= 0 ? 'text-success' : 'text-danger';
+  };
+
+  const handleAccountClick = (account: Account) => {
+    setSelectedAccount(account);
+    setStatementDialogOpen(true);
   };
 
   const bankAccountsData = [
@@ -396,7 +404,11 @@ export default function Dashboard() {
           <CardContent>
             <div className="space-y-4">
               {summary?.accounts_by_type.cash.map(account => (
-                <div key={account.id} className="flex items-center justify-between p-4 border-l-4 border-l-emerald-500 rounded-lg bg-gradient-to-r from-emerald-50/50 to-transparent dark:from-emerald-950/20 hover:shadow-md transition-shadow">
+                <div 
+                  key={account.id} 
+                  className="flex items-center justify-between p-4 border-l-4 border-l-emerald-500 rounded-lg bg-gradient-to-r from-emerald-50/50 to-transparent dark:from-emerald-950/20 hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => handleAccountClick(account)}
+                >
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg">
                       <Wallet className="h-5 w-5 text-white" />
@@ -414,7 +426,11 @@ export default function Dashboard() {
                 </div>
               ))}
               {summary?.accounts_by_type.bank.map(account => (
-                <div key={account.id} className="flex items-center justify-between p-4 border-l-4 border-l-blue-500 rounded-lg bg-gradient-to-r from-blue-50/50 to-transparent dark:from-blue-950/20 hover:shadow-md transition-shadow">
+                <div 
+                  key={account.id} 
+                  className="flex items-center justify-between p-4 border-l-4 border-l-blue-500 rounded-lg bg-gradient-to-r from-blue-50/50 to-transparent dark:from-blue-950/20 hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => handleAccountClick(account)}
+                >
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center shadow-md border-2 border-blue-200 dark:border-blue-800">
                       <BankLogo src={account.institution_logo} alt={account.institution_name || 'Bank'} bankName={account.institution_name || undefined} className="h-8 w-8" />
@@ -451,7 +467,11 @@ export default function Dashboard() {
                 }
                 
                 return (
-                  <div key={account.id} className="p-4 border-l-4 border-l-purple-500 rounded-lg bg-gradient-to-r from-purple-50/50 to-transparent dark:from-purple-950/20 hover:shadow-md transition-shadow space-y-3">
+                  <div 
+                    key={account.id} 
+                    className="p-4 border-l-4 border-l-purple-500 rounded-lg bg-gradient-to-r from-purple-50/50 to-transparent dark:from-purple-950/20 hover:shadow-md transition-shadow space-y-3 cursor-pointer"
+                    onClick={() => handleAccountClick(account)}
+                  >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className="h-10 w-10 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center shadow-md border-2 border-purple-200 dark:border-purple-800">
@@ -558,7 +578,11 @@ export default function Dashboard() {
                 );
               })}
               {summary?.accounts_by_type.loan.map(account => (
-                <div key={account.id} className="flex items-center justify-between p-4 border-l-4 border-l-orange-500 rounded-lg bg-gradient-to-r from-orange-50/50 to-transparent dark:from-orange-950/20 hover:shadow-md transition-shadow">
+                <div 
+                  key={account.id} 
+                  className="flex items-center justify-between p-4 border-l-4 border-l-orange-500 rounded-lg bg-gradient-to-r from-orange-50/50 to-transparent dark:from-orange-950/20 hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => handleAccountClick(account)}
+                >
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center shadow-md border-2 border-orange-200 dark:border-orange-800">
                       <BankLogo src={account.institution_logo} alt={account.institution_name || 'Loan'} bankName={account.institution_name || undefined} className="h-8 w-8" />
@@ -667,6 +691,14 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* Account Statement Dialog */}
+      <AccountStatementDialog
+        account={selectedAccount}
+        open={statementDialogOpen}
+        onOpenChange={setStatementDialogOpen}
+        currency={currency}
+      />
     </div>
   );
 }

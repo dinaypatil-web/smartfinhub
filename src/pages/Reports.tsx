@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { transactionApi, accountApi } from '@/db/api';
-import type { Transaction, Account } from '@/types/types';
+import { transactionApi, accountApi, emiApi } from '@/db/api';
+import type { Transaction, Account, EMITransaction } from '@/types/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,8 +9,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Download, TrendingUp, TrendingDown, Calendar } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Loader2, Download, TrendingUp, TrendingDown, Calendar, CreditCard } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/utils/format';
+import { calculateTotalDueAmount, getBillingCycleInfo } from '@/utils/billingCycleCalculations';
+import BankLogo from '@/components/BankLogo';
 
 export default function Reports() {
   const { user, profile } = useAuth();
@@ -23,6 +26,13 @@ export default function Reports() {
     accountId: 'all',
     transactionType: 'all',
   });
+  
+  // Credit card statement state
+  const [selectedCreditCard, setSelectedCreditCard] = useState<string>('');
+  const [selectedMonth, setSelectedMonth] = useState<string>(
+    `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
+  );
+  const [creditCardEMIs, setCreditCardEMIs] = useState<EMITransaction[]>([]);
 
   const currency = profile?.default_currency || 'INR';
 
@@ -31,6 +41,32 @@ export default function Reports() {
       loadData();
     }
   }, [user]);
+
+  useEffect(() => {
+    // Auto-select first credit card when accounts load
+    const creditCards = accounts.filter(a => a.account_type === 'credit_card');
+    if (creditCards.length > 0 && !selectedCreditCard) {
+      setSelectedCreditCard(creditCards[0].id);
+    }
+  }, [accounts]);
+
+  useEffect(() => {
+    // Load EMIs when credit card is selected
+    if (selectedCreditCard) {
+      loadCreditCardEMIs();
+    }
+  }, [selectedCreditCard]);
+
+  const loadCreditCardEMIs = async () => {
+    if (!selectedCreditCard) return;
+    
+    try {
+      const emis = await emiApi.getEMIsByAccount(selectedCreditCard);
+      setCreditCardEMIs(emis);
+    } catch (error) {
+      console.error('Error loading EMIs:', error);
+    }
+  };
 
   const loadData = async () => {
     if (!user) return;
@@ -139,6 +175,62 @@ export default function Reports() {
     window.URL.revokeObjectURL(url);
   };
 
+  const getCreditCardStatement = () => {
+    if (!selectedCreditCard || !selectedMonth) return null;
+
+    const account = accounts.find(a => a.id === selectedCreditCard);
+    if (!account || !account.statement_day) return null;
+
+    // Parse selected month (YYYY-MM)
+    const [year, month] = selectedMonth.split('-').map(Number);
+    
+    // Get billing cycle info for the selected month
+    const billingInfo = getBillingCycleInfo(account.statement_day, account.due_day || account.statement_day);
+    
+    // Calculate statement date for the selected month
+    const statementDate = new Date(year, month - 1, account.statement_day);
+    
+    // Calculate billing cycle start (day after previous statement)
+    const cycleStart = new Date(statementDate);
+    cycleStart.setMonth(cycleStart.getMonth() - 1);
+    cycleStart.setDate(cycleStart.getDate() + 1);
+    
+    // Billing cycle end is the statement date
+    const cycleEnd = statementDate;
+
+    // Get transactions for this account in the billing cycle
+    const accountTransactions = transactions.filter(t => {
+      const transactionDate = new Date(t.transaction_date);
+      const isInCycle = transactionDate >= cycleStart && transactionDate <= cycleEnd;
+      const isAccountTransaction = t.from_account_id === selectedCreditCard || t.to_account_id === selectedCreditCard;
+      return isInCycle && isAccountTransaction;
+    });
+
+    // Get EMIs for this account
+    const accountEMIs = creditCardEMIs.filter(emi => {
+      const emiDate = new Date(emi.next_due_date);
+      return emiDate >= cycleStart && emiDate <= cycleEnd;
+    });
+
+    // Calculate due amount
+    const dueAmount = calculateTotalDueAmount(accountTransactions, accountEMIs, account.statement_day);
+
+    return {
+      account,
+      cycleStart,
+      cycleEnd,
+      statementDate,
+      dueDate: new Date(billingInfo.dueDateStr),
+      transactions: accountTransactions.sort((a, b) => 
+        new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime()
+      ),
+      emis: accountEMIs,
+      dueAmount,
+    };
+  };
+
+  const creditCardStatement = getCreditCardStatement();
+
   const summary = calculateSummary();
   const filteredTransactions = getFilteredTransactions();
   const accountBalances = getAccountBalances();
@@ -229,10 +321,11 @@ export default function Reports() {
       </Card>
 
       <Tabs defaultValue="summary" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="summary">Summary</TabsTrigger>
           <TabsTrigger value="transactions">Transaction History</TabsTrigger>
           <TabsTrigger value="balances">Account Balances</TabsTrigger>
+          <TabsTrigger value="credit-card">Credit Card Statement</TabsTrigger>
         </TabsList>
 
         <TabsContent value="summary" className="space-y-6">
@@ -471,6 +564,231 @@ export default function Reports() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="credit-card" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5" />
+                Credit Card Statement
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Select Credit Card</Label>
+                  <Select value={selectedCreditCard} onValueChange={setSelectedCreditCard}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a credit card" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {accounts
+                        .filter(a => a.account_type === 'credit_card')
+                        .map(account => (
+                          <SelectItem key={account.id} value={account.id}>
+                            {account.account_name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Select Month</Label>
+                  <Input
+                    type="month"
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {creditCardStatement && (
+                <div className="space-y-6 mt-6">
+                  {/* Statement Summary */}
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="text-sm text-muted-foreground">Statement Date</div>
+                        <div className="text-2xl font-bold mt-1">
+                          {formatDate(creditCardStatement.statementDate.toISOString())}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="text-sm text-muted-foreground">Due Date</div>
+                        <div className="text-2xl font-bold mt-1">
+                          {formatDate(creditCardStatement.dueDate.toISOString())}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="text-sm text-muted-foreground">Total Due Amount</div>
+                        <div className="text-2xl font-bold text-red-600 dark:text-red-400 mt-1">
+                          {formatCurrency(creditCardStatement.dueAmount, currency)}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Account Info */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Account Information</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center gap-4">
+                        <div className="h-12 w-12 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center shadow-md border-2 border-purple-200 dark:border-purple-800">
+                          <BankLogo 
+                            src={creditCardStatement.account.institution_logo} 
+                            alt={creditCardStatement.account.institution_name || 'Credit Card'} 
+                            bankName={creditCardStatement.account.institution_name || undefined} 
+                            className="h-10 w-10" 
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-semibold">{creditCardStatement.account.account_name}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {creditCardStatement.account.institution_name}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm text-muted-foreground">Current Balance</div>
+                          <div className="font-semibold text-purple-600 dark:text-purple-400">
+                            {formatCurrency(Number(creditCardStatement.account.balance), currency)}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Billing Cycle */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Billing Cycle</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-sm">
+                        <span className="font-medium">
+                          {formatDate(creditCardStatement.cycleStart.toISOString())}
+                        </span>
+                        {' to '}
+                        <span className="font-medium">
+                          {formatDate(creditCardStatement.cycleEnd.toISOString())}
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Transactions */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Transactions</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {creditCardStatement.transactions.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          No transactions in this billing cycle
+                        </div>
+                      ) : (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Date</TableHead>
+                              <TableHead>Description</TableHead>
+                              <TableHead>Category</TableHead>
+                              <TableHead className="text-right">Amount</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {creditCardStatement.transactions.map((transaction) => (
+                              <TableRow key={transaction.id}>
+                                <TableCell className="whitespace-nowrap">
+                                  {formatDate(transaction.transaction_date)}
+                                </TableCell>
+                                <TableCell>{transaction.description || '-'}</TableCell>
+                                <TableCell>
+                                  <Badge variant="outline">{transaction.category || 'Uncategorized'}</Badge>
+                                </TableCell>
+                                <TableCell className="text-right font-medium">
+                                  <span className={
+                                    transaction.from_account_id === selectedCreditCard
+                                      ? 'text-red-600 dark:text-red-400'
+                                      : 'text-green-600 dark:text-green-400'
+                                  }>
+                                    {transaction.from_account_id === selectedCreditCard ? '-' : '+'}
+                                    {formatCurrency(transaction.amount, currency)}
+                                  </span>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* EMI Transactions */}
+                  {creditCardStatement.emis.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">EMI Transactions</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Next Due Date</TableHead>
+                              <TableHead>Description</TableHead>
+                              <TableHead className="text-right">Monthly EMI</TableHead>
+                              <TableHead className="text-right">Remaining</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {creditCardStatement.emis.map((emi) => (
+                              <TableRow key={emi.id}>
+                                <TableCell className="whitespace-nowrap">
+                                  {formatDate(emi.next_due_date)}
+                                </TableCell>
+                                <TableCell>{emi.description || 'EMI Payment'}</TableCell>
+                                <TableCell className="text-right font-medium text-red-600 dark:text-red-400">
+                                  {formatCurrency(emi.monthly_emi, currency)}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Badge variant="secondary">
+                                    {emi.remaining_installments} / {emi.emi_months}
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              )}
+
+              {!creditCardStatement && selectedCreditCard && (
+                <div className="text-center py-8 text-muted-foreground">
+                  {accounts.find(a => a.id === selectedCreditCard)?.statement_day
+                    ? 'Select a month to view the statement'
+                    : 'This credit card does not have a statement day configured'}
+                </div>
+              )}
+
+              {accounts.filter(a => a.account_type === 'credit_card').length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  No credit cards found. Add a credit card account to view statements.
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
