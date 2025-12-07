@@ -321,12 +321,14 @@ export default function Reports() {
       </Card>
 
       <Tabs defaultValue="summary" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="summary">Summary</TabsTrigger>
-          <TabsTrigger value="transactions">Transaction History</TabsTrigger>
-          <TabsTrigger value="balances">Account Balances</TabsTrigger>
-          <TabsTrigger value="credit-card">Credit Card Statement</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto">
+          <TabsList className="inline-flex w-full min-w-max xl:grid xl:grid-cols-4">
+            <TabsTrigger value="summary" className="flex-1 xl:flex-none whitespace-nowrap">Summary</TabsTrigger>
+            <TabsTrigger value="transactions" className="flex-1 xl:flex-none whitespace-nowrap">Transaction History</TabsTrigger>
+            <TabsTrigger value="balances" className="flex-1 xl:flex-none whitespace-nowrap">Account Balances</TabsTrigger>
+            <TabsTrigger value="credit-card" className="flex-1 xl:flex-none whitespace-nowrap">Credit Card Statement</TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="summary" className="space-y-6">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
