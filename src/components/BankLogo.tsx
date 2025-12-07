@@ -99,6 +99,16 @@ export default function BankLogo({ src, alt, className = 'h-8 w-8', bankName }: 
       setLogoUrl(null);
       setLogoSources([]);
     }
+    
+    // Set a timeout to show fallback if image takes too long to load
+    const timeout = setTimeout(() => {
+      if (loading) {
+        setError(true);
+        setLoading(false);
+      }
+    }, 3000); // 3 second timeout
+    
+    return () => clearTimeout(timeout);
   }, [src, bankName]);
 
   const handleError = () => {
