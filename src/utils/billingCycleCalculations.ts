@@ -82,23 +82,32 @@ export function getCurrentBillingCycle(statementDay: number): {
  * Calculate the next payment due date
  * @param statementDay - Day of month when statement is generated
  * @param dueDay - Day of month when payment is due
- * @returns Next due date
+ * @returns Next due date (current month if not passed, next month if passed)
  */
 export function getNextDueDate(statementDay: number, dueDay: number): Date {
-  const { statementDate } = getCurrentBillingCycle(statementDay);
-  const statementYear = statementDate.getFullYear();
-  const statementMonth = statementDate.getMonth();
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth();
+  const currentDay = today.getDate();
 
-  // Due date is in the month after statement date
-  let dueYear = statementYear;
-  let dueMonth = statementMonth + 1;
-  if (dueMonth > 11) {
-    dueMonth = 0;
-    dueYear++;
+  // Get the safe due day for current month
+  const safeDueDayThisMonth = getSafeDayInMonth(currentYear, currentMonth, dueDay);
+  
+  // Check if this month's due date has passed
+  if (currentDay <= safeDueDayThisMonth) {
+    // This month's due date hasn't passed yet, return this month's due date
+    return new Date(currentYear, currentMonth, safeDueDayThisMonth, 23, 59, 59);
+  } else {
+    // This month's due date has passed, return next month's due date
+    let nextMonth = currentMonth + 1;
+    let nextYear = currentYear;
+    if (nextMonth > 11) {
+      nextMonth = 0;
+      nextYear++;
+    }
+    const safeDueDayNextMonth = getSafeDayInMonth(nextYear, nextMonth, dueDay);
+    return new Date(nextYear, nextMonth, safeDueDayNextMonth, 23, 59, 59);
   }
-
-  const safeDueDay = getSafeDayInMonth(dueYear, dueMonth, dueDay);
-  return new Date(dueYear, dueMonth, safeDueDay, 23, 59, 59);
 }
 
 /**
