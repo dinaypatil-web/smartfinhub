@@ -565,19 +565,21 @@ export default function Dashboard() {
                       </div>
                     )}
 
-                    {/* Due Amount Information */}
-                    {billingInfo && (
-                      <div className="pt-2 border-t border-purple-200 dark:border-purple-800">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">
-                            {dueAmount > 0 
+                    {/* Due Amount Information - Always show total outstanding balance */}
+                    <div className="pt-2 border-t border-purple-200 dark:border-purple-800">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">
+                          {dueAmount > 0 
+                            ? billingInfo 
                               ? `${formatCurrency(dueAmount, account.currency)} due on ${billingInfo.dueDateStr}`
-                              : `No amount due for current cycle (Due: ${billingInfo.dueDateStr})`
-                            }
-                          </span>
-                        </div>
+                              : `${formatCurrency(dueAmount, account.currency)} outstanding balance`
+                            : billingInfo
+                              ? `No amount due (Next due: ${billingInfo.dueDateStr})`
+                              : 'No outstanding balance'
+                          }
+                        </span>
                       </div>
-                    )}
+                    </div>
                   </div>
                 );
               })}
