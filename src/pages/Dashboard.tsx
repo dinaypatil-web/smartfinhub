@@ -223,7 +223,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="container mx-auto p-4 md:p-6 space-y-4 md:space-y-6 max-w-full overflow-x-hidden">
+    <div className="container mx-auto p-4 md:p-6 space-y-4 md:space-y-6 max-w-full overflow-x-auto">
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold">Dashboard</h1>
@@ -245,7 +245,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 min-w-max md:min-w-0">
         <Card className="border-l-4 border-l-emerald-500 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Current Assets</CardTitle>
@@ -315,7 +315,7 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2 min-w-max md:min-w-0">
         <Card>
           <CardHeader>
             <CardTitle>Cash & Bank Accounts Distribution</CardTitle>
@@ -385,7 +385,7 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-2 min-w-max lg:min-w-0">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Your Accounts</CardTitle>
