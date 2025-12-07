@@ -13,10 +13,16 @@ A comprehensive financial management web application designed for tracking and m
 - Mobile number verification via OTP (One-Time Password)
 - **Twilio Integration**: Use Twilio API for sending OTP to mobile numbers during sign-up process
 - Verified email or mobile number serves as username for secure data retrieval
-- **Mobile Number Update**: After registration through email ID, users can update their mobile number in account settings
-- Updated mobile number requires OTP verification via Twilio before activation
-- Once verified, users can login using either their registered email or updated mobile number
+- **Mobile Number Update**: After registration through email ID, users can update their mobile number in account settings without OTP verification
+- Updated mobile number immediately activated and available for login
+- Once updated, users can login using either their registered email or updated mobile number
 - Mobile number update feature accessible from user profile settings
+- **Alternative Phone Verification Options** (optional implementation):
+  - Email Confirmation: Send verification link to registered email address to confirm phone number change
+  - Security Question: User answers pre-set security questions before updating phone number
+  - Password Re-entry: Require user to re-enter account password to authorize phone number change
+  - Authenticator App: Use third-party authenticator apps (Google Authenticator, Microsoft Authenticator) to generate verification codes
+  - Biometric Verification: Fingerprint or face recognition on supported devices
 
 ## 2. Core Features
 
@@ -141,27 +147,29 @@ A comprehensive financial management web application designed for tracking and m
   - Show active EMI transactions count\n  - Display total outstanding EMI balance
   - Show next EMI installment amount and due date\n- Visual indicators highlighting upcoming statement dates and due dates within 7 days
 
-#### 2.4.4 Account Quick View
-- **Click-to-View Statement**: When user clicks on any account card on dashboard, system displays popup window showing last 90 days statement for that account
+#### 2.4.4 Account Quick View\n- **Click-to-View Statement**: When user clicks on any account card on dashboard, system displays popup window showing last 90 days statement for that account
 - Popup includes transaction history, balance changes, and account activity for the 90-day period
 - Statement popup available for all account types: Cash, Bank, Credit Card, and Loan accounts
 - Close button to dismiss popup and return to dashboard
 
-### 2.5 Budget Management\n- Input monthly budgeted income amounts\n- Input monthly budgeted expense amounts by category
-- Compare actual expenses against budgeted amounts
-- Display budget variance (over/under budget) on dashboard
+### 2.5 Budget Management
+- Input monthly budgeted income amounts
+- Input monthly budgeted expense amounts by category
+- Compare actual expenses against budgeted amounts\n- Display budget variance (over/under budget) on dashboard
 - Monthly budget tracking and analysis
-- Editing or saving budget automatically triggers immediate update of Budget vs. Actual analysis\n- Real-time recalculation of budget variance when budget values are modified
+- Editing or saving budget automatically triggers immediate update of Budget vs. Actual analysis
+- Real-time recalculation of budget variance when budget values are modified
 - Updated Budget vs. Actual analysis immediately reflected on dashboard and reports
 - System recalculates remaining budget for each category after budget modification
 
 ### 2.6 Reporting
-- Transaction history reports with date range filters\n- Income and expense summary reports\n- Account balance reports across all accounts
+- Transaction history reports with date range filters
+- Income and expense summary reports
+- Account balance reports across all accounts
 - Budget vs. actual analysis reports
 - **Credit Card Monthly Statement Report**: Reports section includes credit card statement view with month selector
 - User selects specific month from dropdown to view credit card statement for that period
-- Statement displays all transactions, payments, EMI installments, interest charges, and balance for selected month
-- Statement shows opening balance, closing balance, total spending, and payment due information
+- Statement displays all transactions, payments, EMI installments, interest charges, and balance for selected month\n- Statement shows opening balance, closing balance, total spending, and payment due information
 - **EMI Transaction Reports**: Detailed reports showing all EMI transactions, payment schedules, and outstanding balances
 - Export reports functionality
 
@@ -169,17 +177,19 @@ A comprehensive financial management web application designed for tracking and m
 
 ### 3.1 Color Scheme
 - Primary color: Deep blue (#1E3A8A) conveying trust and financial stability
-- Secondary color: Emerald green (#10B981) for positive balances and income indicators\n- Accent color: Amber (#F59E0B) for alerts and important notifications
+- Secondary color: Emerald green (#10B981) for positive balances and income indicators
+- Accent color: Amber (#F59E0B) for alerts and important notifications
 - Negative indicator: Coral red (#EF4444) for liabilities and overspending
 
-### 3.2 Visual Details\n- Card-based layout with subtle drop shadows for depth
+### 3.2 Visual Details
+- Card-based layout with subtle drop shadows for depth
 - Rounded corners (8px radius) for modern, approachable aesthetic
 - Smooth hover transitions on interactive elements
 - Clear iconography for transaction types and account categories
 - Consistent spacing and padding throughout interface
 
-### 3.3 Layout Structure
-- Grid-based dashboard for account cards with responsive columns\n- Side navigation panel for main sections: Accounts, Transactions, Reports, Budget, Settings
+### 3.3 Layout Structure\n- Grid-based dashboard for account cards with responsive columns
+- Side navigation panel for main sections: Accounts, Transactions, Reports, Budget, Settings
 - Responsive design adapting seamlessly to desktop, tablet, and mobile screens
 - Clear visual hierarchy with prominent balance displays and chart visualizations
 - Sticky header for easy navigation access
