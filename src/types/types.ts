@@ -32,6 +32,7 @@ export interface Account {
   due_date: number | null;
   statement_day: number | null;
   due_day: number | null;
+  credit_limit: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -134,4 +135,33 @@ export interface BankOption {
   name: string;
   logo: string;
   country: string;
+}
+
+export type EMIStatus = 'active' | 'completed' | 'cancelled';
+
+export interface EMITransaction {
+  id: string;
+  user_id: string;
+  account_id: string;
+  transaction_id: string | null;
+  purchase_amount: number;
+  bank_charges: number;
+  total_amount: number;
+  emi_months: number;
+  monthly_emi: number;
+  remaining_installments: number;
+  start_date: string;
+  next_due_date: string;
+  description: string | null;
+  status: EMIStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AccountWithEMI extends Account {
+  active_emis?: EMITransaction[];
+  total_emi_amount?: number;
+  statement_amount?: number;
+  credit_utilization?: number;
+  available_credit?: number;
 }

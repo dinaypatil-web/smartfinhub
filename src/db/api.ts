@@ -7,6 +7,7 @@ import type {
   Transaction,
   Budget,
   ExpenseCategory,
+  EMITransaction,
   AccountWithInterestHistory,
   TransactionWithAccounts,
   FinancialSummary,
@@ -642,5 +643,111 @@ export const categoryApi = {
       .eq('id', categoryId);
     
     if (error) throw error;
+  }
+};
+
+export const emiApi = {
+  async getEMIsByAccount(accountId: string): Promise<EMITransaction[]> {
+    const { data, error } = await supabase
+      .from('emi_transactions')
+      .select('*')
+      .eq('account_id', accountId)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return Array.isArray(data) ? data : [];
+  },
+
+  async getActiveEMIsByAccount(accountId: string): Promise<EMITransaction[]> {
+    const { data, error } = await supabase
+      .from('emi_transactions')
+      .select('*')
+      .eq('account_id', accountId)
+      .eq('status', 'active')
+      .order('next_due_date', { ascending: true });
+    
+    if (error) throw error;
+    return Array.isArray(data) ? data : [];
+  },
+
+  async getEMIsByUser(userId: string): Promise<EMITransaction[]> {
+    const { data, error } = await supabase
+      .from('emi_transactions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return Array.isArray(data) ? data : [];
+  },
+
+  async createEMI(emi: Omit<EMITransaction, 'id' | 'created_at' | 'updated_at'>): Promise<EMITransaction> {
+    const { data, error } = await supabase
+      .from('emi_transactions')
+      .insert(emi)
+      .select()
+      .maybeSingle();
+    
+    if (error) throw error;
+    if (!data) throw new Error('Failed to create EMI transaction');
+    return data;
+  },
+
+  async updateEMI(id: string, updates: Partial<EMITransaction>): Promise<EMITransaction> {
+    const { data, error } = await supabase
+      .from('emi_transactions')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .maybeSingle();
+    
+    if (error) throw error;
+    if (!data) throw new Error('Failed to update EMI transaction');
+    return data;
+  },
+
+  async deleteEMI(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('emi_transactions')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+  },
+
+  async payEMIInstallment(emiId: string): Promise<EMITransaction> {
+    const { data: emi, error: fetchError } = await supabase
+      .from('emi_transactions')
+      .select('*')
+      .eq('id', emiId)
+      .maybeSingle();
+    
+    if (fetchError) throw fetchError;
+    if (!emi) throw new Error('EMI transaction not found');
+    
+    const remainingInstallments = emi.remaining_installments - 1;
+    const status = remainingInstallments === 0 ? 'completed' : 'active';
+    const nextDueDate = remainingInstallments > 0 
+      ? new Date(new Date(emi.next_due_date).setMonth(new Date(emi.next_due_date).getMonth() + 1)).toISOString().split('T')[0]
+      : emi.next_due_date;
+    
+    const { data, error } = await supabase
+      .from('emi_transactions')
+      .update({
+        remaining_installments: remainingInstallments,
+        next_due_date: nextDueDate,
+        status
+      })
+      .eq('id', emiId)
+      .select()
+      .maybeSingle();
+    
+    if (error) throw error;
+    if (!data) throw new Error('Failed to update EMI installment');
+    return data;
+  },
+
+  async cancelEMI(emiId: string): Promise<EMITransaction> {
+    return this.updateEMI(emiId, { status: 'cancelled' });
   }
 };

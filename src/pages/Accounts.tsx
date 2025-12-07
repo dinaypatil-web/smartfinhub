@@ -1,17 +1,24 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { accountApi, interestRateApi } from '@/db/api';
-import type { Account } from '@/types/types';
+import { accountApi, interestRateApi, emiApi } from '@/db/api';
+import type { Account, EMITransaction } from '@/types/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { formatCurrency, formatAccountNumber } from '@/utils/format';
-import { Plus, Edit, Trash2, Building2, CreditCard, Wallet, TrendingUp } from 'lucide-react';
+import { Plus, Edit, Trash2, Building2, CreditCard, Wallet, TrendingUp, AlertCircle } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import InterestRateManager from '@/components/InterestRateManager';
 import { calculateEMI, calculateAccruedInterest } from '@/utils/loanCalculations';
+import { 
+  calculateAvailableCredit, 
+  calculateCreditUtilization, 
+  getCreditLimitWarningLevel,
+  calculateStatementAmount 
+} from '@/utils/emiCalculations';
 import BankLogo from '@/components/BankLogo';
 import { formatDayOfMonth, isComingSoon } from '@/utils/dateUtils';
 import {
@@ -34,6 +41,7 @@ export default function Accounts() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
   const [loanCalculations, setLoanCalculations] = useState<Record<string, { emi: number; accruedInterest: number }>>({});
+  const [accountEMIs, setAccountEMIs] = useState<Record<string, EMITransaction[]>>({});
 
   const currency = profile?.default_currency || 'INR';
 
@@ -84,6 +92,22 @@ export default function Accounts() {
       }
 
       setLoanCalculations(calculations);
+
+      // Load EMI data for credit card accounts
+      const emis: Record<string, EMITransaction[]> = {};
+      for (const account of data) {
+        if (account.account_type === 'credit_card') {
+          try {
+            const accountEMIs = await emiApi.getActiveEMIsByAccount(account.id);
+            if (accountEMIs.length > 0) {
+              emis[account.id] = accountEMIs;
+            }
+          } catch (error) {
+            console.error(`Error loading EMIs for account ${account.id}:`, error);
+          }
+        }
+      }
+      setAccountEMIs(emis);
     } catch (error) {
       console.error('Error loading accounts:', error);
       toast({
@@ -353,79 +377,169 @@ export default function Accounts() {
                 Credit Cards
               </h2>
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {groupedAccounts.credit_card.map(account => (
-                  <Card key={account.id} className="hover:shadow-lg transition-shadow">
-                    <CardHeader className="flex flex-row items-start justify-between space-y-0">
-                      <div className="flex items-center gap-3">
-                        <BankLogo 
-                          src={account.institution_logo} 
-                          alt={account.institution_name || 'Credit Card'} 
-                          className="h-10 w-10"
-                        />
+                {groupedAccounts.credit_card.map(account => {
+                  const emis = accountEMIs[account.id] || [];
+                  const statementAmount = calculateStatementAmount(account.balance, emis);
+                  const utilization = account.credit_limit ? calculateCreditUtilization(account.balance, account.credit_limit) : null;
+                  const warningLevel = account.credit_limit ? getCreditLimitWarningLevel(account.balance, account.credit_limit) : 'safe';
+                  const availableCredit = account.credit_limit ? calculateAvailableCredit(account.balance, account.credit_limit) : null;
+                  
+                  return (
+                    <Card key={account.id} className="hover:shadow-lg transition-shadow">
+                      <CardHeader className="flex flex-row items-start justify-between space-y-0">
+                        <div className="flex items-center gap-3">
+                          <BankLogo 
+                            src={account.institution_logo} 
+                            alt={account.institution_name || 'Credit Card'} 
+                            className="h-10 w-10"
+                          />
+                          <div>
+                            <CardTitle className="text-lg">{account.account_name}</CardTitle>
+                            <p className="text-sm text-muted-foreground">{account.institution_name}</p>
+                          </div>
+                        </div>
+                        <Badge variant={getAccountTypeBadgeVariant(account.account_type)}>
+                          {getAccountTypeLabel(account.account_type)}
+                        </Badge>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
                         <div>
-                          <CardTitle className="text-lg">{account.account_name}</CardTitle>
-                          <p className="text-sm text-muted-foreground">{account.institution_name}</p>
+                          <p className="text-sm text-muted-foreground">Card Number</p>
+                          <p className="font-medium">{formatAccountNumber(account.last_4_digits)}</p>
                         </div>
-                      </div>
-                      <Badge variant={getAccountTypeBadgeVariant(account.account_type)}>
-                        {getAccountTypeLabel(account.account_type)}
-                      </Badge>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Card Number</p>
-                        <p className="font-medium">{formatAccountNumber(account.last_4_digits)}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Outstanding Balance</p>
-                        <p className={`text-2xl font-bold ${getBalanceColor(account)}`}>
-                          {formatCurrency(Number(account.balance), account.currency)}
-                        </p>
-                      </div>
-                      {(account.statement_day || account.due_day) && (
-                        <div className="space-y-2 pt-2 border-t">
-                          {account.statement_day && (
-                            <div className="flex items-center justify-between">
-                              <p className="text-sm text-muted-foreground">Statement Date</p>
-                              <p className={`text-sm font-medium ${isComingSoon(account.statement_day) ? 'text-amber-600 dark:text-amber-400' : ''}`}>
-                                {formatDayOfMonth(account.statement_day)} of each month
-                              </p>
-                            </div>
-                          )}
-                          {account.due_day && (
-                            <div className="flex items-center justify-between">
-                              <p className="text-sm text-muted-foreground">Payment Due Date</p>
-                              <p className={`text-sm font-medium ${isComingSoon(account.due_day) ? 'text-red-600 dark:text-red-400' : ''}`}>
-                                {formatDayOfMonth(account.due_day)} of each month
-                              </p>
-                            </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Outstanding Balance</p>
+                          <p className={`text-2xl font-bold ${getBalanceColor(account)}`}>
+                            {formatCurrency(Number(account.balance), account.currency)}
+                          </p>
+                          {emis.length > 0 && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              + {formatCurrency(statementAmount - account.balance, account.currency)} in EMIs
+                            </p>
                           )}
                         </div>
-                      )}
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1"
-                          onClick={() => navigate(`/accounts/edit/${account.id}`)}
-                        >
-                          <Edit className="mr-2 h-4 w-4" />
-                          Edit
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setAccountToDelete(account);
-                            setDeleteDialogOpen(true);
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4 text-danger" />
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+
+                        {/* Credit Limit Section */}
+                        {account.credit_limit && (
+                          <div className="space-y-2 pt-2 border-t">
+                            <div className="flex items-center justify-between">
+                              <p className="text-sm text-muted-foreground">Credit Utilization</p>
+                              <div className="flex items-center gap-2">
+                                <span className={`text-sm font-semibold ${
+                                  warningLevel === 'danger' ? 'text-red-600 dark:text-red-400' :
+                                  warningLevel === 'warning' ? 'text-amber-600 dark:text-amber-400' :
+                                  'text-emerald-600 dark:text-emerald-400'
+                                }`}>
+                                  {utilization?.toFixed(1)}%
+                                </span>
+                                {warningLevel !== 'safe' && (
+                                  <AlertCircle className={`h-4 w-4 ${
+                                    warningLevel === 'danger' ? 'text-red-600' : 'text-amber-600'
+                                  }`} />
+                                )}
+                              </div>
+                            </div>
+                            <Progress 
+                              value={utilization || 0} 
+                              className="h-2"
+                            />
+                            <div className="flex items-center justify-between text-xs text-muted-foreground">
+                              <span>Available: {formatCurrency(availableCredit || 0, account.currency)}</span>
+                              <span>Limit: {formatCurrency(account.credit_limit, account.currency)}</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Statement and Due Dates */}
+                        {(account.statement_day || account.due_day) && (
+                          <div className="space-y-2 pt-2 border-t">
+                            {account.statement_day && (
+                              <div className="flex items-center justify-between">
+                                <p className="text-sm text-muted-foreground">Statement Date</p>
+                                <p className={`text-sm font-medium ${isComingSoon(account.statement_day) ? 'text-amber-600 dark:text-amber-400' : ''}`}>
+                                  {formatDayOfMonth(account.statement_day)} of each month
+                                </p>
+                              </div>
+                            )}
+                            {account.due_day && (
+                              <div className="flex items-center justify-between">
+                                <p className="text-sm text-muted-foreground">Payment Due Date</p>
+                                <p className={`text-sm font-medium ${isComingSoon(account.due_day) ? 'text-red-600 dark:text-red-400' : ''}`}>
+                                  {formatDayOfMonth(account.due_day)} of each month
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* EMI Section */}
+                        {emis.length > 0 && (
+                          <div className="space-y-2 pt-2 border-t">
+                            <div className="flex items-center justify-between">
+                              <p className="text-sm text-muted-foreground">Active EMIs</p>
+                              <Badge variant="secondary">{emis.length}</Badge>
+                            </div>
+                            <div className="space-y-2">
+                              {emis.map(emi => {
+                                const remainingAmount = emi.monthly_emi * emi.remaining_installments;
+                                return (
+                                  <div key={emi.id} className="bg-muted/50 rounded-lg p-3 space-y-1">
+                                    <div className="flex items-center justify-between">
+                                      <p className="text-sm font-medium truncate max-w-[180px]">{emi.description}</p>
+                                      <Badge variant="outline" className="text-xs">
+                                        {emi.remaining_installments}/{emi.emi_months}
+                                      </Badge>
+                                    </div>
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="text-muted-foreground">Monthly EMI</span>
+                                      <span className="font-semibold">{formatCurrency(emi.monthly_emi, account.currency)}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="text-muted-foreground">Remaining</span>
+                                      <span className="font-semibold">{formatCurrency(remainingAmount, account.currency)}</span>
+                                    </div>
+                                    <Progress 
+                                      value={((emi.emi_months - emi.remaining_installments) / emi.emi_months) * 100} 
+                                      className="h-1 mt-2"
+                                    />
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            <div className="flex items-center justify-between pt-2 border-t">
+                              <p className="text-sm font-semibold">Total Statement Amount</p>
+                              <p className="text-lg font-bold text-purple-600 dark:text-purple-400">
+                                {formatCurrency(statementAmount, account.currency)}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1"
+                            onClick={() => navigate(`/accounts/edit/${account.id}`)}
+                          >
+                            <Edit className="mr-2 h-4 w-4" />
+                            Edit
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setAccountToDelete(account);
+                              setDeleteDialogOpen(true);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 text-danger" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             </div>
           )}

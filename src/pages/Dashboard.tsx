@@ -1,15 +1,23 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { accountApi, transactionApi, interestRateApi } from '@/db/api';
-import type { Account, Transaction, FinancialSummary } from '@/types/types';
+import { accountApi, transactionApi, interestRateApi, emiApi } from '@/db/api';
+import type { Account, Transaction, FinancialSummary, EMITransaction } from '@/types/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { formatCurrency, formatAccountNumber } from '@/utils/format';
-import { Plus, Wallet, CreditCard, TrendingUp, TrendingDown, Building2 } from 'lucide-react';
+import { Plus, Wallet, CreditCard, TrendingUp, TrendingDown, Building2, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { calculateEMI, calculateAccruedInterest } from '@/utils/loanCalculations';
+import { 
+  calculateAvailableCredit, 
+  calculateCreditUtilization, 
+  getCreditLimitWarningLevel,
+  calculateStatementAmount 
+} from '@/utils/emiCalculations';
 import InterestRateChart from '@/components/InterestRateChart';
 import InterestRateTable from '@/components/InterestRateTable';
 import BankLogo from '@/components/BankLogo';
@@ -21,6 +29,7 @@ export default function Dashboard() {
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [loanCalculations, setLoanCalculations] = useState<Record<string, { emi: number; accruedInterest: number }>>({});
+  const [accountEMIs, setAccountEMIs] = useState<Record<string, EMITransaction[]>>({});
 
   const currency = profile?.default_currency || 'INR';
 
@@ -78,6 +87,22 @@ export default function Dashboard() {
       }
 
       setLoanCalculations(calculations);
+
+      // Load EMI data for credit card accounts
+      const emis: Record<string, EMITransaction[]> = {};
+      if (summaryData?.accounts_by_type.credit_card) {
+        for (const account of summaryData.accounts_by_type.credit_card) {
+          try {
+            const accountEMIs = await emiApi.getActiveEMIsByAccount(account.id);
+            if (accountEMIs.length > 0) {
+              emis[account.id] = accountEMIs;
+            }
+          } catch (error) {
+            console.error(`Error loading EMIs for account ${account.id}:`, error);
+          }
+        }
+      }
+      setAccountEMIs(emis);
     } catch (error) {
       console.error('Error loading dashboard:', error);
     } finally {
@@ -394,38 +419,120 @@ export default function Dashboard() {
                   </div>
                 </div>
               ))}
-              {summary?.accounts_by_type.credit_card.map(account => (
-                <div key={account.id} className="flex items-center justify-between p-4 border-l-4 border-l-purple-500 rounded-lg bg-gradient-to-r from-purple-50/50 to-transparent dark:from-purple-950/20 hover:shadow-md transition-shadow">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center shadow-md border-2 border-purple-200 dark:border-purple-800">
-                      <BankLogo src={account.institution_logo} alt={account.institution_name || 'Credit Card'} bankName={account.institution_name || undefined} className="h-8 w-8" />
-                    </div>
-                    <div>
-                      <p className="font-medium">{account.account_name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {getAccountTypeLabel(account.account_type)} • {formatAccountNumber(account.last_4_digits)}
-                      </p>
-                      {(account.statement_day || account.due_day) && (
-                        <div className="flex gap-3 mt-1 text-xs">
-                          {account.statement_day && (
-                            <span className={`${isComingSoon(account.statement_day) ? 'text-amber-600 dark:text-amber-400 font-semibold' : 'text-muted-foreground'}`}>
-                              📄 Statement: {formatDayOfMonth(account.statement_day)}
-                            </span>
-                          )}
-                          {account.due_day && (
-                            <span className={`${isComingSoon(account.due_day) ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-muted-foreground'}`}>
-                              💳 Due: {formatDayOfMonth(account.due_day)}
-                            </span>
+              {summary?.accounts_by_type.credit_card.map(account => {
+                const emis = accountEMIs[account.id] || [];
+                const statementAmount = calculateStatementAmount(account.balance, emis);
+                const utilization = account.credit_limit ? calculateCreditUtilization(account.balance, account.credit_limit) : null;
+                const warningLevel = account.credit_limit ? getCreditLimitWarningLevel(account.balance, account.credit_limit) : 'safe';
+                const availableCredit = account.credit_limit ? calculateAvailableCredit(account.balance, account.credit_limit) : null;
+                
+                return (
+                  <div key={account.id} className="p-4 border-l-4 border-l-purple-500 rounded-lg bg-gradient-to-r from-purple-50/50 to-transparent dark:from-purple-950/20 hover:shadow-md transition-shadow space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center shadow-md border-2 border-purple-200 dark:border-purple-800">
+                          <BankLogo src={account.institution_logo} alt={account.institution_name || 'Credit Card'} bankName={account.institution_name || undefined} className="h-8 w-8" />
+                        </div>
+                        <div>
+                          <p className="font-medium">{account.account_name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {getAccountTypeLabel(account.account_type)} • {formatAccountNumber(account.last_4_digits)}
+                          </p>
+                          {(account.statement_day || account.due_day) && (
+                            <div className="flex gap-3 mt-1 text-xs">
+                              {account.statement_day && (
+                                <span className={`${isComingSoon(account.statement_day) ? 'text-amber-600 dark:text-amber-400 font-semibold' : 'text-muted-foreground'}`}>
+                                  📄 Statement: {formatDayOfMonth(account.statement_day)}
+                                </span>
+                              )}
+                              {account.due_day && (
+                                <span className={`${isComingSoon(account.due_day) ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-muted-foreground'}`}>
+                                  💳 Due: {formatDayOfMonth(account.due_day)}
+                                </span>
+                              )}
+                            </div>
                           )}
                         </div>
-                      )}
+                      </div>
+                      <div className="text-right">
+                        <div className="font-semibold text-purple-600 dark:text-purple-400">
+                          {formatCurrency(Number(account.balance), account.currency)}
+                        </div>
+                        {emis.length > 0 && (
+                          <div className="text-xs text-muted-foreground mt-1">
+                            + {formatCurrency(statementAmount - account.balance, account.currency)} EMI
+                          </div>
+                        )}
+                      </div>
                     </div>
+
+                    {/* Credit Limit Information */}
+                    {account.credit_limit && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">Credit Utilization</span>
+                          <div className="flex items-center gap-2">
+                            <span className={`font-semibold ${
+                              warningLevel === 'danger' ? 'text-red-600 dark:text-red-400' :
+                              warningLevel === 'warning' ? 'text-amber-600 dark:text-amber-400' :
+                              'text-emerald-600 dark:text-emerald-400'
+                            }`}>
+                              {utilization?.toFixed(1)}%
+                            </span>
+                            {warningLevel !== 'safe' && (
+                              <AlertCircle className={`h-3 w-3 ${
+                                warningLevel === 'danger' ? 'text-red-600' : 'text-amber-600'
+                              }`} />
+                            )}
+                          </div>
+                        </div>
+                        <Progress 
+                          value={utilization || 0} 
+                          className="h-2"
+                        />
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>Available: {formatCurrency(availableCredit || 0, account.currency)}</span>
+                          <span>Limit: {formatCurrency(account.credit_limit, account.currency)}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* EMI Information */}
+                    {emis.length > 0 && (
+                      <div className="pt-2 border-t border-purple-200 dark:border-purple-800">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">Active EMIs ({emis.length})</span>
+                          <span className="font-semibold text-purple-600 dark:text-purple-400">
+                            Total Statement: {formatCurrency(statementAmount, account.currency)}
+                          </span>
+                        </div>
+                        <div className="mt-2 space-y-1">
+                          {emis.slice(0, 2).map(emi => (
+                            <div key={emi.id} className="flex items-center justify-between text-xs bg-purple-50 dark:bg-purple-950/30 rounded px-2 py-1">
+                              <span className="text-muted-foreground truncate max-w-[150px]">
+                                {emi.description}
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="text-xs">
+                                  {emi.remaining_installments}/{emi.emi_months}
+                                </Badge>
+                                <span className="font-medium">
+                                  {formatCurrency(emi.monthly_emi, account.currency)}/mo
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                          {emis.length > 2 && (
+                            <div className="text-xs text-center text-muted-foreground">
+                              +{emis.length - 2} more EMIs
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div className="text-right font-semibold text-purple-600 dark:text-purple-400">
-                    {formatCurrency(Number(account.balance), account.currency)}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
               {summary?.accounts_by_type.loan.map(account => (
                 <div key={account.id} className="flex items-center justify-between p-4 border-l-4 border-l-orange-500 rounded-lg bg-gradient-to-r from-orange-50/50 to-transparent dark:from-orange-950/20 hover:shadow-md transition-shadow">
                   <div className="flex items-center gap-3">

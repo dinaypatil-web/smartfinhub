@@ -1,18 +1,25 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { transactionApi, accountApi, categoryApi, budgetApi } from '@/db/api';
-import type { TransactionType } from '@/types/types';
+import { transactionApi, accountApi, categoryApi, budgetApi, emiApi } from '@/db/api';
+import type { TransactionType, Account } from '@/types/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, ArrowLeft, TrendingDown, AlertCircle } from 'lucide-react';
+import { Loader2, ArrowLeft, TrendingDown, AlertCircle, CreditCard } from 'lucide-react';
 import { formatCurrency } from '@/utils/format';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { 
+  calculateMonthlyEMI, 
+  calculateEMIDetails, 
+  validateCreditLimit,
+  getCreditLimitWarningMessage 
+} from '@/utils/emiCalculations';
 
 export default function TransactionForm() {
   const { id } = useParams();
@@ -35,7 +42,19 @@ export default function TransactionForm() {
     category: '',
     description: '',
     transaction_date: new Date().toISOString().split('T')[0],
+    is_emi: false,
+    emi_months: '',
+    bank_charges: '',
   });
+
+  const [calculatedEMI, setCalculatedEMI] = useState<{
+    monthlyEMI: number;
+    totalAmount: number;
+    totalInterest: number;
+    effectiveRate: number;
+  } | null>(null);
+
+  const [creditLimitWarning, setCreditLimitWarning] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -51,6 +70,48 @@ export default function TransactionForm() {
       setBudgetInfo(null);
     }
   }, [user, formData.category, formData.transaction_type, formData.transaction_date]);
+
+  // Calculate EMI when EMI fields change
+  useEffect(() => {
+    if (formData.is_emi && formData.amount && formData.emi_months && formData.bank_charges) {
+      const amount = parseFloat(formData.amount);
+      const months = parseInt(formData.emi_months);
+      const charges = parseFloat(formData.bank_charges);
+      
+      if (!isNaN(amount) && !isNaN(months) && !isNaN(charges) && months > 0) {
+        const emiDetails = calculateEMIDetails(amount, charges, months);
+        setCalculatedEMI(emiDetails);
+      } else {
+        setCalculatedEMI(null);
+      }
+    } else {
+      setCalculatedEMI(null);
+    }
+  }, [formData.is_emi, formData.amount, formData.emi_months, formData.bank_charges]);
+
+  // Validate credit limit when amount or account changes
+  useEffect(() => {
+    if (formData.from_account_id && formData.amount) {
+      const account = accounts.find((a: Account) => a.id === formData.from_account_id);
+      if (account && account.account_type === 'credit_card') {
+        const amount = parseFloat(formData.amount);
+        if (!isNaN(amount)) {
+          const warning = getCreditLimitWarningMessage(account.balance, account.credit_limit, account.currency);
+          setCreditLimitWarning(warning);
+          
+          // Validate if transaction would exceed limit
+          const validation = validateCreditLimit(account.balance, amount, account.credit_limit);
+          if (!validation.valid) {
+            setCreditLimitWarning(`⚠️ ${validation.message}`);
+          }
+        }
+      } else {
+        setCreditLimitWarning(null);
+      }
+    } else {
+      setCreditLimitWarning(null);
+    }
+  }, [formData.from_account_id, formData.amount, accounts]);
 
   const loadBudgetInfo = async () => {
     if (!user || !formData.category || formData.transaction_type !== 'expense') return;
@@ -97,6 +158,9 @@ export default function TransactionForm() {
             category: transaction.category || '',
             description: transaction.description || '',
             transaction_date: transaction.transaction_date,
+            is_emi: false,
+            emi_months: '',
+            bank_charges: '',
           });
         }
       }
@@ -125,6 +189,46 @@ export default function TransactionForm() {
       return;
     }
 
+    // Validate EMI fields if EMI is selected
+    if (formData.is_emi) {
+      if (!formData.emi_months || parseInt(formData.emi_months) <= 0) {
+        toast({
+          title: 'Error',
+          description: 'Please enter valid EMI duration',
+          variant: 'destructive',
+        });
+        return;
+      }
+      if (!formData.bank_charges || parseFloat(formData.bank_charges) < 0) {
+        toast({
+          title: 'Error',
+          description: 'Please enter valid bank charges',
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
+    // Validate credit limit for credit card transactions
+    if (formData.from_account_id) {
+      const account = accounts.find((a: Account) => a.id === formData.from_account_id);
+      if (account && account.account_type === 'credit_card' && account.credit_limit) {
+        const validation = validateCreditLimit(
+          account.balance,
+          parseFloat(formData.amount),
+          account.credit_limit
+        );
+        if (!validation.valid) {
+          toast({
+            title: 'Credit Limit Exceeded',
+            description: validation.message,
+            variant: 'destructive',
+          });
+          return;
+        }
+      }
+    }
+
     setLoading(true);
 
     try {
@@ -140,6 +244,8 @@ export default function TransactionForm() {
         transaction_date: formData.transaction_date,
       };
 
+      let createdTransaction = null;
+
       if (id) {
         await transactionApi.updateTransaction(id, transactionData);
         toast({
@@ -147,10 +253,40 @@ export default function TransactionForm() {
           description: 'Transaction updated successfully',
         });
       } else {
-        await transactionApi.createTransaction(transactionData);
+        createdTransaction = await transactionApi.createTransaction(transactionData);
+        
+        // Create EMI transaction if EMI option is selected
+        if (formData.is_emi && createdTransaction) {
+          const purchaseAmount = parseFloat(formData.amount);
+          const bankCharges = parseFloat(formData.bank_charges);
+          const emiMonths = parseInt(formData.emi_months);
+          const monthlyEMI = calculateMonthlyEMI(purchaseAmount, bankCharges, emiMonths);
+          const totalAmount = purchaseAmount + bankCharges;
+          
+          const emiData = {
+            user_id: user.id,
+            account_id: formData.from_account_id,
+            transaction_id: createdTransaction.id,
+            purchase_amount: purchaseAmount,
+            bank_charges: bankCharges,
+            total_amount: totalAmount,
+            emi_months: emiMonths,
+            monthly_emi: monthlyEMI,
+            remaining_installments: emiMonths,
+            start_date: formData.transaction_date,
+            next_due_date: formData.transaction_date,
+            description: formData.description || `EMI for ${formData.category || 'purchase'}`,
+            status: 'active' as const,
+          };
+          
+          await emiApi.createEMI(emiData);
+        }
+        
         toast({
           title: 'Success',
-          description: 'Transaction created successfully',
+          description: formData.is_emi 
+            ? 'Transaction and EMI created successfully' 
+            : 'Transaction created successfully',
         });
       }
 
@@ -364,6 +500,121 @@ export default function TransactionForm() {
                       </Alert>
                     ) : null}
                   </div>
+                )}
+              </div>
+            )}
+
+            {/* Credit Limit Warning */}
+            {creditLimitWarning && (
+              <Alert className="border-amber-500 bg-amber-50 dark:bg-amber-950/20">
+                <AlertCircle className="h-4 w-4 text-amber-600" />
+                <AlertDescription className="text-amber-900 dark:text-amber-200">
+                  {creditLimitWarning}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* EMI Option for Credit Card Transactions */}
+            {formData.from_account_id && 
+             accounts.find((a: Account) => a.id === formData.from_account_id)?.account_type === 'credit_card' && 
+             !id && (
+              <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="is_emi"
+                    checked={formData.is_emi}
+                    onCheckedChange={(checked) => 
+                      setFormData({ 
+                        ...formData, 
+                        is_emi: checked as boolean,
+                        emi_months: checked ? formData.emi_months : '',
+                        bank_charges: checked ? formData.bank_charges : '',
+                      })
+                    }
+                  />
+                  <Label htmlFor="is_emi" className="flex items-center gap-2 cursor-pointer">
+                    <CreditCard className="h-4 w-4" />
+                    Convert to EMI (Equated Monthly Installment)
+                  </Label>
+                </div>
+
+                {formData.is_emi && (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="emi_months">EMI Duration (Months) *</Label>
+                        <Input
+                          id="emi_months"
+                          type="number"
+                          min="1"
+                          max="60"
+                          value={formData.emi_months}
+                          onChange={(e) => setFormData({ ...formData, emi_months: e.target.value })}
+                          placeholder="e.g., 12"
+                          required={formData.is_emi}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Number of monthly installments (1-60)
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="bank_charges">Bank Charges *</Label>
+                        <Input
+                          id="bank_charges"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={formData.bank_charges}
+                          onChange={(e) => setFormData({ ...formData, bank_charges: e.target.value })}
+                          placeholder="0.00"
+                          required={formData.is_emi}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Processing fees and interest charges
+                        </p>
+                      </div>
+                    </div>
+
+                    {calculatedEMI && (
+                      <Alert className="border-blue-500 bg-blue-50 dark:bg-blue-950/20">
+                        <CreditCard className="h-4 w-4 text-blue-600" />
+                        <AlertDescription>
+                          <div className="space-y-2">
+                            <div className="font-semibold text-sm text-blue-900 dark:text-blue-200">
+                              EMI Calculation Summary
+                            </div>
+                            <div className="grid grid-cols-2 gap-3 text-xs">
+                              <div>
+                                <div className="text-muted-foreground">Monthly EMI</div>
+                                <div className="font-bold text-lg text-blue-600 dark:text-blue-400">
+                                  {formatCurrency(calculatedEMI.monthlyEMI, formData.currency)}
+                                </div>
+                              </div>
+                              <div>
+                                <div className="text-muted-foreground">Total Amount</div>
+                                <div className="font-medium">
+                                  {formatCurrency(calculatedEMI.totalAmount, formData.currency)}
+                                </div>
+                              </div>
+                              <div>
+                                <div className="text-muted-foreground">Total Interest</div>
+                                <div className="font-medium">
+                                  {formatCurrency(calculatedEMI.totalInterest, formData.currency)}
+                                </div>
+                              </div>
+                              <div>
+                                <div className="text-muted-foreground">Effective Rate</div>
+                                <div className="font-medium">
+                                  {calculatedEMI.effectiveRate.toFixed(2)}%
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                  </>
                 )}
               </div>
             )}
