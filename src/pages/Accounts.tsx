@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { formatCurrency, formatAccountNumber } from '@/utils/format';
-import { Plus, Edit, Trash2, Building2, CreditCard, Wallet, TrendingUp, AlertCircle, Calendar } from 'lucide-react';
+import { Plus, Edit, Trash2, Building2, CreditCard, Wallet, TrendingUp, AlertCircle } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import InterestRateManager from '@/components/InterestRateManager';
@@ -24,7 +24,6 @@ import {
   getBillingCycleInfo
 } from '@/utils/billingCycleCalculations';
 import BankLogo from '@/components/BankLogo';
-import { formatDayOfMonth, isComingSoon } from '@/utils/dateUtils';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -470,28 +469,6 @@ export default function Accounts() {
                           </div>
                         )}
 
-                        {/* Statement and Due Dates */}
-                        {(account.statement_day || account.due_day) && (
-                          <div className="space-y-2 pt-2 border-t">
-                            {account.statement_day && (
-                              <div className="flex items-center justify-between">
-                                <p className="text-sm text-muted-foreground">Statement Date</p>
-                                <p className={`text-sm font-medium ${isComingSoon(account.statement_day) ? 'text-amber-600 dark:text-amber-400' : ''}`}>
-                                  {formatDayOfMonth(account.statement_day)} of each month
-                                </p>
-                              </div>
-                            )}
-                            {account.due_day && (
-                              <div className="flex items-center justify-between">
-                                <p className="text-sm text-muted-foreground">Payment Due Date</p>
-                                <p className={`text-sm font-medium ${isComingSoon(account.due_day) ? 'text-red-600 dark:text-red-400' : ''}`}>
-                                  {formatDayOfMonth(account.due_day)} of each month
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                        )}
-
                         {/* EMI Section */}
                         {emis.length > 0 && (
                           <div className="space-y-2 pt-2 border-t">
@@ -539,25 +516,13 @@ export default function Accounts() {
                         {billingInfo && dueAmount > 0 && (
                           <div className="space-y-2 pt-2 border-t">
                             <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <Calendar className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                                <p className="text-sm text-muted-foreground">
-                                  {billingInfo.isOverdue ? 'Overdue Payment' : 'Payment Due'}
-                                </p>
-                              </div>
-                              <Badge variant={billingInfo.isOverdue ? 'destructive' : 'secondary'}>
-                                {billingInfo.isOverdue ? `${Math.abs(billingInfo.daysUntilDue)} days ago` : `in ${billingInfo.daysUntilDue} days`}
-                              </Badge>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <p className="text-sm font-medium">Amount Due</p>
-                              <p className={`text-xl font-bold ${billingInfo.isOverdue ? 'text-red-600 dark:text-red-400' : 'text-purple-600 dark:text-purple-400'}`}>
+                              <p className="text-sm text-muted-foreground">Payment Due</p>
+                              <p className="text-lg font-bold text-purple-600 dark:text-purple-400">
                                 {formatCurrency(dueAmount, account.currency)}
                               </p>
                             </div>
-                            <div className="text-xs text-muted-foreground">
-                              <p>Billing Cycle: {billingInfo.cycleStartStr} - {billingInfo.cycleEndStr}</p>
-                              <p>Payment Due: {billingInfo.dueDateStr}</p>
+                            <div className="text-xs text-muted-foreground text-right">
+                              Due on {billingInfo.dueDateStr}
                             </div>
                           </div>
                         )}

@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { formatCurrency, formatAccountNumber } from '@/utils/format';
-import { Plus, Wallet, CreditCard, TrendingUp, TrendingDown, Building2, AlertCircle, Calendar } from 'lucide-react';
+import { Plus, Wallet, CreditCard, TrendingUp, TrendingDown, Building2, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { calculateEMI, calculateAccruedInterest } from '@/utils/loanCalculations';
@@ -25,7 +25,6 @@ import {
 import InterestRateChart from '@/components/InterestRateChart';
 import InterestRateTable from '@/components/InterestRateTable';
 import BankLogo from '@/components/BankLogo';
-import { formatDayOfMonth, isComingSoon } from '@/utils/dateUtils';
 
 export default function Dashboard() {
   const { user, profile } = useAuth();
@@ -458,20 +457,6 @@ export default function Dashboard() {
                           <p className="text-sm text-muted-foreground">
                             {getAccountTypeLabel(account.account_type)} • {formatAccountNumber(account.last_4_digits)}
                           </p>
-                          {(account.statement_day || account.due_day) && (
-                            <div className="flex gap-3 mt-1 text-xs">
-                              {account.statement_day && (
-                                <span className={`${isComingSoon(account.statement_day) ? 'text-amber-600 dark:text-amber-400 font-semibold' : 'text-muted-foreground'}`}>
-                                  📄 Statement: {formatDayOfMonth(account.statement_day)}
-                                </span>
-                              )}
-                              {account.due_day && (
-                                <span className={`${isComingSoon(account.due_day) ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-muted-foreground'}`}>
-                                  💳 Due: {formatDayOfMonth(account.due_day)}
-                                </span>
-                              )}
-                            </div>
-                          )}
                         </div>
                       </div>
                       <div className="text-right">
@@ -555,18 +540,9 @@ export default function Dashboard() {
                     {billingInfo && dueAmount > 0 && (
                       <div className="pt-2 border-t border-purple-200 dark:border-purple-800">
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                            <span className="text-xs font-medium text-muted-foreground">
-                              {billingInfo.isOverdue ? 'Overdue' : 'Due'} {billingInfo.isOverdue ? `${billingInfo.daysUntilDue} days ago` : `in ${billingInfo.daysUntilDue} days`}
-                            </span>
-                          </div>
-                          <div className={`text-sm font-bold ${billingInfo.isOverdue ? 'text-red-600 dark:text-red-400' : 'text-purple-600 dark:text-purple-400'}`}>
-                            {formatCurrency(dueAmount, account.currency)}
-                          </div>
-                        </div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          Payment due: {billingInfo.dueDateStr}
+                          <span className="text-sm text-muted-foreground">
+                            {formatCurrency(dueAmount, account.currency)} due on {billingInfo.dueDateStr}
+                          </span>
                         </div>
                       </div>
                     )}
