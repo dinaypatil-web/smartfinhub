@@ -41,6 +41,7 @@ export default function AccountForm() {
     due_date: '',
     statement_day: '',
     due_day: '',
+    credit_limit: '',
   });
 
   const [calculatedEMI, setCalculatedEMI] = useState<number>(0);
@@ -104,6 +105,7 @@ export default function AccountForm() {
           due_date: account.due_date?.toString() || '',
           statement_day: account.statement_day?.toString() || '',
           due_day: account.due_day?.toString() || '',
+          credit_limit: account.credit_limit?.toString() || '',
         });
       }
     } catch (error) {
@@ -154,6 +156,7 @@ export default function AccountForm() {
         due_date: formData.account_type === 'loan' ? parseInt(formData.due_date) : null,
         statement_day: formData.account_type === 'credit_card' && formData.statement_day ? parseInt(formData.statement_day) : null,
         due_day: formData.account_type === 'credit_card' && formData.due_day ? parseInt(formData.due_day) : null,
+        credit_limit: formData.account_type === 'credit_card' && formData.credit_limit ? parseFloat(formData.credit_limit) : null,
       };
 
       if (id) {
@@ -445,6 +448,22 @@ export default function AccountForm() {
                   />
                   <p className="text-sm text-muted-foreground">
                     Day of the month when your credit card payment is due (1-31)
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="credit_limit">Credit Limit (Optional)</Label>
+                  <Input
+                    id="credit_limit"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData.credit_limit}
+                    onChange={(e) => setFormData({ ...formData, credit_limit: e.target.value })}
+                    placeholder="e.g., 50000"
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Maximum credit limit for this card. You'll be warned when approaching this limit.
                   </p>
                 </div>
               </>
