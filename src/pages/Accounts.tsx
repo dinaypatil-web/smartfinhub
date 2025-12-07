@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { accountApi, interestRateApi, emiApi } from '@/db/api';
-import type { Account, EMITransaction } from '@/types/types';
+import { accountApi, interestRateApi, emiApi, transactionApi } from '@/db/api';
+import type { Account, EMITransaction, Transaction } from '@/types/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { formatCurrency, formatAccountNumber } from '@/utils/format';
-import { Plus, Edit, Trash2, Building2, CreditCard, Wallet, TrendingUp, AlertCircle } from 'lucide-react';
+import { Plus, Edit, Trash2, Building2, CreditCard, Wallet, TrendingUp, AlertCircle, Calendar } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import InterestRateManager from '@/components/InterestRateManager';
@@ -19,6 +19,10 @@ import {
   getCreditLimitWarningLevel,
   calculateStatementAmount 
 } from '@/utils/emiCalculations';
+import {
+  calculateTotalDueAmount,
+  getBillingCycleInfo
+} from '@/utils/billingCycleCalculations';
 import BankLogo from '@/components/BankLogo';
 import { formatDayOfMonth, isComingSoon } from '@/utils/dateUtils';
 import {
@@ -42,6 +46,7 @@ export default function Accounts() {
   const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
   const [loanCalculations, setLoanCalculations] = useState<Record<string, { emi: number; accruedInterest: number }>>({});
   const [accountEMIs, setAccountEMIs] = useState<Record<string, EMITransaction[]>>({});
+  const [accountTransactions, setAccountTransactions] = useState<Record<string, Transaction[]>>({});
 
   const currency = profile?.default_currency || 'INR';
 
@@ -95,6 +100,7 @@ export default function Accounts() {
 
       // Load EMI data for credit card accounts
       const emis: Record<string, EMITransaction[]> = {};
+      const accountTxs: Record<string, Transaction[]> = {};
       for (const account of data) {
         if (account.account_type === 'credit_card') {
           try {
@@ -102,12 +108,17 @@ export default function Accounts() {
             if (accountEMIs.length > 0) {
               emis[account.id] = accountEMIs;
             }
+            
+            // Load transactions for due amount calculation
+            const txs = await transactionApi.getTransactionsByAccount(user.id, account.id);
+            accountTxs[account.id] = txs;
           } catch (error) {
-            console.error(`Error loading EMIs for account ${account.id}:`, error);
+            console.error(`Error loading data for account ${account.id}:`, error);
           }
         }
       }
       setAccountEMIs(emis);
+      setAccountTransactions(accountTxs);
     } catch (error) {
       console.error('Error loading accounts:', error);
       toast({
@@ -379,10 +390,19 @@ export default function Accounts() {
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {groupedAccounts.credit_card.map(account => {
                   const emis = accountEMIs[account.id] || [];
+                  const transactions = accountTransactions[account.id] || [];
                   const statementAmount = calculateStatementAmount(account.balance, emis);
                   const utilization = account.credit_limit ? calculateCreditUtilization(account.balance, account.credit_limit) : null;
                   const warningLevel = account.credit_limit ? getCreditLimitWarningLevel(account.balance, account.credit_limit) : 'safe';
                   const availableCredit = account.credit_limit ? calculateAvailableCredit(account.balance, account.credit_limit) : null;
+                  
+                  // Calculate due amount if statement_day is available
+                  let dueAmount = 0;
+                  let billingInfo = null;
+                  if (account.statement_day && account.due_day) {
+                    dueAmount = calculateTotalDueAmount(transactions, emis, account.statement_day);
+                    billingInfo = getBillingCycleInfo(account.statement_day, account.due_day);
+                  }
                   
                   return (
                     <Card key={account.id} className="hover:shadow-lg transition-shadow">
@@ -511,6 +531,33 @@ export default function Accounts() {
                               <p className="text-lg font-bold text-purple-600 dark:text-purple-400">
                                 {formatCurrency(statementAmount, account.currency)}
                               </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Due Amount Section */}
+                        {billingInfo && dueAmount > 0 && (
+                          <div className="space-y-2 pt-2 border-t">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Calendar className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                                <p className="text-sm text-muted-foreground">
+                                  {billingInfo.isOverdue ? 'Overdue Payment' : 'Payment Due'}
+                                </p>
+                              </div>
+                              <Badge variant={billingInfo.isOverdue ? 'destructive' : 'secondary'}>
+                                {billingInfo.isOverdue ? `${Math.abs(billingInfo.daysUntilDue)} days ago` : `in ${billingInfo.daysUntilDue} days`}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <p className="text-sm font-medium">Amount Due</p>
+                              <p className={`text-xl font-bold ${billingInfo.isOverdue ? 'text-red-600 dark:text-red-400' : 'text-purple-600 dark:text-purple-400'}`}>
+                                {formatCurrency(dueAmount, account.currency)}
+                              </p>
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              <p>Billing Cycle: {billingInfo.cycleStartStr} - {billingInfo.cycleEndStr}</p>
+                              <p>Payment Due: {billingInfo.dueDateStr}</p>
                             </div>
                           </div>
                         )}

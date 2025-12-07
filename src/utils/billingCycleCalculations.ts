@@ -1,0 +1,237 @@
+/**
+ * Billing Cycle and Due Amount Calculation Utilities
+ * 
+ * Handles credit card billing cycle calculations and due amount determinations
+ */
+
+import type { Transaction, EMITransaction } from '@/types/types';
+
+/**
+ * Get the last day of a given month
+ */
+function getLastDayOfMonth(year: number, month: number): number {
+  return new Date(year, month + 1, 0).getDate();
+}
+
+/**
+ * Safely get a day within a month (handles months with fewer days)
+ */
+function getSafeDayInMonth(year: number, month: number, day: number): number {
+  const lastDay = getLastDayOfMonth(year, month);
+  return Math.min(day, lastDay);
+}
+
+/**
+ * Calculate the current billing cycle dates for a credit card
+ * @param statementDay - Day of month when statement is generated (1-31)
+ * @returns Object with cycle start and end dates
+ */
+export function getCurrentBillingCycle(statementDay: number): {
+  cycleStart: Date;
+  cycleEnd: Date;
+  statementDate: Date;
+} {
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth();
+  const currentDay = today.getDate();
+
+  // Determine if we're before or after the statement day this month
+  const safeStatementDay = getSafeDayInMonth(currentYear, currentMonth, statementDay);
+  
+  let cycleStartYear: number;
+  let cycleStartMonth: number;
+  let cycleEndYear: number;
+  let cycleEndMonth: number;
+
+  if (currentDay < safeStatementDay) {
+    // We're in the cycle that started last month
+    cycleStartMonth = currentMonth - 1;
+    cycleStartYear = currentYear;
+    if (cycleStartMonth < 0) {
+      cycleStartMonth = 11;
+      cycleStartYear--;
+    }
+    cycleEndMonth = currentMonth;
+    cycleEndYear = currentYear;
+  } else {
+    // We're in the cycle that started this month
+    cycleStartMonth = currentMonth;
+    cycleStartYear = currentYear;
+    cycleEndMonth = currentMonth + 1;
+    cycleEndYear = currentYear;
+    if (cycleEndMonth > 11) {
+      cycleEndMonth = 0;
+      cycleEndYear++;
+    }
+  }
+
+  const cycleStartDay = getSafeDayInMonth(cycleStartYear, cycleStartMonth, statementDay);
+  const cycleEndDay = getSafeDayInMonth(cycleEndYear, cycleEndMonth, statementDay);
+
+  const cycleStart = new Date(cycleStartYear, cycleStartMonth, cycleStartDay, 0, 0, 0);
+  const cycleEnd = new Date(cycleEndYear, cycleEndMonth, cycleEndDay, 23, 59, 59);
+  const statementDate = new Date(cycleEndYear, cycleEndMonth, cycleEndDay, 23, 59, 59);
+
+  return { cycleStart, cycleEnd, statementDate };
+}
+
+/**
+ * Calculate the next payment due date
+ * @param statementDay - Day of month when statement is generated
+ * @param dueDay - Day of month when payment is due
+ * @returns Next due date
+ */
+export function getNextDueDate(statementDay: number, dueDay: number): Date {
+  const { statementDate } = getCurrentBillingCycle(statementDay);
+  const statementYear = statementDate.getFullYear();
+  const statementMonth = statementDate.getMonth();
+
+  // Due date is in the month after statement date
+  let dueYear = statementYear;
+  let dueMonth = statementMonth + 1;
+  if (dueMonth > 11) {
+    dueMonth = 0;
+    dueYear++;
+  }
+
+  const safeDueDay = getSafeDayInMonth(dueYear, dueMonth, dueDay);
+  return new Date(dueYear, dueMonth, safeDueDay, 23, 59, 59);
+}
+
+/**
+ * Check if a transaction date falls within the current billing cycle
+ * @param transactionDate - Date of the transaction
+ * @param statementDay - Day of month when statement is generated
+ * @returns True if transaction is in current cycle
+ */
+export function isTransactionInCurrentCycle(
+  transactionDate: Date | string,
+  statementDay: number
+): boolean {
+  const txDate = typeof transactionDate === 'string' ? new Date(transactionDate) : transactionDate;
+  const { cycleStart, cycleEnd } = getCurrentBillingCycle(statementDay);
+  
+  return txDate >= cycleStart && txDate <= cycleEnd;
+}
+
+/**
+ * Calculate due amount from regular transactions in current billing cycle
+ * @param transactions - All transactions for the account
+ * @param statementDay - Day of month when statement is generated
+ * @returns Total amount due from transactions
+ */
+export function calculateTransactionsDueAmount(
+  transactions: Transaction[],
+  statementDay: number
+): number {
+  const { cycleStart, cycleEnd } = getCurrentBillingCycle(statementDay);
+  
+  return transactions
+    .filter(tx => {
+      const txDate = new Date(tx.transaction_date);
+      return txDate >= cycleStart && txDate <= cycleEnd;
+    })
+    .reduce((sum, tx) => {
+      // For credit cards, expenses and withdrawals increase the balance (amount owed)
+      if (tx.transaction_type === 'expense' || tx.transaction_type === 'withdrawal') {
+        return sum + tx.amount;
+      }
+      // Payments reduce the balance
+      if (tx.transaction_type === 'credit_card_payment') {
+        return sum - tx.amount;
+      }
+      return sum;
+    }, 0);
+}
+
+/**
+ * Calculate due amount from EMI installments for current month
+ * @param emis - All active EMI transactions for the account
+ * @returns Total EMI amount due this month
+ */
+export function calculateEMIDueAmount(emis: EMITransaction[]): number {
+  // All active EMIs have an installment due this month
+  return emis
+    .filter(emi => emi.status === 'active' && emi.remaining_installments > 0)
+    .reduce((sum, emi) => sum + emi.monthly_emi, 0);
+}
+
+/**
+ * Calculate total due amount for a credit card
+ * @param transactions - All transactions for the account
+ * @param emis - All active EMI transactions for the account
+ * @param statementDay - Day of month when statement is generated
+ * @returns Total amount due (transactions + EMIs)
+ */
+export function calculateTotalDueAmount(
+  transactions: Transaction[],
+  emis: EMITransaction[],
+  statementDay: number
+): number {
+  const transactionsDue = calculateTransactionsDueAmount(transactions, statementDay);
+  const emisDue = calculateEMIDueAmount(emis);
+  
+  return transactionsDue + emisDue;
+}
+
+/**
+ * Get days until payment due date
+ * @param statementDay - Day of month when statement is generated
+ * @param dueDay - Day of month when payment is due
+ * @returns Number of days until due date
+ */
+export function getDaysUntilDue(statementDay: number, dueDay: number): number {
+  const today = new Date();
+  const dueDate = getNextDueDate(statementDay, dueDay);
+  
+  const diffTime = dueDate.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  return diffDays;
+}
+
+/**
+ * Check if payment is overdue
+ * @param statementDay - Day of month when statement is generated
+ * @param dueDay - Day of month when payment is due
+ * @returns True if payment is overdue
+ */
+export function isPaymentOverdue(statementDay: number, dueDay: number): boolean {
+  return getDaysUntilDue(statementDay, dueDay) < 0;
+}
+
+/**
+ * Get billing cycle information as formatted strings
+ * @param statementDay - Day of month when statement is generated
+ * @param dueDay - Day of month when payment is due
+ * @returns Formatted billing cycle information
+ */
+export function getBillingCycleInfo(statementDay: number, dueDay: number): {
+  cycleStartStr: string;
+  cycleEndStr: string;
+  dueDateStr: string;
+  daysUntilDue: number;
+  isOverdue: boolean;
+} {
+  const { cycleStart, cycleEnd } = getCurrentBillingCycle(statementDay);
+  const dueDate = getNextDueDate(statementDay, dueDay);
+  const daysUntilDue = getDaysUntilDue(statementDay, dueDay);
+  const isOverdue = daysUntilDue < 0;
+
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
+  return {
+    cycleStartStr: formatDate(cycleStart),
+    cycleEndStr: formatDate(cycleEnd),
+    dueDateStr: formatDate(dueDate),
+    daysUntilDue: Math.abs(daysUntilDue),
+    isOverdue
+  };
+}

@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { formatCurrency, formatAccountNumber } from '@/utils/format';
-import { Plus, Wallet, CreditCard, TrendingUp, TrendingDown, Building2, AlertCircle } from 'lucide-react';
+import { Plus, Wallet, CreditCard, TrendingUp, TrendingDown, Building2, AlertCircle, Calendar } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { calculateEMI, calculateAccruedInterest } from '@/utils/loanCalculations';
@@ -18,6 +18,10 @@ import {
   getCreditLimitWarningLevel,
   calculateStatementAmount 
 } from '@/utils/emiCalculations';
+import {
+  calculateTotalDueAmount,
+  getBillingCycleInfo
+} from '@/utils/billingCycleCalculations';
 import InterestRateChart from '@/components/InterestRateChart';
 import InterestRateTable from '@/components/InterestRateTable';
 import BankLogo from '@/components/BankLogo';
@@ -30,6 +34,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [loanCalculations, setLoanCalculations] = useState<Record<string, { emi: number; accruedInterest: number }>>({});
   const [accountEMIs, setAccountEMIs] = useState<Record<string, EMITransaction[]>>({});
+  const [accountTransactions, setAccountTransactions] = useState<Record<string, Transaction[]>>({});
 
   const currency = profile?.default_currency || 'INR';
 
@@ -90,6 +95,7 @@ export default function Dashboard() {
 
       // Load EMI data for credit card accounts
       const emis: Record<string, EMITransaction[]> = {};
+      const accountTxs: Record<string, Transaction[]> = {};
       if (summaryData?.accounts_by_type.credit_card) {
         for (const account of summaryData.accounts_by_type.credit_card) {
           try {
@@ -97,12 +103,17 @@ export default function Dashboard() {
             if (accountEMIs.length > 0) {
               emis[account.id] = accountEMIs;
             }
+            
+            // Load transactions for due amount calculation
+            const txs = await transactionApi.getTransactionsByAccount(user.id, account.id);
+            accountTxs[account.id] = txs;
           } catch (error) {
-            console.error(`Error loading EMIs for account ${account.id}:`, error);
+            console.error(`Error loading data for account ${account.id}:`, error);
           }
         }
       }
       setAccountEMIs(emis);
+      setAccountTransactions(accountTxs);
     } catch (error) {
       console.error('Error loading dashboard:', error);
     } finally {
@@ -421,10 +432,19 @@ export default function Dashboard() {
               ))}
               {summary?.accounts_by_type.credit_card.map(account => {
                 const emis = accountEMIs[account.id] || [];
+                const transactions = accountTransactions[account.id] || [];
                 const statementAmount = calculateStatementAmount(account.balance, emis);
                 const utilization = account.credit_limit ? calculateCreditUtilization(account.balance, account.credit_limit) : null;
                 const warningLevel = account.credit_limit ? getCreditLimitWarningLevel(account.balance, account.credit_limit) : 'safe';
                 const availableCredit = account.credit_limit ? calculateAvailableCredit(account.balance, account.credit_limit) : null;
+                
+                // Calculate due amount if statement_day is available
+                let dueAmount = 0;
+                let billingInfo = null;
+                if (account.statement_day && account.due_day) {
+                  dueAmount = calculateTotalDueAmount(transactions, emis, account.statement_day);
+                  billingInfo = getBillingCycleInfo(account.statement_day, account.due_day);
+                }
                 
                 return (
                   <div key={account.id} className="p-4 border-l-4 border-l-purple-500 rounded-lg bg-gradient-to-r from-purple-50/50 to-transparent dark:from-purple-950/20 hover:shadow-md transition-shadow space-y-3">
@@ -527,6 +547,26 @@ export default function Dashboard() {
                               +{emis.length - 2} more EMIs
                             </div>
                           )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Due Amount Information */}
+                    {billingInfo && dueAmount > 0 && (
+                      <div className="pt-2 border-t border-purple-200 dark:border-purple-800">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                            <span className="text-xs font-medium text-muted-foreground">
+                              {billingInfo.isOverdue ? 'Overdue' : 'Due'} {billingInfo.isOverdue ? `${billingInfo.daysUntilDue} days ago` : `in ${billingInfo.daysUntilDue} days`}
+                            </span>
+                          </div>
+                          <div className={`text-sm font-bold ${billingInfo.isOverdue ? 'text-red-600 dark:text-red-400' : 'text-purple-600 dark:text-purple-400'}`}>
+                            {formatCurrency(dueAmount, account.currency)}
+                          </div>
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Payment due: {billingInfo.dueDateStr}
                         </div>
                       </div>
                     )}

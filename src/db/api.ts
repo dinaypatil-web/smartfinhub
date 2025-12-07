@@ -271,6 +271,18 @@ export const transactionApi = {
     return Array.isArray(data) ? data : [];
   },
 
+  async getTransactionsByAccount(userId: string, accountId: string): Promise<Transaction[]> {
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('account_id', accountId)
+      .order('transaction_date', { ascending: false });
+    
+    if (error) throw error;
+    return Array.isArray(data) ? data : [];
+  },
+
   async createTransaction(transaction: Omit<Transaction, 'id' | 'created_at' | 'updated_at'>): Promise<Transaction> {
     const { data, error } = await supabase
       .from('transactions')
