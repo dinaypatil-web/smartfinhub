@@ -13,6 +13,7 @@ import { Loader2, ArrowLeft } from 'lucide-react';
 import { countries } from '@/utils/countries';
 import { getBanksByCountry, getBankLogo } from '@/utils/banks';
 import { calculateEMI, formatLoanAmount } from '@/utils/loanCalculations';
+import BankLogo from '@/components/BankLogo';
 
 export default function AccountForm() {
   const { id } = useParams();
@@ -334,6 +335,24 @@ export default function AccountForm() {
                         ← Back to bank selection
                       </Button>
                     )}
+                  </div>
+                )}
+                
+                {/* Logo Preview */}
+                {formData.institution_name && (
+                  <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border">
+                    <BankLogo 
+                      src={formData.institution_logo || null}
+                      alt={formData.institution_name}
+                      bankName={formData.institution_name}
+                      className="h-12 w-12"
+                    />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">Logo Preview</p>
+                      <p className="text-xs text-muted-foreground">
+                        This logo will be displayed on your dashboard and accounts page
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>
