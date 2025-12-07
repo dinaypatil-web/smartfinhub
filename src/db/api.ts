@@ -146,7 +146,10 @@ export const accountApi = {
     const cash_total = cashAccounts.reduce((sum, acc) => sum + Number(acc.balance), 0);
     const bank_total = bankAccounts.reduce((sum, acc) => sum + Number(acc.balance), 0);
     const total_assets = cash_total + bank_total;
-    const total_liabilities = creditCards.reduce((sum, acc) => sum + Number(acc.balance), 0);
+    
+    // Credit card balances are negative (debt), so we need to negate them to get positive liability amount
+    const total_liabilities = Math.abs(creditCards.reduce((sum, acc) => sum + Number(acc.balance), 0));
+    
     const liquid_assets = total_assets;
     const working_capital = total_assets - total_liabilities;
     
