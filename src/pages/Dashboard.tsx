@@ -20,8 +20,7 @@ import {
 } from '@/utils/emiCalculations';
 import {
   calculateTotalDueAmount,
-  getBillingCycleInfo,
-  isDueDatePassed
+  getBillingCycleInfo
 } from '@/utils/billingCycleCalculations';
 import InterestRateChart from '@/components/InterestRateChart';
 import InterestRateTable from '@/components/InterestRateTable';
@@ -465,15 +464,12 @@ export default function Dashboard() {
                 const warningLevel = account.credit_limit ? getCreditLimitWarningLevel(account.balance, account.credit_limit) : 'safe';
                 const availableCredit = account.credit_limit ? calculateAvailableCredit(account.balance, account.credit_limit) : null;
                 
-                // Calculate due amount if statement_day is available and due date hasn't passed
+                // Calculate due amount if statement_day is available
                 let dueAmount = 0;
                 let billingInfo = null;
                 if (account.statement_day && account.due_day) {
-                  // Only show due amount if due date hasn't passed
-                  if (!isDueDatePassed(account.statement_day, account.due_day)) {
-                    dueAmount = calculateTotalDueAmount(transactions, emis, account.statement_day);
-                    billingInfo = getBillingCycleInfo(account.statement_day, account.due_day);
-                  }
+                  dueAmount = calculateTotalDueAmount(transactions, emis, account.statement_day);
+                  billingInfo = getBillingCycleInfo(account.statement_day, account.due_day);
                 }
                 
                 return (
