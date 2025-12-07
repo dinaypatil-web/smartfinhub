@@ -46,7 +46,7 @@ export default function Dashboard() {
     if (user) {
       loadDashboardData();
     }
-  }, [user, location.pathname]);
+  }, [user, location.key]);
 
   const loadDashboardData = async () => {
     if (!user) return;
