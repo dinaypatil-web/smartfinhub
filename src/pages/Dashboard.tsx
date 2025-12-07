@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { formatCurrency, formatAccountNumber } from '@/utils/format';
 import { Plus, Wallet, CreditCard, TrendingUp, TrendingDown, Building2, AlertCircle } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { calculateEMI, calculateAccruedInterest } from '@/utils/loanCalculations';
 import { 
@@ -29,6 +29,7 @@ import BankLogo from '@/components/BankLogo';
 
 export default function Dashboard() {
   const { user, profile } = useAuth();
+  const location = useLocation();
   const [summary, setSummary] = useState<FinancialSummary | null>(null);
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,7 +43,7 @@ export default function Dashboard() {
     if (user) {
       loadDashboardData();
     }
-  }, [user]);
+  }, [user, location.pathname]);
 
   const loadDashboardData = async () => {
     if (!user) return;

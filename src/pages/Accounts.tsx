@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { formatCurrency, formatAccountNumber } from '@/utils/format';
 import { Plus, Edit, Trash2, Building2, CreditCard, Wallet, TrendingUp, AlertCircle } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import InterestRateManager from '@/components/InterestRateManager';
 import { calculateEMI, calculateAccruedInterest } from '@/utils/loanCalculations';
@@ -39,6 +39,7 @@ import {
 export default function Accounts() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,7 +55,7 @@ export default function Accounts() {
     if (user) {
       loadAccounts();
     }
-  }, [user]);
+  }, [user, location.pathname]);
 
   const loadAccounts = async () => {
     if (!user) return;
