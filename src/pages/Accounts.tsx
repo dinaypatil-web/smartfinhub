@@ -55,7 +55,7 @@ export default function Accounts() {
     if (user) {
       loadAccounts();
     }
-  }, [user, location.pathname]);
+  }, [user, location.key]);
 
   const loadAccounts = async () => {
     if (!user) return;
