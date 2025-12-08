@@ -10,6 +10,7 @@ import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ResetPassword from './pages/ResetPassword';
 
 interface RouteConfig {
   name: string;
@@ -30,6 +31,12 @@ const routes: RouteConfig[] = [
     name: 'Register',
     path: '/register',
     element: <Register />,
+    visible: false,
+  },
+  {
+    name: 'Reset Password',
+    path: '/reset-password',
+    element: <ResetPassword />,
     visible: false,
   },
   {
