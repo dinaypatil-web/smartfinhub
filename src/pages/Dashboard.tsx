@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { accountApi, transactionApi, interestRateApi, emiApi } from '@/db/api';
+import { accountApi, transactionApi, interestRateApi, emiApi, loanEMIPaymentApi } from '@/db/api';
 import type { Account, Transaction, FinancialSummary, EMITransaction } from '@/types/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -87,13 +87,28 @@ export default function Dashboard() {
             let accruedInterest = 0;
             if (account.loan_start_date) {
               try {
+                // Check if there are EMI payment records
+                const emiPayments = await loanEMIPaymentApi.getPaymentsByAccount(account.id);
                 const history = await interestRateApi.getInterestRateHistory(account.id);
-                accruedInterest = calculateAccruedInterest(
-                  account.loan_start_date,
-                  Number(account.balance),
-                  history,
-                  Number(account.current_interest_rate)
-                );
+                
+                if (emiPayments.length > 0) {
+                  // Use last EMI payment as reference
+                  const lastPayment = emiPayments[emiPayments.length - 1];
+                  accruedInterest = calculateAccruedInterest(
+                    lastPayment.payment_date,
+                    lastPayment.outstanding_principal,
+                    history,
+                    Number(account.current_interest_rate)
+                  );
+                } else {
+                  // No EMI payments, use loan start date and current balance
+                  accruedInterest = calculateAccruedInterest(
+                    account.loan_start_date,
+                    Number(account.balance),
+                    history,
+                    Number(account.current_interest_rate)
+                  );
+                }
               } catch (error) {
                 console.error('Error calculating accrued interest:', error);
               }
