@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Trash2, Calendar } from 'lucide-react';
+import { Plus, Trash2, Calendar, Edit2, Check, X } from 'lucide-react';
 import { calculateEMIBreakdown } from '@/utils/loanCalculations';
 import { formatCurrency } from '@/utils/format';
 import type { LoanEMIPayment } from '@/types/types';
@@ -42,8 +42,15 @@ export default function LoanEMIPaymentManager({
   const [newPayment, setNewPayment] = useState({
     payment_date: '',
     emi_amount: '',
+    principal_component: '',
+    interest_component: '',
     notes: ''
   });
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editValues, setEditValues] = useState<{
+    principal_component: string;
+    interest_component: string;
+  }>({ principal_component: '', interest_component: '' });
 
   useEffect(() => {
     onPaymentsChange(payments);
@@ -69,18 +76,38 @@ export default function LoanEMIPaymentManager({
     const paymentNumber = payments.length + 1;
     const outstandingPrincipal = calculateOutstandingPrincipal(payments.length);
 
-    const breakdown = calculateEMIBreakdown(
-      outstandingPrincipal,
-      emiAmount,
-      interestRate
-    );
+    let principalComponent: number;
+    let interestComponent: number;
+
+    if (newPayment.principal_component && newPayment.interest_component) {
+      principalComponent = parseFloat(newPayment.principal_component);
+      interestComponent = parseFloat(newPayment.interest_component);
+      
+      if (isNaN(principalComponent) || isNaN(interestComponent)) {
+        return;
+      }
+      
+      if (Math.abs((principalComponent + interestComponent) - emiAmount) > 0.01) {
+        return;
+      }
+    } else {
+      const breakdown = calculateEMIBreakdown(
+        outstandingPrincipal,
+        emiAmount,
+        interestRate
+      );
+      principalComponent = breakdown.principalComponent;
+      interestComponent = breakdown.interestComponent;
+    }
+
+    const newOutstandingPrincipal = Math.max(0, Math.round((outstandingPrincipal - principalComponent) * 100) / 100);
 
     const payment: EMIPaymentEntry = {
       payment_date: newPayment.payment_date,
       emi_amount: emiAmount,
-      principal_component: breakdown.principalComponent,
-      interest_component: breakdown.interestComponent,
-      outstanding_principal: breakdown.newOutstandingPrincipal,
+      principal_component: principalComponent,
+      interest_component: interestComponent,
+      outstanding_principal: newOutstandingPrincipal,
       interest_rate: interestRate,
       payment_number: paymentNumber,
       notes: newPayment.notes
@@ -88,7 +115,7 @@ export default function LoanEMIPaymentManager({
 
     const updatedPayments = [...payments, payment];
     setPayments(updatedPayments);
-    setNewPayment({ payment_date: '', emi_amount: '', notes: '' });
+    setNewPayment({ payment_date: '', emi_amount: '', principal_component: '', interest_component: '', notes: '' });
   };
 
   const handleRemovePayment = (index: number) => {
@@ -114,6 +141,83 @@ export default function LoanEMIPaymentManager({
     });
     
     setPayments(recalculatedPayments);
+  };
+
+  const handleStartEdit = (index: number) => {
+    setEditingIndex(index);
+    setEditValues({
+      principal_component: payments[index].principal_component.toString(),
+      interest_component: payments[index].interest_component.toString()
+    });
+  };
+
+  const handleSaveEdit = (index: number) => {
+    const principalComponent = parseFloat(editValues.principal_component);
+    const interestComponent = parseFloat(editValues.interest_component);
+    
+    if (isNaN(principalComponent) || isNaN(interestComponent)) {
+      return;
+    }
+
+    const payment = payments[index];
+    const expectedTotal = payment.emi_amount;
+    const actualTotal = principalComponent + interestComponent;
+    
+    if (Math.abs(actualTotal - expectedTotal) > 0.01) {
+      return;
+    }
+
+    const updatedPayments = [...payments];
+    let outstandingPrincipal = index === 0 ? loanPrincipal : payments[index - 1].outstanding_principal;
+    
+    for (let i = index; i < updatedPayments.length; i++) {
+      if (i === index) {
+        updatedPayments[i] = {
+          ...updatedPayments[i],
+          principal_component: principalComponent,
+          interest_component: interestComponent,
+          outstanding_principal: Math.max(0, Math.round((outstandingPrincipal - principalComponent) * 100) / 100)
+        };
+        outstandingPrincipal = updatedPayments[i].outstanding_principal;
+      } else {
+        const breakdown = calculateEMIBreakdown(
+          outstandingPrincipal,
+          updatedPayments[i].emi_amount,
+          updatedPayments[i].interest_rate
+        );
+        updatedPayments[i] = {
+          ...updatedPayments[i],
+          principal_component: breakdown.principalComponent,
+          interest_component: breakdown.interestComponent,
+          outstanding_principal: breakdown.newOutstandingPrincipal
+        };
+        outstandingPrincipal = breakdown.newOutstandingPrincipal;
+      }
+    }
+    
+    setPayments(updatedPayments);
+    setEditingIndex(null);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingIndex(null);
+    setEditValues({ principal_component: '', interest_component: '' });
+  };
+
+  const handleEMIAmountChange = (value: string) => {
+    setNewPayment({ ...newPayment, emi_amount: value });
+    
+    const emiAmount = parseFloat(value);
+    if (!isNaN(emiAmount) && emiAmount > 0 && !newPayment.principal_component && !newPayment.interest_component) {
+      const outstandingPrincipal = calculateOutstandingPrincipal(payments.length);
+      const breakdown = calculateEMIBreakdown(outstandingPrincipal, emiAmount, interestRate);
+      setNewPayment(prev => ({
+        ...prev,
+        emi_amount: value,
+        principal_component: breakdown.principalComponent.toFixed(2),
+        interest_component: breakdown.interestComponent.toFixed(2)
+      }));
+    }
   };
 
   const totalPrincipalPaid = payments.reduce((sum, p) => sum + p.principal_component, 0);
@@ -153,7 +257,7 @@ export default function LoanEMIPaymentManager({
 
         <div className="space-y-4">
           <h4 className="font-medium">Add EMI Payment</h4>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <div className="space-y-2">
               <Label htmlFor="payment_date">Payment Date *</Label>
               <Input
@@ -173,8 +277,32 @@ export default function LoanEMIPaymentManager({
                 step="0.01"
                 placeholder="0.00"
                 value={newPayment.emi_amount}
-                onChange={(e) => setNewPayment({ ...newPayment, emi_amount: e.target.value })}
+                onChange={(e) => handleEMIAmountChange(e.target.value)}
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="principal_component">Principal Component</Label>
+              <Input
+                id="principal_component"
+                type="number"
+                step="0.01"
+                placeholder="Auto-calculated"
+                value={newPayment.principal_component}
+                onChange={(e) => setNewPayment({ ...newPayment, principal_component: e.target.value })}
+              />
+              <p className="text-xs text-muted-foreground">Leave blank for auto-calculation</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="interest_component">Interest Component</Label>
+              <Input
+                id="interest_component"
+                type="number"
+                step="0.01"
+                placeholder="Auto-calculated"
+                value={newPayment.interest_component}
+                onChange={(e) => setNewPayment({ ...newPayment, interest_component: e.target.value })}
+              />
+              <p className="text-xs text-muted-foreground">Leave blank for auto-calculation</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="notes">Notes (Optional)</Label>
@@ -187,6 +315,15 @@ export default function LoanEMIPaymentManager({
               />
             </div>
           </div>
+          {newPayment.principal_component && newPayment.interest_component && newPayment.emi_amount && (
+            <div className="text-sm">
+              {Math.abs((parseFloat(newPayment.principal_component) + parseFloat(newPayment.interest_component)) - parseFloat(newPayment.emi_amount)) > 0.01 ? (
+                <p className="text-destructive">⚠️ Principal + Interest must equal EMI Amount</p>
+              ) : (
+                <p className="text-green-600 dark:text-green-400">✓ Components sum correctly</p>
+              )}
+            </div>
+          )}
           <Button
             type="button"
             onClick={handleAddPayment}
@@ -213,7 +350,7 @@ export default function LoanEMIPaymentManager({
                       <TableHead className="text-right">Interest</TableHead>
                       <TableHead className="text-right">Outstanding</TableHead>
                       <TableHead>Notes</TableHead>
-                      <TableHead className="w-12"></TableHead>
+                      <TableHead className="w-24">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -225,10 +362,30 @@ export default function LoanEMIPaymentManager({
                           {formatCurrency(payment.emi_amount, currency)}
                         </TableCell>
                         <TableCell className="text-right text-green-600 dark:text-green-400">
-                          {formatCurrency(payment.principal_component, currency)}
+                          {editingIndex === index ? (
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={editValues.principal_component}
+                              onChange={(e) => setEditValues({ ...editValues, principal_component: e.target.value })}
+                              className="w-24 h-8 text-right"
+                            />
+                          ) : (
+                            formatCurrency(payment.principal_component, currency)
+                          )}
                         </TableCell>
                         <TableCell className="text-right text-orange-600 dark:text-orange-400">
-                          {formatCurrency(payment.interest_component, currency)}
+                          {editingIndex === index ? (
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={editValues.interest_component}
+                              onChange={(e) => setEditValues({ ...editValues, interest_component: e.target.value })}
+                              className="w-24 h-8 text-right"
+                            />
+                          ) : (
+                            formatCurrency(payment.interest_component, currency)
+                          )}
                         </TableCell>
                         <TableCell className="text-right">
                           {formatCurrency(payment.outstanding_principal, currency)}
@@ -237,14 +394,51 @@ export default function LoanEMIPaymentManager({
                           {payment.notes || '-'}
                         </TableCell>
                         <TableCell>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRemovePayment(index)}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
+                          <div className="flex gap-1">
+                            {editingIndex === index ? (
+                              <>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleSaveEdit(index)}
+                                  title="Save changes"
+                                >
+                                  <Check className="h-4 w-4 text-green-600" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={handleCancelEdit}
+                                  title="Cancel editing"
+                                >
+                                  <X className="h-4 w-4 text-muted-foreground" />
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleStartEdit(index)}
+                                  title="Edit principal/interest"
+                                >
+                                  <Edit2 className="h-4 w-4 text-primary" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleRemovePayment(index)}
+                                  title="Delete payment"
+                                >
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
