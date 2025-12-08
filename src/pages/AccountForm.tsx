@@ -109,6 +109,11 @@ export default function AccountForm() {
           due_day: account.due_day?.toString() || '',
           credit_limit: account.credit_limit?.toString() || '',
         });
+
+        if (account.account_type === 'loan') {
+          const existingPayments = await loanEMIPaymentApi.getPaymentsByAccount(id);
+          setEmiPayments(existingPayments);
+        }
       }
     } catch (error) {
       console.error('Error loading account:', error);
@@ -163,6 +168,17 @@ export default function AccountForm() {
 
       if (id) {
         await accountApi.updateAccount(id, accountData);
+
+        if (formData.account_type === 'loan' && emiPayments.length > 0) {
+          await loanEMIPaymentApi.deletePaymentsByAccount(id);
+          const paymentsToSave = emiPayments.map(payment => ({
+            ...payment,
+            user_id: user.id,
+            account_id: id,
+          }));
+          await loanEMIPaymentApi.createBulkPayments(paymentsToSave);
+        }
+
         toast({
           title: 'Success',
           description: 'Account updated successfully',
@@ -583,7 +599,7 @@ export default function AccountForm() {
               </>
             )}
 
-            {formData.account_type === 'loan' && !id && formData.loan_principal && formData.current_interest_rate && formData.loan_start_date && (
+            {formData.account_type === 'loan' && formData.loan_principal && formData.current_interest_rate && formData.loan_start_date && (
               <div className="col-span-2">
                 <LoanEMIPaymentManager
                   loanPrincipal={parseFloat(formData.loan_principal) || 0}
@@ -591,7 +607,7 @@ export default function AccountForm() {
                   loanStartDate={formData.loan_start_date}
                   currency={formData.currency}
                   onPaymentsChange={setEmiPayments}
-                  initialPayments={[]}
+                  initialPayments={emiPayments}
                 />
               </div>
             )}
