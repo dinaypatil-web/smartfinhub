@@ -611,6 +611,8 @@ export default function AccountForm() {
                   currency={formData.currency}
                   onPaymentsChange={setEmiPayments}
                   initialPayments={emiPayments}
+                  accountId={id}
+                  interestRateType={formData.interest_rate_type as 'fixed' | 'floating'}
                 />
               </div>
             )}
