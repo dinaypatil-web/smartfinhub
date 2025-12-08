@@ -155,3 +155,77 @@ export function calculateMonthlyInterest(
   const interest = balance * monthlyRate;
   return Math.round(interest * 100) / 100;
 }
+
+/**
+ * Calculate EMI payment breakdown (principal and interest components)
+ * Uses reducing balance method
+ */
+export function calculateEMIBreakdown(
+  outstandingPrincipal: number,
+  emiAmount: number,
+  annualInterestRate: number
+): {
+  principalComponent: number;
+  interestComponent: number;
+  newOutstandingPrincipal: number;
+} {
+  if (outstandingPrincipal <= 0 || emiAmount <= 0 || annualInterestRate < 0) {
+    return {
+      principalComponent: 0,
+      interestComponent: 0,
+      newOutstandingPrincipal: 0
+    };
+  }
+
+  const monthlyRate = annualInterestRate / 12 / 100;
+  const interestComponent = Math.round(outstandingPrincipal * monthlyRate * 100) / 100;
+  const principalComponent = Math.round((emiAmount - interestComponent) * 100) / 100;
+  const newOutstandingPrincipal = Math.max(0, Math.round((outstandingPrincipal - principalComponent) * 100) / 100);
+
+  return {
+    principalComponent,
+    interestComponent,
+    newOutstandingPrincipal
+  };
+}
+
+/**
+ * Generate complete EMI payment schedule
+ */
+export function generateEMISchedule(
+  principal: number,
+  annualInterestRate: number,
+  tenureMonths: number,
+  startDate: Date
+): Array<{
+  paymentNumber: number;
+  paymentDate: Date;
+  emiAmount: number;
+  principalComponent: number;
+  interestComponent: number;
+  outstandingPrincipal: number;
+}> {
+  const emi = calculateEMI(principal, annualInterestRate, tenureMonths);
+  const schedule = [];
+  let outstandingPrincipal = principal;
+
+  for (let i = 1; i <= tenureMonths; i++) {
+    const paymentDate = new Date(startDate);
+    paymentDate.setMonth(paymentDate.getMonth() + i);
+
+    const breakdown = calculateEMIBreakdown(outstandingPrincipal, emi, annualInterestRate);
+    
+    schedule.push({
+      paymentNumber: i,
+      paymentDate,
+      emiAmount: emi,
+      principalComponent: breakdown.principalComponent,
+      interestComponent: breakdown.interestComponent,
+      outstandingPrincipal: breakdown.newOutstandingPrincipal
+    });
+
+    outstandingPrincipal = breakdown.newOutstandingPrincipal;
+  }
+
+  return schedule;
+}
