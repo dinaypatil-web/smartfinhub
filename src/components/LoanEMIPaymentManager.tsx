@@ -5,10 +5,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Trash2, Calendar, Edit2, Check, X } from 'lucide-react';
-import { calculateEMIBreakdown } from '@/utils/loanCalculations';
+import { Plus, Trash2, Calendar, Edit2, Check, X, Calculator } from 'lucide-react';
+import { calculateAllEMIBreakdowns } from '@/utils/loanCalculations';
 import { formatCurrency } from '@/utils/format';
-import type { LoanEMIPayment } from '@/types/types';
+import type { LoanEMIPayment, InterestRateHistory } from '@/types/types';
+import { interestRateApi } from '@/db/api';
+import { useToast } from '@/hooks/use-toast';
 
 interface EMIPaymentEntry {
   payment_date: string;
@@ -28,6 +30,8 @@ interface LoanEMIPaymentManagerProps {
   currency: string;
   onPaymentsChange: (payments: EMIPaymentEntry[]) => void;
   initialPayments?: EMIPaymentEntry[];
+  accountId?: string;
+  interestRateType: 'fixed' | 'floating';
 }
 
 export default function LoanEMIPaymentManager({
@@ -36,14 +40,16 @@ export default function LoanEMIPaymentManager({
   loanStartDate,
   currency,
   onPaymentsChange,
-  initialPayments = []
+  initialPayments = [],
+  accountId,
+  interestRateType
 }: LoanEMIPaymentManagerProps) {
+  const { toast } = useToast();
   const [payments, setPayments] = useState<EMIPaymentEntry[]>(initialPayments);
+  const [emiEntries, setEmiEntries] = useState<Array<{ payment_date: string; emi_amount: string; notes: string }>>([]);
   const [newPayment, setNewPayment] = useState({
     payment_date: '',
     emi_amount: '',
-    principal_component: '',
-    interest_component: '',
     notes: ''
   });
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -51,19 +57,64 @@ export default function LoanEMIPaymentManager({
     principal_component: string;
     interest_component: string;
   }>({ principal_component: '', interest_component: '' });
+  const [rateHistory, setRateHistory] = useState<InterestRateHistory[]>([]);
+  const [loadingRates, setLoadingRates] = useState(false);
 
   useEffect(() => {
     onPaymentsChange(payments);
   }, [payments]);
 
-  const calculateOutstandingPrincipal = (paymentIndex: number): number => {
-    if (paymentIndex === 0) {
-      return loanPrincipal;
+  useEffect(() => {
+    if (accountId) {
+      loadInterestRateHistory();
+    } else {
+      setRateHistory([{
+        id: 'temp',
+        account_id: 'temp',
+        interest_rate: interestRate,
+        effective_date: loanStartDate,
+        created_at: new Date().toISOString()
+      }]);
     }
-    return payments[paymentIndex - 1]?.outstanding_principal || loanPrincipal;
+  }, [accountId, interestRate, loanStartDate]);
+
+  const loadInterestRateHistory = async () => {
+    if (!accountId) return;
+    
+    setLoadingRates(true);
+    try {
+      const rates = await interestRateApi.getInterestRateHistory(accountId);
+      if (rates.length === 0) {
+        setRateHistory([{
+          id: 'temp',
+          account_id: accountId,
+          interest_rate: interestRate,
+          effective_date: loanStartDate,
+          created_at: new Date().toISOString()
+        }]);
+      } else {
+        setRateHistory(rates);
+      }
+    } catch (error) {
+      console.error('Error loading interest rate history:', error);
+      toast({
+        title: 'Warning',
+        description: 'Could not load interest rate history. Using current rate.',
+        variant: 'destructive',
+      });
+      setRateHistory([{
+        id: 'temp',
+        account_id: accountId || 'temp',
+        interest_rate: interestRate,
+        effective_date: loanStartDate,
+        created_at: new Date().toISOString()
+      }]);
+    } finally {
+      setLoadingRates(false);
+    }
   };
 
-  const handleAddPayment = () => {
+  const handleAddEMIEntry = () => {
     if (!newPayment.payment_date || !newPayment.emi_amount) {
       return;
     }
@@ -73,74 +124,72 @@ export default function LoanEMIPaymentManager({
       return;
     }
 
-    const paymentNumber = payments.length + 1;
-    const outstandingPrincipal = calculateOutstandingPrincipal(payments.length);
-
-    let principalComponent: number;
-    let interestComponent: number;
-
-    if (newPayment.principal_component && newPayment.interest_component) {
-      principalComponent = parseFloat(newPayment.principal_component);
-      interestComponent = parseFloat(newPayment.interest_component);
-      
-      if (isNaN(principalComponent) || isNaN(interestComponent)) {
-        return;
-      }
-      
-      if (Math.abs((principalComponent + interestComponent) - emiAmount) > 0.01) {
-        return;
-      }
-    } else {
-      const breakdown = calculateEMIBreakdown(
-        outstandingPrincipal,
-        emiAmount,
-        interestRate
-      );
-      principalComponent = breakdown.principalComponent;
-      interestComponent = breakdown.interestComponent;
-    }
-
-    const newOutstandingPrincipal = Math.max(0, Math.round((outstandingPrincipal - principalComponent) * 100) / 100);
-
-    const payment: EMIPaymentEntry = {
+    const newEntry = {
       payment_date: newPayment.payment_date,
-      emi_amount: emiAmount,
-      principal_component: principalComponent,
-      interest_component: interestComponent,
-      outstanding_principal: newOutstandingPrincipal,
-      interest_rate: interestRate,
-      payment_number: paymentNumber,
+      emi_amount: newPayment.emi_amount,
       notes: newPayment.notes
     };
 
-    const updatedPayments = [...payments, payment];
-    setPayments(updatedPayments);
-    setNewPayment({ payment_date: '', emi_amount: '', principal_component: '', interest_component: '', notes: '' });
+    setEmiEntries([...emiEntries, newEntry]);
+    setNewPayment({ payment_date: '', emi_amount: '', notes: '' });
+  };
+
+  const handleRemoveEMIEntry = (index: number) => {
+    setEmiEntries(emiEntries.filter((_, i) => i !== index));
+  };
+
+  const handleCalculateComponents = () => {
+    if (emiEntries.length === 0) {
+      toast({
+        title: 'No Entries',
+        description: 'Please add EMI payment entries first.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const sortedEntries = [...emiEntries].sort(
+      (a, b) => new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime()
+    );
+
+    const paymentsToCalculate = sortedEntries.map(entry => ({
+      payment_date: entry.payment_date,
+      emi_amount: parseFloat(entry.emi_amount)
+    }));
+
+    const rateHistoryForCalculation = rateHistory.map(rate => ({
+      effective_date: rate.effective_date,
+      interest_rate: rate.interest_rate
+    }));
+
+    const calculatedPayments = calculateAllEMIBreakdowns(
+      loanStartDate,
+      loanPrincipal,
+      paymentsToCalculate,
+      rateHistoryForCalculation
+    );
+
+    const paymentsWithNotes = calculatedPayments.map((payment, index) => ({
+      ...payment,
+      interest_rate: interestRate,
+      notes: sortedEntries[index]?.notes || ''
+    }));
+
+    setPayments(paymentsWithNotes);
+    setEmiEntries([]);
+    
+    toast({
+      title: 'Success',
+      description: `Calculated components for ${calculatedPayments.length} payments.`,
+    });
   };
 
   const handleRemovePayment = (index: number) => {
-    const updatedPayments = payments.filter((_, i) => i !== index);
-    
-    let outstandingPrincipal = loanPrincipal;
-    const recalculatedPayments = updatedPayments.map((payment, idx) => {
-      const breakdown = calculateEMIBreakdown(
-        outstandingPrincipal,
-        payment.emi_amount,
-        payment.interest_rate
-      );
-      
-      outstandingPrincipal = breakdown.newOutstandingPrincipal;
-      
-      return {
-        ...payment,
-        payment_number: idx + 1,
-        principal_component: breakdown.principalComponent,
-        interest_component: breakdown.interestComponent,
-        outstanding_principal: breakdown.newOutstandingPrincipal
-      };
-    });
-    
-    setPayments(recalculatedPayments);
+    const updatedPayments = payments.filter((_, i) => i !== index).map((payment, idx) => ({
+      ...payment,
+      payment_number: idx + 1
+    }));
+    setPayments(updatedPayments);
   };
 
   const handleStartEdit = (index: number) => {
@@ -156,6 +205,11 @@ export default function LoanEMIPaymentManager({
     const interestComponent = parseFloat(editValues.interest_component);
     
     if (isNaN(principalComponent) || isNaN(interestComponent)) {
+      toast({
+        title: 'Invalid Input',
+        description: 'Please enter valid numbers for principal and interest.',
+        variant: 'destructive',
+      });
       return;
     }
 
@@ -164,60 +218,44 @@ export default function LoanEMIPaymentManager({
     const actualTotal = principalComponent + interestComponent;
     
     if (Math.abs(actualTotal - expectedTotal) > 0.01) {
+      toast({
+        title: 'Validation Error',
+        description: 'Principal + Interest must equal EMI Amount.',
+        variant: 'destructive',
+      });
       return;
     }
 
     const updatedPayments = [...payments];
     let outstandingPrincipal = index === 0 ? loanPrincipal : payments[index - 1].outstanding_principal;
     
-    for (let i = index; i < updatedPayments.length; i++) {
-      if (i === index) {
-        updatedPayments[i] = {
-          ...updatedPayments[i],
-          principal_component: principalComponent,
-          interest_component: interestComponent,
-          outstanding_principal: Math.max(0, Math.round((outstandingPrincipal - principalComponent) * 100) / 100)
-        };
-        outstandingPrincipal = updatedPayments[i].outstanding_principal;
-      } else {
-        const breakdown = calculateEMIBreakdown(
-          outstandingPrincipal,
-          updatedPayments[i].emi_amount,
-          updatedPayments[i].interest_rate
-        );
-        updatedPayments[i] = {
-          ...updatedPayments[i],
-          principal_component: breakdown.principalComponent,
-          interest_component: breakdown.interestComponent,
-          outstanding_principal: breakdown.newOutstandingPrincipal
-        };
-        outstandingPrincipal = breakdown.newOutstandingPrincipal;
-      }
+    updatedPayments[index] = {
+      ...updatedPayments[index],
+      principal_component: principalComponent,
+      interest_component: interestComponent,
+      outstanding_principal: Math.max(0, Math.round((outstandingPrincipal - principalComponent) * 100) / 100)
+    };
+
+    for (let i = index + 1; i < updatedPayments.length; i++) {
+      outstandingPrincipal = updatedPayments[i - 1].outstanding_principal;
+      const newOutstanding = Math.max(0, Math.round((outstandingPrincipal - updatedPayments[i].principal_component) * 100) / 100);
+      updatedPayments[i] = {
+        ...updatedPayments[i],
+        outstanding_principal: newOutstanding
+      };
     }
     
     setPayments(updatedPayments);
     setEditingIndex(null);
+    toast({
+      title: 'Success',
+      description: 'Payment updated successfully.',
+    });
   };
 
   const handleCancelEdit = () => {
     setEditingIndex(null);
     setEditValues({ principal_component: '', interest_component: '' });
-  };
-
-  const handleEMIAmountChange = (value: string) => {
-    setNewPayment({ ...newPayment, emi_amount: value });
-    
-    const emiAmount = parseFloat(value);
-    if (!isNaN(emiAmount) && emiAmount > 0 && !newPayment.principal_component && !newPayment.interest_component) {
-      const outstandingPrincipal = calculateOutstandingPrincipal(payments.length);
-      const breakdown = calculateEMIBreakdown(outstandingPrincipal, emiAmount, interestRate);
-      setNewPayment(prev => ({
-        ...prev,
-        emi_amount: value,
-        principal_component: breakdown.principalComponent.toFixed(2),
-        interest_component: breakdown.interestComponent.toFixed(2)
-      }));
-    }
   };
 
   const totalPrincipalPaid = payments.reduce((sum, p) => sum + p.principal_component, 0);
@@ -256,8 +294,15 @@ export default function LoanEMIPaymentManager({
         )}
 
         <div className="space-y-4">
-          <h4 className="font-medium">Add EMI Payment</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="flex items-center justify-between">
+            <h4 className="font-medium">Step 1: Add EMI Payment Entries</h4>
+            {interestRateType === 'floating' && rateHistory.length > 1 && (
+              <div className="text-xs text-muted-foreground">
+                {rateHistory.length} rate changes detected
+              </div>
+            )}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label htmlFor="payment_date">Payment Date *</Label>
               <Input
@@ -277,32 +322,8 @@ export default function LoanEMIPaymentManager({
                 step="0.01"
                 placeholder="0.00"
                 value={newPayment.emi_amount}
-                onChange={(e) => handleEMIAmountChange(e.target.value)}
+                onChange={(e) => setNewPayment({ ...newPayment, emi_amount: e.target.value })}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="principal_component">Principal Component</Label>
-              <Input
-                id="principal_component"
-                type="number"
-                step="0.01"
-                placeholder="Auto-calculated"
-                value={newPayment.principal_component}
-                onChange={(e) => setNewPayment({ ...newPayment, principal_component: e.target.value })}
-              />
-              <p className="text-xs text-muted-foreground">Leave blank for auto-calculation</p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="interest_component">Interest Component</Label>
-              <Input
-                id="interest_component"
-                type="number"
-                step="0.01"
-                placeholder="Auto-calculated"
-                value={newPayment.interest_component}
-                onChange={(e) => setNewPayment({ ...newPayment, interest_component: e.target.value })}
-              />
-              <p className="text-xs text-muted-foreground">Leave blank for auto-calculation</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="notes">Notes (Optional)</Label>
@@ -314,26 +335,75 @@ export default function LoanEMIPaymentManager({
                 onChange={(e) => setNewPayment({ ...newPayment, notes: e.target.value })}
               />
             </div>
-          </div>
-          {newPayment.principal_component && newPayment.interest_component && newPayment.emi_amount && (
-            <div className="text-sm">
-              {Math.abs((parseFloat(newPayment.principal_component) + parseFloat(newPayment.interest_component)) - parseFloat(newPayment.emi_amount)) > 0.01 ? (
-                <p className="text-destructive">⚠️ Principal + Interest must equal EMI Amount</p>
-              ) : (
-                <p className="text-green-600 dark:text-green-400">✓ Components sum correctly</p>
-              )}
+            <div className="space-y-2">
+              <Label className="invisible">Action</Label>
+              <Button
+                type="button"
+                onClick={handleAddEMIEntry}
+                disabled={!newPayment.payment_date || !newPayment.emi_amount || !loanPrincipal || !interestRate}
+                className="w-full"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add Entry
+              </Button>
             </div>
-          )}
-          <Button
-            type="button"
-            onClick={handleAddPayment}
-            disabled={!newPayment.payment_date || !newPayment.emi_amount || !loanPrincipal || !interestRate}
-            className="w-full md:w-auto"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Add Payment
-          </Button>
+          </div>
         </div>
+
+        {emiEntries.length > 0 && (
+          <div className="space-y-2">
+            <h4 className="font-medium">EMI Entries ({emiEntries.length})</h4>
+            <div className="border rounded-lg overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead className="text-right">EMI Amount</TableHead>
+                    <TableHead>Notes</TableHead>
+                    <TableHead className="w-12"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {emiEntries.map((entry, index) => (
+                    <TableRow key={index}>
+                      <TableCell>{new Date(entry.payment_date).toLocaleDateString()}</TableCell>
+                      <TableCell className="text-right font-medium">
+                        {formatCurrency(parseFloat(entry.emi_amount), currency)}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {entry.notes || '-'}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveEMIEntry(index)}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                onClick={handleCalculateComponents}
+                disabled={loadingRates}
+                className="flex-1"
+              >
+                <Calculator className="mr-2 h-4 w-4" />
+                Step 2: Calculate Principal & Interest Components
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Interest will be calculated from day 1 of loan{interestRateType === 'floating' ? ', considering all rate changes' : ''}.
+            </p>
+          </div>
+        )}
 
         {payments.length > 0 && (
           <div className="space-y-2">

@@ -190,42 +190,133 @@ export function calculateEMIBreakdown(
 }
 
 /**
- * Generate complete EMI payment schedule
+ * Calculate EMI payment breakdown considering interest rate history
+ * This function calculates interest from day 1 of loan, considering rate changes
  */
-export function generateEMISchedule(
-  principal: number,
-  annualInterestRate: number,
-  tenureMonths: number,
-  startDate: Date
-): Array<{
-  paymentNumber: number;
-  paymentDate: Date;
-  emiAmount: number;
+export function calculateEMIBreakdownWithHistory(
+  loanStartDate: string,
+  previousPaymentDate: string | null,
+  currentPaymentDate: string,
+  outstandingPrincipal: number,
+  emiAmount: number,
+  rateHistory: Array<{ effective_date: string; interest_rate: number }>
+): {
   principalComponent: number;
   interestComponent: number;
-  outstandingPrincipal: number;
-}> {
-  const emi = calculateEMI(principal, annualInterestRate, tenureMonths);
-  const schedule = [];
-  let outstandingPrincipal = principal;
+  newOutstandingPrincipal: number;
+} {
+  if (outstandingPrincipal <= 0 || emiAmount <= 0) {
+    return {
+      principalComponent: 0,
+      interestComponent: 0,
+      newOutstandingPrincipal: 0
+    };
+  }
 
-  for (let i = 1; i <= tenureMonths; i++) {
-    const paymentDate = new Date(startDate);
-    paymentDate.setMonth(paymentDate.getMonth() + i);
+  const startDate = new Date(previousPaymentDate || loanStartDate);
+  const endDate = new Date(currentPaymentDate);
+  
+  // Sort rate history by effective date
+  const sortedRates = [...rateHistory].sort(
+    (a, b) => new Date(a.effective_date).getTime() - new Date(b.effective_date).getTime()
+  );
 
-    const breakdown = calculateEMIBreakdown(outstandingPrincipal, emi, annualInterestRate);
+  let totalInterest = 0;
+  let periodStartDate = startDate;
+
+  // Calculate interest for each rate period
+  for (let i = 0; i < sortedRates.length; i++) {
+    const rateEntry = sortedRates[i];
+    const rateEffectiveDate = new Date(rateEntry.effective_date);
     
-    schedule.push({
-      paymentNumber: i,
-      paymentDate,
-      emiAmount: emi,
-      principalComponent: breakdown.principalComponent,
-      interestComponent: breakdown.interestComponent,
-      outstandingPrincipal: breakdown.newOutstandingPrincipal
+    // Skip if rate is effective before the period start
+    if (rateEffectiveDate <= periodStartDate) {
+      continue;
+    }
+
+    // If rate change is after payment date, use current rate till payment date
+    if (rateEffectiveDate >= endDate) {
+      break;
+    }
+
+    // Calculate interest for period before rate change
+    const periodEndDate = rateEffectiveDate;
+    const days = Math.floor((periodEndDate.getTime() - periodStartDate.getTime()) / (1000 * 60 * 60 * 24));
+    
+    // Get the applicable rate for this period (previous rate or first rate)
+    const applicableRate = i > 0 ? sortedRates[i - 1].interest_rate : sortedRates[0].interest_rate;
+    const periodInterest = (outstandingPrincipal * applicableRate * days) / (365 * 100);
+    totalInterest += periodInterest;
+
+    periodStartDate = periodEndDate;
+  }
+
+  // Calculate interest for remaining period (from last rate change or start to payment date)
+  const remainingDays = Math.floor((endDate.getTime() - periodStartDate.getTime()) / (1000 * 60 * 60 * 24));
+  if (remainingDays > 0) {
+    // Use the last applicable rate
+    const lastRate = sortedRates.length > 0 
+      ? sortedRates[sortedRates.length - 1].interest_rate 
+      : 0;
+    const remainingInterest = (outstandingPrincipal * lastRate * remainingDays) / (365 * 100);
+    totalInterest += remainingInterest;
+  }
+
+  const interestComponent = Math.round(totalInterest * 100) / 100;
+  const principalComponent = Math.round((emiAmount - interestComponent) * 100) / 100;
+  const newOutstandingPrincipal = Math.max(0, Math.round((outstandingPrincipal - principalComponent) * 100) / 100);
+
+  return {
+    principalComponent,
+    interestComponent,
+    newOutstandingPrincipal
+  };
+}
+
+/**
+ * Calculate all EMI payment breakdowns in batch considering interest rate history
+ */
+export function calculateAllEMIBreakdowns(
+  loanStartDate: string,
+  loanPrincipal: number,
+  payments: Array<{ payment_date: string; emi_amount: number }>,
+  rateHistory: Array<{ effective_date: string; interest_rate: number }>
+): Array<{
+  payment_date: string;
+  emi_amount: number;
+  principal_component: number;
+  interest_component: number;
+  outstanding_principal: number;
+  payment_number: number;
+}> {
+  const results = [];
+  let outstandingPrincipal = loanPrincipal;
+  let previousPaymentDate: string | null = null;
+
+  for (let i = 0; i < payments.length; i++) {
+    const payment = payments[i];
+    
+    const breakdown = calculateEMIBreakdownWithHistory(
+      loanStartDate,
+      previousPaymentDate,
+      payment.payment_date,
+      outstandingPrincipal,
+      payment.emi_amount,
+      rateHistory
+    );
+
+    results.push({
+      payment_date: payment.payment_date,
+      emi_amount: payment.emi_amount,
+      principal_component: breakdown.principalComponent,
+      interest_component: breakdown.interestComponent,
+      outstanding_principal: breakdown.newOutstandingPrincipal,
+      payment_number: i + 1
     });
 
     outstandingPrincipal = breakdown.newOutstandingPrincipal;
+    previousPaymentDate = payment.payment_date;
   }
 
-  return schedule;
+  return results;
 }
