@@ -25,7 +25,6 @@ import InterestRateChart from '@/components/InterestRateChart';
 import InterestRateTable from '@/components/InterestRateTable';
 import BankLogo from '@/components/BankLogo';
 import AccountStatementDialog from '@/components/AccountStatementDialog';
-import ChangePassword from '@/components/ChangePassword';
 
 export default function Dashboard() {
   const { user, profile } = useAuth();
@@ -247,7 +246,6 @@ export default function Dashboard() {
           <p className="text-sm md:text-base text-muted-foreground">Welcome back, {profile?.email || 'User'}</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <ChangePassword />
           <Link to="/accounts/new">
             <Button size="sm" className="md:size-default shadow-elegant hover:shadow-glow transition-smooth">
               <Plus className="mr-2 h-4 w-4" />

@@ -18,6 +18,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { supabase } from '@/db/supabase';
+import ChangePassword from '@/components/ChangePassword';
 
 export default function Settings() {
   const { user, profile, refreshProfile } = useAuth();
@@ -245,6 +246,24 @@ export default function Settings() {
           <div>
             <Label>Role</Label>
             <p className="text-sm text-muted-foreground mt-1 capitalize">{profile?.role || 'user'}</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Security</CardTitle>
+          <CardDescription>Manage your account security settings</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div>
+              <Label>Password</Label>
+              <p className="text-sm text-muted-foreground mt-1 mb-3">
+                Keep your account secure by using a strong password
+              </p>
+              <ChangePassword />
+            </div>
           </div>
         </CardContent>
       </Card>
