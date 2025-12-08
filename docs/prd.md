@@ -1,11 +1,12 @@
 # SmartFinHub Requirements Document
+\n## 1. Application Overview\n
+### 1.1 Application Name
+SmartFinHub
 
-## 1. Application Overview
-
-### 1.1 Application Name\nSmartFinHub
-\n### 1.2 Application Description
+### 1.2 Application Description
 A comprehensive financial management web application designed for tracking and managing multiple financial accounts including cash, bank accounts, credit cards, and loans. The platform provides real-time balance updates, transaction recording, budget analysis, and detailed financial reporting.
-\n### 1.3 Authentication System
+
+### 1.3 Authentication System
 - Login using email address or mobile number
 - Email verification via verification link
 - Mobile number verification via OTP (One-Time Password)
@@ -28,12 +29,12 @@ A comprehensive financial management web application designed for tracking and m
   - Password Re-entry: Require user to re-enter account password to authorize phone number change
   - Authenticator App: Use third-party authenticator apps (Google Authenticator, Microsoft Authenticator) to generate verification codes
   - Biometric Verification: Fingerprint or face recognition on supported devices
-\n## 2. Core Features\n
-### 2.1 User Preferences
+
+## 2. Core Features
+\n### 2.1 User Preferences
 - Select default country from dropdown list
 - Choose preferred currency for dashboard display
-- Country and currency settings saved to user profile
-- Settings apply across all dashboard views and reports
+- Country and currency settings saved to user profile\n- Settings apply across all dashboard views and reports
 
 ### 2.2 Account Management
 \n#### 2.2.1 Account Types
@@ -66,14 +67,35 @@ A comprehensive financial management web application designed for tracking and m
 #### 2.2.4 Loan Account Configuration
 - Select interest rate type: Fixed or Floating
 - Input total principal loan amount
-- Auto-calculate EMI based on principal, interest rate, and tenure\n
+- Auto-calculate EMI based on principal, interest rate, and tenure\n- **EMI Payment History Entry**: During loan account creation, system prompts user to provide details of every EMI payment already made:\n  - EMI Payment Date: Date when each EMI was paid
+  - EMI Amount Paid: Actual amount paid for each EMI installment
+- User can add multiple historical EMI payment records during account setup
+- **EMI Breakdown Calculation**: System automatically calculates for each EMI payment:
+  - Principal Component: Portion of EMI payment applied to principal reduction
+  - Interest Component: Portion of EMI payment applied to interest charges
+- Calculation based on loan amount, interest rate, tenure, and payment date
+- **Loan Account Statement Generation**: System generates detailed loan account statement showing:
+  - Each EMI payment with date and amount
+  - Principal and interest breakdown for each payment
+  - Running balance of outstanding principal after each payment
+  - Cumulative interest paid to date
+  - Remaining loan balance
+- **Accurate Accrued Interest Calculation**: System calculates precise accrued interest based on:
+  - Historical EMI payment records
+  - Interest component extracted from each EMI\n  - Current outstanding principal balance
+  - Interest rate and payment schedule
+- Accrued interest displayed on dashboard and loan account detail page
+- **Edit EMI History**: User can add, edit, or delete historical EMI payment records at any time
+- System recalculates principal/interest breakdown and accrued interest automatically when EMI history is modified
+
 #### 2.2.5 Floating Interest Rate Management
 - Record all interest rate changes from loan inception to current date
 - User can update floating interest rate at any time
 - System maintains complete historical record of rate changes
 - Auto-calculate total accrued interest till date
 - Display accrued interest on dashboard and account detail page
-- Chart visualization showing floating interest rate history over time
+- Chart visualization showing floating interest rate history over time\n- **EMI Recalculation on Rate Change**: When floating interest rate is updated, system recalculates principal and interest components for all subsequent EMI payments
+- Updated interest breakdown reflected in loan account statement
 
 #### 2.2.6 Data Security
 - **End-to-End Encryption**: All user data encrypted in database using industry-standard encryption algorithms
@@ -87,24 +109,24 @@ A comprehensive financial management web application designed for tracking and m
 - Transaction details encrypted in database
 - Personal information encrypted in database
 - Budget data encrypted in database
-- Account balances encrypted in database\n- All financial data encrypted at rest and in transit
+- Account balances encrypted in database
+- All financial data encrypted at rest and in transit
 - Account data accessible only by authenticated account owner with valid decryption credentials
-- **Data Privacy Guarantee**: System architecture ensures that even database administrators and application developers cannot access or view user's financial information\n
-#### 2.2.7 Account Modification
+- **Data Privacy Guarantee**: System architecture ensures that even database administrators and application developers cannot access or view user's financial information
+\n#### 2.2.7 Account Modification
 - Edit any account information at any time
 - Delete accounts with user confirmation
 
 ### 2.3 Transaction Management
 
 #### 2.3.1 Transaction Types
-- Income transactions\n- Expense transactions
+- Income transactions
+- Expense transactions
 - Cash withdrawals (from bank account or credit card)
 - Bank-to-bank transfers
-- Loan payments
-- Credit card payments\n
-#### 2.3.2 Transaction Processing Logic
-- Credit card accounts displayed as negative balances
-- Loan accounts displayed as negative balances
+- Loan payments\n- Credit card payments
+\n#### 2.3.2 Transaction Processing Logic
+- Credit card accounts displayed as negative balances\n- Loan accounts displayed as negative balances
 - Cash withdrawal from credit card increases card balance (more negative)
 - Payments to loan accounts decrease loan balance (less negative)
 - Payments to credit card decrease card balance (less negative)\n- During expense transaction entry, display remaining budget balance for the selected budget category for current month
@@ -160,13 +182,15 @@ A comprehensive financial management web application designed for tracking and m
 
 #### 2.4.4 Account Quick View\n- **Click-to-View Statement**: When user clicks on any account card on dashboard, system displays popup window showing last 90 days statement for that account
 - Popup includes transaction history, balance changes, and account activity for the 90-day period
+- **For loan accounts**: Popup displays detailed EMI payment history with principal and interest breakdown for each payment within the 90-day period
 - Statement popup available for all account types: Cash, Bank, Credit Card, and Loan accounts
 - Close button to dismiss popup and return to dashboard
 
 ### 2.5 Budget Management
 - Input monthly budgeted income amounts
 - Input monthly budgeted expense amounts by category
-- Compare actual expenses against budgeted amounts\n- Display budget variance (over/under budget) on dashboard
+- Compare actual expenses against budgeted amounts
+- Display budget variance (over/under budget) on dashboard
 - Monthly budget tracking and analysis
 - Editing or saving budget automatically triggers immediate update of Budget vs. Actual analysis
 - Real-time recalculation of budget variance when budget values are modified
@@ -180,24 +204,28 @@ A comprehensive financial management web application designed for tracking and m
 - Budget vs. actual analysis reports
 - **Credit Card Monthly Statement Report**: Reports section includes credit card statement view with month selector
 - User selects specific month from dropdown to view credit card statement for that period
-- Statement displays all transactions, payments, EMI installments, interest charges, and balance for selected month\n- Statement shows opening balance, closing balance, total spending, and payment due information
-- **EMI Transaction Reports**: Detailed reports showing all EMI transactions, payment schedules, and outstanding balances
-- Export reports functionality
-
+- Statement displays all transactions, payments, EMI installments, interest charges, and balance for selected month
+- Statement shows opening balance, closing balance, total spending, and payment due information
+- **EMI Transaction Reports**: Detailed reports showing all EMI transactions, payment schedules, and outstanding balances\n- **Loan Account Statement Report**: Comprehensive loan statement report showing:
+  - Complete EMI payment history with dates and amounts
+  - Principal and interest breakdown for each EMI payment
+  - Outstanding principal balance after each payment
+  - Cumulative interest paid to date
+  - Total accrued interest\n  - Remaining loan tenure
+  - Amortization schedule
+- Date range filter for loan statement reports
+- Export reports functionality\n
 ## 3. Design Style
 
 ### 3.1 Color Scheme
 - Primary color: Deep blue (#1E3A8A) conveying trust and financial stability
 - Secondary color: Emerald green (#10B981) for positive balances and income indicators
-- Accent color: Amber (#F59E0B) for alerts and important notifications
-- Negative indicator: Coral red (#EF4444) for liabilities and overspending
+- Accent color: Amber (#F59E0B) for alerts and important notifications\n- Negative indicator: Coral red (#EF4444) for liabilities and overspending
 
 ### 3.2 Visual Details
-- Card-based layout with subtle drop shadows for depth
-- Rounded corners (8px radius) for modern, approachable aesthetic
+- Card-based layout with subtle drop shadows for depth\n- Rounded corners (8px radius) for modern, approachable aesthetic
 - Smooth hover transitions on interactive elements
-- Clear iconography for transaction types and account categories
-- Consistent spacing and padding throughout interface
+- Clear iconography for transaction types and account categories\n- Consistent spacing and padding throughout interface
 
 ### 3.3 Layout Structure\n- Grid-based dashboard for account cards with responsive columns
 - Side navigation panel for main sections: Accounts, Transactions, Reports, Budget, Settings

@@ -8,6 +8,7 @@ import type {
   Budget,
   ExpenseCategory,
   EMITransaction,
+  LoanEMIPayment,
   AccountWithInterestHistory,
   TransactionWithAccounts,
   FinancialSummary,
@@ -764,5 +765,114 @@ export const emiApi = {
 
   async cancelEMI(emiId: string): Promise<EMITransaction> {
     return this.updateEMI(emiId, { status: 'cancelled' });
+  }
+};
+
+export const loanEMIPaymentApi = {
+  async getPaymentsByAccount(accountId: string): Promise<LoanEMIPayment[]> {
+    const { data, error } = await supabase
+      .from('loan_emi_payments')
+      .select('*')
+      .eq('account_id', accountId)
+      .order('payment_number', { ascending: true });
+    
+    if (error) throw error;
+    return Array.isArray(data) ? data : [];
+  },
+
+  async getPaymentsByUser(userId: string): Promise<LoanEMIPayment[]> {
+    const { data, error } = await supabase
+      .from('loan_emi_payments')
+      .select('*')
+      .eq('user_id', userId)
+      .order('payment_date', { ascending: false });
+    
+    if (error) throw error;
+    return Array.isArray(data) ? data : [];
+  },
+
+  async createPayment(payment: Omit<LoanEMIPayment, 'id' | 'created_at' | 'updated_at'>): Promise<LoanEMIPayment> {
+    const { data, error } = await supabase
+      .from('loan_emi_payments')
+      .insert(payment)
+      .select()
+      .maybeSingle();
+    
+    if (error) throw error;
+    if (!data) throw new Error('Failed to create loan EMI payment');
+    return data;
+  },
+
+  async createBulkPayments(payments: Omit<LoanEMIPayment, 'id' | 'created_at' | 'updated_at'>[]): Promise<LoanEMIPayment[]> {
+    const { data, error } = await supabase
+      .from('loan_emi_payments')
+      .insert(payments)
+      .select();
+    
+    if (error) throw error;
+    return Array.isArray(data) ? data : [];
+  },
+
+  async updatePayment(id: string, updates: Partial<LoanEMIPayment>): Promise<LoanEMIPayment> {
+    const { data, error } = await supabase
+      .from('loan_emi_payments')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .maybeSingle();
+    
+    if (error) throw error;
+    if (!data) throw new Error('Failed to update loan EMI payment');
+    return data;
+  },
+
+  async deletePayment(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('loan_emi_payments')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+  },
+
+  async deletePaymentsByAccount(accountId: string): Promise<void> {
+    const { error } = await supabase
+      .from('loan_emi_payments')
+      .delete()
+      .eq('account_id', accountId);
+    
+    if (error) throw error;
+  },
+
+  async getTotalPrincipalPaid(accountId: string): Promise<number> {
+    const { data, error } = await supabase
+      .rpc('get_total_principal_paid', { p_account_id: accountId });
+    
+    if (error) throw error;
+    return data || 0;
+  },
+
+  async getTotalInterestPaid(accountId: string): Promise<number> {
+    const { data, error } = await supabase
+      .rpc('get_total_interest_paid', { p_account_id: accountId });
+    
+    if (error) throw error;
+    return data || 0;
+  },
+
+  async getLatestOutstandingPrincipal(accountId: string): Promise<number> {
+    const { data, error } = await supabase
+      .rpc('get_latest_outstanding_principal', { p_account_id: accountId });
+    
+    if (error) throw error;
+    return data || 0;
+  },
+
+  async getNextPaymentNumber(accountId: string): Promise<number> {
+    const { data, error } = await supabase
+      .rpc('get_next_payment_number', { p_account_id: accountId });
+    
+    if (error) throw error;
+    return data || 1;
   }
 };

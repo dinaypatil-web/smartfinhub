@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { accountApi, interestRateApi } from '@/db/api';
-import type { Account, AccountType, InterestRateType } from '@/types/types';
+import { accountApi, interestRateApi, loanEMIPaymentApi } from '@/db/api';
+import type { Account, AccountType, InterestRateType, LoanEMIPayment } from '@/types/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,7 @@ import { countries } from '@/utils/countries';
 import { getBanksByCountry, getBankLogo } from '@/utils/banks';
 import { calculateEMI, formatLoanAmount } from '@/utils/loanCalculations';
 import BankLogo from '@/components/BankLogo';
+import LoanEMIPaymentManager from '@/components/LoanEMIPaymentManager';
 
 export default function AccountForm() {
   const { id } = useParams();
@@ -46,6 +47,7 @@ export default function AccountForm() {
 
   const [calculatedEMI, setCalculatedEMI] = useState<number>(0);
   const [availableBanks, setAvailableBanks] = useState(getBanksByCountry(formData.country));
+  const [emiPayments, setEmiPayments] = useState<Array<Omit<LoanEMIPayment, 'id' | 'user_id' | 'account_id' | 'created_at' | 'updated_at'>>>([]);
 
   // Calculate EMI whenever loan details change
   useEffect(() => {
@@ -174,6 +176,15 @@ export default function AccountForm() {
             interest_rate: parseFloat(formData.current_interest_rate),
             effective_date: formData.loan_start_date,
           });
+
+          if (emiPayments.length > 0) {
+            const paymentsToSave = emiPayments.map(payment => ({
+              ...payment,
+              user_id: user.id,
+              account_id: newAccount.id,
+            }));
+            await loanEMIPaymentApi.createBulkPayments(paymentsToSave);
+          }
         }
 
         toast({
@@ -572,15 +583,42 @@ export default function AccountForm() {
               </>
             )}
 
-            <div className="flex gap-4">
-              <Button type="submit" disabled={loading} className="flex-1">
-                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {id ? 'Update Account' : 'Create Account'}
-              </Button>
-              <Button type="button" variant="outline" onClick={() => navigate('/accounts')}>
-                Cancel
-              </Button>
-            </div>
+            {formData.account_type === 'loan' && !id && formData.loan_principal && formData.current_interest_rate && formData.loan_start_date && (
+              <div className="col-span-2">
+                <LoanEMIPaymentManager
+                  loanPrincipal={parseFloat(formData.loan_principal) || 0}
+                  interestRate={parseFloat(formData.current_interest_rate) || 0}
+                  loanStartDate={formData.loan_start_date}
+                  currency={formData.currency}
+                  onPaymentsChange={setEmiPayments}
+                  initialPayments={[]}
+                />
+              </div>
+            )}
+
+            {formData.account_type !== 'loan' && (
+              <div className="flex gap-4">
+                <Button type="submit" disabled={loading} className="flex-1">
+                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {id ? 'Update Account' : 'Create Account'}
+                </Button>
+                <Button type="button" variant="outline" onClick={() => navigate('/accounts')}>
+                  Cancel
+                </Button>
+              </div>
+            )}
+
+            {formData.account_type === 'loan' && (
+              <div className="flex gap-4">
+                <Button type="submit" disabled={loading} className="flex-1">
+                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {id ? 'Update Account' : 'Create Account'}
+                </Button>
+                <Button type="button" variant="outline" onClick={() => navigate('/accounts')}>
+                  Cancel
+                </Button>
+              </div>
+            )}
           </form>
         </CardContent>
       </Card>

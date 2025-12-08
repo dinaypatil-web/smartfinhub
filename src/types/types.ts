@@ -166,3 +166,26 @@ export interface AccountWithEMI extends Account {
   credit_utilization?: number;
   available_credit?: number;
 }
+
+export interface LoanEMIPayment {
+  id: string;
+  user_id: string;
+  account_id: string;
+  payment_date: string;
+  emi_amount: number;
+  principal_component: number;
+  interest_component: number;
+  outstanding_principal: number;
+  interest_rate: number;
+  payment_number: number;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LoanAccountWithPayments extends LoanAccountWithCalculations {
+  emi_payments?: LoanEMIPayment[];
+  total_principal_paid?: number;
+  total_interest_paid?: number;
+  remaining_principal?: number;
+}
