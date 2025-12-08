@@ -171,11 +171,14 @@ export default function AccountForm() {
 
         if (formData.account_type === 'loan' && emiPayments.length > 0) {
           await loanEMIPaymentApi.deletePaymentsByAccount(id);
-          const paymentsToSave = emiPayments.map(payment => ({
-            ...payment,
-            user_id: user.id,
-            account_id: id,
-          }));
+          const paymentsToSave = emiPayments.map(payment => {
+            const { id: _id, created_at, updated_at, ...paymentData } = payment as any;
+            return {
+              ...paymentData,
+              user_id: user.id,
+              account_id: id,
+            };
+          });
           await loanEMIPaymentApi.createBulkPayments(paymentsToSave);
         }
 
