@@ -162,20 +162,30 @@ export default function LoanEMIPaymentManager({
       interest_rate: rate.interest_rate
     }));
 
+    const outstandingPrincipal = payments.length > 0 
+      ? payments[payments.length - 1].outstanding_principal 
+      : loanPrincipal;
+
+    const effectiveStartDate = payments.length > 0
+      ? payments[payments.length - 1].payment_date
+      : loanStartDate;
+
     const calculatedPayments = calculateAllEMIBreakdowns(
-      loanStartDate,
-      loanPrincipal,
+      effectiveStartDate,
+      outstandingPrincipal,
       paymentsToCalculate,
       rateHistoryForCalculation
     );
 
+    const startingPaymentNumber = payments.length + 1;
     const paymentsWithNotes = calculatedPayments.map((payment, index) => ({
       ...payment,
+      payment_number: startingPaymentNumber + index,
       interest_rate: interestRate,
       notes: sortedEntries[index]?.notes || ''
     }));
 
-    setPayments(paymentsWithNotes);
+    setPayments([...payments, ...paymentsWithNotes]);
     setEmiEntries([]);
     
     toast({
