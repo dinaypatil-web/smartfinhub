@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { transactionApi, emiApi } from '@/db/api';
-import type { Transaction, Account, EMITransaction } from '@/types/types';
+import { transactionApi, emiApi, loanEMIPaymentApi } from '@/db/api';
+import type { Transaction, Account, EMITransaction, LoanEMIPayment } from '@/types/types';
 import {
   Dialog,
   DialogContent,
@@ -10,6 +10,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatCurrency, formatDate, formatAccountNumber } from '@/utils/format';
 import { TrendingUp, TrendingDown, ArrowRightLeft, CreditCard, Building2 } from 'lucide-react';
 import BankLogo from './BankLogo';
@@ -29,6 +30,7 @@ export default function AccountStatementDialog({
 }: AccountStatementDialogProps) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [emiTransactions, setEmiTransactions] = useState<EMITransaction[]>([]);
+  const [loanEMIPayments, setLoanEMIPayments] = useState<LoanEMIPayment[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -69,6 +71,12 @@ export default function AccountStatementDialog({
       if (account.account_type === 'credit_card') {
         const emis = await emiApi.getEMIsByAccount(account.id);
         setEmiTransactions(emis);
+      }
+
+      // Load loan EMI payments if loan account
+      if (account.account_type === 'loan') {
+        const loanPayments = await loanEMIPaymentApi.getPaymentsByAccount(account.id);
+        setLoanEMIPayments(loanPayments);
       }
     } catch (error) {
       console.error('Error loading statement:', error);
@@ -203,73 +211,248 @@ export default function AccountStatementDialog({
             )}
           </div>
 
-          {/* Transactions Table */}
-          <div>
-            <h3 className="text-lg font-semibold mb-3">Transaction History</h3>
-            {loading ? (
-              <div className="space-y-2">
-                {[1, 2, 3, 4, 5].map(i => (
-                  <Skeleton key={i} className="h-12 w-full bg-muted" />
-                ))}
-              </div>
-            ) : transactions.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No transactions in the last 90 days
-              </div>
-            ) : (
-              <div className="border rounded-lg overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                      <TableHead className="text-right">Balance</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {transactionsWithBalance.map(({ transaction, balanceAfter }) => {
-                      const amount = getTransactionAmount(transaction);
-                      const isEMI = emiTransactions.some(emi => emi.transaction_id === transaction.id);
-                      
-                      return (
-                        <TableRow key={transaction.id}>
-                          <TableCell className="whitespace-nowrap">
-                            {formatDate(transaction.transaction_date)}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              {getTransactionIcon(transaction.transaction_type)}
-                              <span className="capitalize text-sm">
-                                {transaction.transaction_type.replace('_', ' ')}
-                              </span>
-                              {isEMI && (
-                                <Badge variant="outline" className="text-xs">EMI</Badge>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="max-w-xs truncate">
-                              {transaction.description || transaction.category || '-'}
-                            </div>
-                          </TableCell>
-                          <TableCell className={`text-right font-medium ${
-                            amount >= 0 ? 'text-success' : 'text-danger'
-                          }`}>
-                            {amount >= 0 ? '+' : ''}{formatCurrency(amount, currency)}
-                          </TableCell>
-                          <TableCell className="text-right font-medium">
-                            {formatCurrency(balanceAfter, currency)}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </div>
+          {/* Content - Use tabs for loan accounts */}
+          {account.account_type === 'loan' ? (
+            <Tabs defaultValue="emi-payments" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="emi-payments">EMI Payments</TabsTrigger>
+                <TabsTrigger value="transactions">Transactions</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="emi-payments" className="mt-4">
+                <div>
+                  <h3 className="text-lg font-semibold mb-3">EMI Payment History</h3>
+                  {loading ? (
+                    <div className="space-y-2">
+                      {[1, 2, 3, 4, 5].map(i => (
+                        <Skeleton key={i} className="h-12 w-full bg-muted" />
+                      ))}
+                    </div>
+                  ) : loanEMIPayments.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No EMI payments recorded yet
+                    </div>
+                  ) : (
+                    <>
+                      {/* EMI Summary */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                        <div className="p-4 bg-muted rounded-lg">
+                          <div className="text-sm text-muted-foreground">Total Payments</div>
+                          <div className="text-lg font-semibold">{loanEMIPayments.length}</div>
+                        </div>
+                        <div className="p-4 bg-muted rounded-lg">
+                          <div className="text-sm text-muted-foreground">Total Paid</div>
+                          <div className="text-lg font-semibold">
+                            {formatCurrency(
+                              loanEMIPayments.reduce((sum, p) => sum + p.emi_amount, 0),
+                              currency
+                            )}
+                          </div>
+                        </div>
+                        <div className="p-4 bg-muted rounded-lg">
+                          <div className="text-sm text-muted-foreground">Principal Paid</div>
+                          <div className="text-lg font-semibold text-success">
+                            {formatCurrency(
+                              loanEMIPayments.reduce((sum, p) => sum + p.principal_component, 0),
+                              currency
+                            )}
+                          </div>
+                        </div>
+                        <div className="p-4 bg-muted rounded-lg">
+                          <div className="text-sm text-muted-foreground">Interest Paid</div>
+                          <div className="text-lg font-semibold text-warning">
+                            {formatCurrency(
+                              loanEMIPayments.reduce((sum, p) => sum + p.interest_component, 0),
+                              currency
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* EMI Payments Table */}
+                      <div className="border rounded-lg overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>#</TableHead>
+                              <TableHead>Payment Date</TableHead>
+                              <TableHead className="text-right">EMI Amount</TableHead>
+                              <TableHead className="text-right">Principal</TableHead>
+                              <TableHead className="text-right">Interest</TableHead>
+                              <TableHead className="text-right">Outstanding</TableHead>
+                              <TableHead>Notes</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {loanEMIPayments.map((payment) => (
+                              <TableRow key={payment.id}>
+                                <TableCell className="font-medium">
+                                  {payment.payment_number}
+                                </TableCell>
+                                <TableCell className="whitespace-nowrap">
+                                  {formatDate(payment.payment_date)}
+                                </TableCell>
+                                <TableCell className="text-right font-medium">
+                                  {formatCurrency(payment.emi_amount, currency)}
+                                </TableCell>
+                                <TableCell className="text-right text-success font-medium">
+                                  {formatCurrency(payment.principal_component, currency)}
+                                </TableCell>
+                                <TableCell className="text-right text-warning font-medium">
+                                  {formatCurrency(payment.interest_component, currency)}
+                                </TableCell>
+                                <TableCell className="text-right font-medium">
+                                  {formatCurrency(payment.outstanding_principal, currency)}
+                                </TableCell>
+                                <TableCell>
+                                  <div className="max-w-xs truncate text-sm text-muted-foreground">
+                                    {payment.notes || '-'}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="transactions" className="mt-4">
+                <div>
+                  <h3 className="text-lg font-semibold mb-3">Transaction History</h3>
+                  {loading ? (
+                    <div className="space-y-2">
+                      {[1, 2, 3, 4, 5].map(i => (
+                        <Skeleton key={i} className="h-12 w-full bg-muted" />
+                      ))}
+                    </div>
+                  ) : transactions.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No transactions in the last 90 days
+                    </div>
+                  ) : (
+                    <div className="border rounded-lg overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Type</TableHead>
+                            <TableHead>Description</TableHead>
+                            <TableHead className="text-right">Amount</TableHead>
+                            <TableHead className="text-right">Balance</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {transactionsWithBalance.map(({ transaction, balanceAfter }) => {
+                            const amount = getTransactionAmount(transaction);
+                            
+                            return (
+                              <TableRow key={transaction.id}>
+                                <TableCell className="whitespace-nowrap">
+                                  {formatDate(transaction.transaction_date)}
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-2">
+                                    {getTransactionIcon(transaction.transaction_type)}
+                                    <span className="capitalize text-sm">
+                                      {transaction.transaction_type.replace('_', ' ')}
+                                    </span>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="max-w-xs truncate">
+                                    {transaction.description || transaction.category || '-'}
+                                  </div>
+                                </TableCell>
+                                <TableCell className={`text-right font-medium ${
+                                  amount >= 0 ? 'text-success' : 'text-danger'
+                                }`}>
+                                  {amount >= 0 ? '+' : ''}{formatCurrency(amount, currency)}
+                                </TableCell>
+                                <TableCell className="text-right font-medium">
+                                  {formatCurrency(balanceAfter, currency)}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+            </Tabs>
+          ) : (
+            /* Non-loan accounts - show transactions only */
+            <div>
+              <h3 className="text-lg font-semibold mb-3">Transaction History</h3>
+              {loading ? (
+                <div className="space-y-2">
+                  {[1, 2, 3, 4, 5].map(i => (
+                    <Skeleton key={i} className="h-12 w-full bg-muted" />
+                  ))}
+                </div>
+              ) : transactions.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No transactions in the last 90 days
+                </div>
+              ) : (
+                <div className="border rounded-lg overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead className="text-right">Balance</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {transactionsWithBalance.map(({ transaction, balanceAfter }) => {
+                        const amount = getTransactionAmount(transaction);
+                        const isEMI = emiTransactions.some(emi => emi.transaction_id === transaction.id);
+                        
+                        return (
+                          <TableRow key={transaction.id}>
+                            <TableCell className="whitespace-nowrap">
+                              {formatDate(transaction.transaction_date)}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                {getTransactionIcon(transaction.transaction_type)}
+                                <span className="capitalize text-sm">
+                                  {transaction.transaction_type.replace('_', ' ')}
+                                </span>
+                                {isEMI && (
+                                  <Badge variant="outline" className="text-xs">EMI</Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="max-w-xs truncate">
+                                {transaction.description || transaction.category || '-'}
+                              </div>
+                            </TableCell>
+                            <TableCell className={`text-right font-medium ${
+                              amount >= 0 ? 'text-success' : 'text-danger'
+                            }`}>
+                              {amount >= 0 ? '+' : ''}{formatCurrency(amount, currency)}
+                            </TableCell>
+                            <TableCell className="text-right font-medium">
+                              {formatCurrency(balanceAfter, currency)}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

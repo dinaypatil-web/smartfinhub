@@ -7,7 +7,8 @@ SmartFinHub
 
 ### 1.2 Application Description
 A comprehensive financial management web application designed for tracking and managing multiple financial accounts including cash, bank accounts, credit cards, and loans. The platform provides real-time balance updates, transaction recording, budget analysis, and detailed financial reporting.
-\n### 1.3 Authentication System
+
+### 1.3 Authentication System
 - Login using email address or mobile number
 - Email verification via verification link
 - Mobile number verification via OTP (One-Time Password)
@@ -23,7 +24,8 @@ A comprehensive financial management web application designed for tracking and m
 - **Mobile Number Update**: After registration through email ID, users can update their mobile number in account settings without OTP verification
 - Updated mobile number immediately activated and available for login
 - Once updated, users can login using either their registered email or updated mobile number
-- Mobile number update feature accessible from user profile settings\n- **Alternative Phone Verification Options** (optional implementation):
+- Mobile number update feature accessible from user profile settings
+- **Alternative Phone Verification Options** (optional implementation):
   - Email Confirmation: Send verification link to registered email address to confirm phone number change
   - Security Question: User answers pre-set security questions before updating phone number
   - Password Re-entry: Require user to re-enter account password to authorize phone number change
@@ -31,20 +33,20 @@ A comprehensive financial management web application designed for tracking and m
   - Biometric Verification: Fingerprint or face recognition on supported devices
 
 ## 2. Core Features
-
-### 2.1 User Preferences
+\n### 2.1 User Preferences
 - Select default country from dropdown list
 - Choose preferred currency for dashboard display
 - Country and currency settings saved to user profile
 - Settings apply across all dashboard views and reports
 
-### 2.2 Account Management\n\n#### 2.2.1 Account Types
+### 2.2 Account Management
+\n#### 2.2.1 Account Types
 - Cash accounts
 - Bank accounts
 - Credit card accounts
-- Loan accounts
-
-#### 2.2.2 Account Setup\n- Country selection from dropdown menu\n- Bank or financial institution selection based on chosen country
+- Loan accounts\n\n#### 2.2.2 Account Setup
+- Country selection from dropdown menu
+- Bank or financial institution selection based on chosen country
 - **Complete bank name list available in dropdown for all supported countries**
 - Dropdown includes all major banks and financial institutions for selected country
 - Display bank/financial institution logo on account pages and dashboard
@@ -62,25 +64,28 @@ A comprehensive financial management web application designed for tracking and m
 - Statement day and due day saved to credit card account profile
 - System displays statement date and due date reminders on dashboard
 - Payment reminders shown on credit card account detail page
-- Visual indicators for upcoming statement dates and due dates\n- **Credit Limit Alert**: System triggers alert notification when user attempts transaction that would exceed their set credit limit\n- Alert displayed before transaction confirmation to prevent overspending
+- Visual indicators for upcoming statement dates and due dates\n- **Credit Limit Alert**: System triggers alert notification when user attempts transaction that would exceed their set credit limit
+- Alert displayed before transaction confirmation to prevent overspending
 - Current available credit displayed on credit card account page and dashboard
 
 #### 2.2.4 Loan Account Configuration
 - Select interest rate type: Fixed or Floating
 - Input total principal loan amount
-- Auto-calculate EMI based on principal, interest rate, and tenure\n- **EMI Payment History Entry**: During loan account creation or editing, system prompts user to provide details of every EMI payment already made:
-  - EMI Payment Date: Date when each EMI was paid
+- Auto-calculate EMI based on principal, interest rate, and tenure
+- **EMI Payment History Entry**: During loan account creation or editing, system prompts user to provide details of every EMI payment already made:\n  - EMI Payment Date: Date when each EMI was paid
   - EMI Amount Paid: Actual amount paid for each EMI installment
 - User can add multiple historical EMI payment records during account setup or editing
 - **EMI Breakdown Calculation**: System automatically calculates for each EMI payment:
   - Principal Component: Portion of EMI payment applied to principal reduction
-  - Interest Component: Portion of EMI payment applied to interest charges\n- Calculation based on loan amount, interest rate, tenure, and payment date
+  - Interest Component: Portion of EMI payment applied to interest charges
+- Calculation based on loan amount, interest rate, tenure, and payment date
 - **Manual Correction of Principal and Interest**: After system calculates principal and interest breakdown for each EMI, user can manually edit and correct the principal amount and interest amount if needed
 - Manual corrections allow user to adjust for any discrepancies or special payment arrangements
 - System saves user-corrected values and uses them for all subsequent calculations
 - Corrected values reflected in loan account statement and accrued interest calculations
 - **Loan Account Statement Generation**: System generates detailed loan account statement showing:
-  - Each EMI payment with date and amount\n  - Principal and interest breakdown for each payment (including user corrections)
+  - Each EMI payment with date and amount
+  - Principal and interest breakdown for each payment (including user corrections)
   - Running balance of outstanding principal after each payment
   - Cumulative interest paid to date
   - Remaining loan balance
@@ -93,7 +98,8 @@ A comprehensive financial management web application designed for tracking and m
 - **Edit EMI History**: User can add, edit, or delete historical EMI payment records at any time
 - User can modify principal and interest breakdown for any EMI payment record
 - System recalculates principal/interest breakdown and accrued interest automatically when EMI history is modified
-\n#### 2.2.5Floating Interest Rate Management
+
+#### 2.2.5 Floating Interest Rate Management
 - Record all interest rate changes from loan inception to current date
 - User can update floating interest rate at any time
 - System maintains complete historical record of rate changes
@@ -121,16 +127,15 @@ A comprehensive financial management web application designed for tracking and m
 #### 2.2.7 Account Modification
 - Edit any account information at any time
 - Delete accounts with user confirmation
-\n### 2.3 Transaction Management
-
-#### 2.3.1 Transaction Types\n- Income transactions
+\n### 2.3 Transaction Management\n
+#### 2.3.1 Transaction Types
+- Income transactions
 - Expense transactions\n- Cash withdrawals (from bank account or credit card)
 - Bank-to-bank transfers
 - Loan payments
 - Credit card payments
 \n#### 2.3.2 Transaction Processing Logic
-- Credit card accounts displayed as negative balances
-- Loan accounts displayed as negative balances
+- Credit card accounts displayed as negative balances\n- Loan accounts displayed as negative balances
 - Cash withdrawal from credit card increases card balance (more negative)
 - Payments to loan accounts decrease loan balance (less negative)
 - Payments to credit card decrease card balance (less negative)
@@ -139,7 +144,8 @@ A comprehensive financial management web application designed for tracking and m
 - Dashboard auto-updates after each transaction\n- Screen refreshes automatically after transaction entry
 \n#### 2.3.3 Credit Card Transaction with EMI Option
 - **EMI Payment Option**: During credit card transaction entry, system prompts user to select payment method\n- Payment options: Full Payment or EMI (Equated Monthly Installment)
-- **EMI Configuration**: If EMI option selected, user provides:\n  - EMI Duration: Number of months for installment plan
+- **EMI Configuration**: If EMI option selected, user provides:
+  - EMI Duration: Number of months for installment plan
   - Bank EMI Charges: Processing fee or interest charges applied by bank
 - **EMI Calculation**: System automatically calculates monthly EMI amount based on transaction amount, duration, and bank charges
 - **Statement Amount Calculation**: System calculates EMI amount to be included in monthly credit card statement
@@ -201,18 +207,25 @@ A comprehensive financial management web application designed for tracking and m
 - Income and expense summary reports
 - Account balance reports across all accounts
 - Budget vs. actual analysis reports
-- **Credit Card Monthly Statement Report**: Reports section includes credit card statement view with month selector
-- User selects specific month from dropdown to view credit card statement for that period
+- **Credit Card Monthly Statement Report**: Reports section includes credit card statement view with month selector\n- User selects specific month from dropdown to view credit card statement for that period
 - Statement displays all transactions, payments, EMI installments, interest charges, and balance for selected month
 - Statement shows opening balance, closing balance, total spending, and payment due information
 - **EMI Transaction Reports**: Detailed reports showing all EMI transactions, payment schedules, and outstanding balances
-- **Loan Account Statement Report**: Comprehensive loan statement report showing:
-  - Complete EMI payment history with dates and amounts
-  - Principal and interest breakdown for each EMI payment (including user corrections)
-  - Outstanding principal balance after each payment
+- **Loan Account Statement Report**: Comprehensive loan statement report included in Reports section showing:
+  - **Historical EMI Payments**: Complete record of all EMI payments already made with:\n    - Payment date for each EMI
+    - Total EMI amount paid
+    - Principal payment component (including user corrections)
+    - Interest payment component (including user corrections)
+    - Outstanding principal balance after each payment
+  - **Future EMI Payments**: Scheduled upcoming EMI payments with:
+    - Projected payment dates
+    - Estimated EMI amounts
+    - Projected principal payment bifurcation
+    - Projected interest payment bifurcation\n    - Expected outstanding balance after each future payment
+  - **Additional EMI Payments**: Any extra or additional EMI payments made beyond regular schedule with complete principal and interest bifurcation
   - Cumulative interest paid to date
   - Total accrued interest\n  - Remaining loan tenure
-  - Amortization schedule
+  - Complete amortization schedule showing full loan lifecycle
 - Date range filter for loan statement reports
 - Export reports functionality\n
 ## 3. Design Style
@@ -229,8 +242,7 @@ A comprehensive financial management web application designed for tracking and m
 - Smooth hover transitions on interactive elements
 - Clear iconography for transaction types and account categories
 - Consistent spacing and padding throughout interface
-
-### 3.3 Layout Structure
+\n### 3.3 Layout Structure
 - Grid-based dashboard for account cards with responsive columns
 - Side navigation panel for main sections: Accounts, Transactions, Reports, Budget, Settings
 - Responsive design adapting seamlessly to desktop, tablet, and mobile screens
