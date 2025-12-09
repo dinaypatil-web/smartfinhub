@@ -613,6 +613,7 @@ export default function AccountForm() {
                   initialPayments={emiPayments}
                   accountId={id}
                   interestRateType={formData.interest_rate_type as 'fixed' | 'floating'}
+                  dueDayOfMonth={formData.due_date ? parseInt(formData.due_date) : undefined}
                 />
               </div>
             )}
