@@ -32,6 +32,7 @@ interface LoanEMIPaymentManagerProps {
   initialPayments?: EMIPaymentEntry[];
   accountId?: string;
   interestRateType: 'fixed' | 'floating';
+  dueDayOfMonth?: number;
 }
 
 export default function LoanEMIPaymentManager({
@@ -42,7 +43,8 @@ export default function LoanEMIPaymentManager({
   onPaymentsChange,
   initialPayments = [],
   accountId,
-  interestRateType
+  interestRateType,
+  dueDayOfMonth
 }: LoanEMIPaymentManagerProps) {
   const { toast } = useToast();
   const [payments, setPayments] = useState<EMIPaymentEntry[]>(initialPayments);
@@ -174,7 +176,8 @@ export default function LoanEMIPaymentManager({
       effectiveStartDate,
       outstandingPrincipal,
       paymentsToCalculate,
-      rateHistoryForCalculation
+      rateHistoryForCalculation,
+      dueDayOfMonth
     );
 
     const startingPaymentNumber = payments.length + 1;

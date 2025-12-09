@@ -193,13 +193,79 @@ export function calculateEMIBreakdown(
  * Calculate EMI payment breakdown considering interest rate history
  * This function calculates interest from day 1 of loan, considering rate changes
  */
+/**
+ * Helper function to calculate interest for a period with rate history
+ */
+function calculateInterestForPeriod(
+  startDate: Date,
+  endDate: Date,
+  principal: number,
+  rateHistory: Array<{ effective_date: string; interest_rate: number }>
+): number {
+  const sortedRates = [...rateHistory].sort(
+    (a, b) => new Date(a.effective_date).getTime() - new Date(b.effective_date).getTime()
+  );
+
+  let totalInterest = 0;
+  let periodStartDate = startDate;
+
+  for (let i = 0; i < sortedRates.length; i++) {
+    const rateEntry = sortedRates[i];
+    const rateEffectiveDate = new Date(rateEntry.effective_date);
+    
+    if (rateEffectiveDate <= periodStartDate) {
+      continue;
+    }
+
+    if (rateEffectiveDate >= endDate) {
+      break;
+    }
+
+    const periodEndDate = rateEffectiveDate;
+    const days = Math.floor((periodEndDate.getTime() - periodStartDate.getTime()) / (1000 * 60 * 60 * 24));
+    
+    const applicableRate = i > 0 ? sortedRates[i - 1].interest_rate : sortedRates[0].interest_rate;
+    const periodInterest = (principal * applicableRate * days) / (365 * 100);
+    totalInterest += periodInterest;
+
+    periodStartDate = periodEndDate;
+  }
+
+  const remainingDays = Math.floor((endDate.getTime() - periodStartDate.getTime()) / (1000 * 60 * 60 * 24));
+  if (remainingDays > 0) {
+    const lastRate = sortedRates.length > 0 
+      ? sortedRates[sortedRates.length - 1].interest_rate 
+      : 0;
+    const remainingInterest = (principal * lastRate * remainingDays) / (365 * 100);
+    totalInterest += remainingInterest;
+  }
+
+  return totalInterest;
+}
+
+/**
+ * Calculate the due date for an EMI payment based on the due day of month
+ */
+function calculateDueDate(referenceDate: Date, dueDayOfMonth: number): Date {
+  const dueDate = new Date(referenceDate);
+  dueDate.setDate(dueDayOfMonth);
+  
+  // If the due day has already passed in the reference month, move to next month
+  if (dueDate <= referenceDate) {
+    dueDate.setMonth(dueDate.getMonth() + 1);
+  }
+  
+  return dueDate;
+}
+
 export function calculateEMIBreakdownWithHistory(
   loanStartDate: string,
   previousPaymentDate: string | null,
   currentPaymentDate: string,
   outstandingPrincipal: number,
   emiAmount: number,
-  rateHistory: Array<{ effective_date: string; interest_rate: number }>
+  rateHistory: Array<{ effective_date: string; interest_rate: number }>,
+  dueDayOfMonth?: number
 ): {
   principalComponent: number;
   interestComponent: number;
@@ -214,56 +280,46 @@ export function calculateEMIBreakdownWithHistory(
   }
 
   const startDate = new Date(previousPaymentDate || loanStartDate);
-  const endDate = new Date(currentPaymentDate);
+  const paymentDate = new Date(currentPaymentDate);
   
-  // Sort rate history by effective date
-  const sortedRates = [...rateHistory].sort(
-    (a, b) => new Date(a.effective_date).getTime() - new Date(b.effective_date).getTime()
-  );
-
   let totalInterest = 0;
-  let periodStartDate = startDate;
+  let principalComponent = 0;
 
-  // Calculate interest for each rate period
-  for (let i = 0; i < sortedRates.length; i++) {
-    const rateEntry = sortedRates[i];
-    const rateEffectiveDate = new Date(rateEntry.effective_date);
+  // If due day is provided and payment is made before due date, use split calculation
+  if (dueDayOfMonth) {
+    const dueDate = calculateDueDate(startDate, dueDayOfMonth);
     
-    // Skip if rate is effective before the period start
-    if (rateEffectiveDate <= periodStartDate) {
-      continue;
+    if (paymentDate < dueDate) {
+      // Split calculation: payment made before due date
+      
+      // Period 1: From last payment to current payment on full principal
+      const interest1 = calculateInterestForPeriod(startDate, paymentDate, outstandingPrincipal, rateHistory);
+      
+      // Estimate principal component (EMI - interest for period 1)
+      const estimatedPrincipal = emiAmount - interest1;
+      
+      // Period 2: From current payment to due date on reduced principal
+      const reducedPrincipal = outstandingPrincipal - estimatedPrincipal;
+      const interest2 = calculateInterestForPeriod(paymentDate, dueDate, reducedPrincipal, rateHistory);
+      
+      // Total interest is sum of both periods
+      totalInterest = interest1 + interest2;
+      
+      // Actual principal component
+      principalComponent = emiAmount - totalInterest;
+    } else {
+      // Payment made on or after due date, calculate normally till payment date
+      totalInterest = calculateInterestForPeriod(startDate, paymentDate, outstandingPrincipal, rateHistory);
+      principalComponent = emiAmount - totalInterest;
     }
-
-    // If rate change is after payment date, use current rate till payment date
-    if (rateEffectiveDate >= endDate) {
-      break;
-    }
-
-    // Calculate interest for period before rate change
-    const periodEndDate = rateEffectiveDate;
-    const days = Math.floor((periodEndDate.getTime() - periodStartDate.getTime()) / (1000 * 60 * 60 * 24));
-    
-    // Get the applicable rate for this period (previous rate or first rate)
-    const applicableRate = i > 0 ? sortedRates[i - 1].interest_rate : sortedRates[0].interest_rate;
-    const periodInterest = (outstandingPrincipal * applicableRate * days) / (365 * 100);
-    totalInterest += periodInterest;
-
-    periodStartDate = periodEndDate;
-  }
-
-  // Calculate interest for remaining period (from last rate change or start to payment date)
-  const remainingDays = Math.floor((endDate.getTime() - periodStartDate.getTime()) / (1000 * 60 * 60 * 24));
-  if (remainingDays > 0) {
-    // Use the last applicable rate
-    const lastRate = sortedRates.length > 0 
-      ? sortedRates[sortedRates.length - 1].interest_rate 
-      : 0;
-    const remainingInterest = (outstandingPrincipal * lastRate * remainingDays) / (365 * 100);
-    totalInterest += remainingInterest;
+  } else {
+    // No due day provided, calculate normally
+    totalInterest = calculateInterestForPeriod(startDate, paymentDate, outstandingPrincipal, rateHistory);
+    principalComponent = emiAmount - totalInterest;
   }
 
   const interestComponent = Math.round(totalInterest * 100) / 100;
-  const principalComponent = Math.round((emiAmount - interestComponent) * 100) / 100;
+  principalComponent = Math.round(principalComponent * 100) / 100;
   const newOutstandingPrincipal = Math.max(0, Math.round((outstandingPrincipal - principalComponent) * 100) / 100);
 
   return {
@@ -280,7 +336,8 @@ export function calculateAllEMIBreakdowns(
   loanStartDate: string,
   loanPrincipal: number,
   payments: Array<{ payment_date: string; emi_amount: number }>,
-  rateHistory: Array<{ effective_date: string; interest_rate: number }>
+  rateHistory: Array<{ effective_date: string; interest_rate: number }>,
+  dueDayOfMonth?: number
 ): Array<{
   payment_date: string;
   emi_amount: number;
@@ -302,7 +359,8 @@ export function calculateAllEMIBreakdowns(
       payment.payment_date,
       outstandingPrincipal,
       payment.emi_amount,
-      rateHistory
+      rateHistory,
+      dueDayOfMonth
     );
 
     results.push({
