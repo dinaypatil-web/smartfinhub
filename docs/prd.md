@@ -31,20 +31,19 @@ A comprehensive financial management web application designed for tracking and m
   - Password Re-entry: Require user to re-enter account password to authorize phone number change
   - Authenticator App: Use third-party authenticator apps (Google Authenticator, Microsoft Authenticator) to generate verification codes
   - Biometric Verification: Fingerprint or face recognition on supported devices
-
-## 2. Core Features
+\n## 2. Core Features
 \n### 2.1 User Preferences
 - Select default country from dropdown list
 - Choose preferred currency for dashboard display
 - Country and currency settings saved to user profile
 - Settings apply across all dashboard views and reports
-
-### 2.2 Account Management
+\n### 2.2 Account Management
 \n#### 2.2.1 Account Types
 - Cash accounts
 - Bank accounts
 - Credit card accounts
-- Loan accounts\n\n#### 2.2.2 Account Setup
+- Loan accounts\n
+#### 2.2.2 Account Setup
 - Country selection from dropdown menu
 - Bank or financial institution selection based on chosen country
 - **Complete bank name list available in dropdown for all supported countries**
@@ -54,8 +53,7 @@ A comprehensive financial management web application designed for tracking and m
 - **Automatic Logo Fetching**: When bank/loan/credit card account logo is not available in the system database during account creation or editing, automatically fetch the logo from internet sources
 - Fetched logos displayed on both account pages and dashboard
 - System caches fetched logos for future use
-- Optional account number entry (encrypted storage, only last 4 digits visible on dashboard)
-
+- Optional account number entry (encrypted storage, only last 4 digits visible on dashboard)\n
 #### 2.2.3 Credit Card Configuration
 - **Statement Day of Month**: User inputs the day of month when credit card statement is generated (1-31)
 - **Due Day of Month**: User inputs the day of month when credit card payment is due (1-31)
@@ -67,10 +65,11 @@ A comprehensive financial management web application designed for tracking and m
 - Visual indicators for upcoming statement dates and due dates\n- **Credit Limit Alert**: System triggers alert notification when user attempts transaction that would exceed their set credit limit
 - Alert displayed before transaction confirmation to prevent overspending
 - Current available credit displayed on credit card account page and dashboard
-
-#### 2.2.4 Loan Account Configuration
+\n#### 2.2.4 Loan Account Configuration
 - Select interest rate type: Fixed or Floating
 - Input total principal loan amount
+- **EMI Due Day of Month**: User inputs the day of month when EMI payment is due (1-31)
+- EMI due day saved to loan account profile for automatic interest calculation
 - Auto-calculate EMI based on principal, interest rate, and tenure
 - **EMI Payment History Entry**: During loan account creation or editing, system prompts user to provide details of every EMI payment already made:\n  - EMI Payment Date: Date when each EMI was paid
   - EMI Amount Paid: Actual amount paid for each EMI installment
@@ -98,8 +97,15 @@ A comprehensive financial management web application designed for tracking and m
 - **Edit EMI History**: User can add, edit, or delete historical EMI payment records at any time
 - User can modify principal and interest breakdown for any EMI payment record
 - System recalculates principal/interest breakdown and accrued interest automatically when EMI history is modified
-
-#### 2.2.5 Floating Interest Rate Management
+- **Automatic Monthly Interest Calculation and Addition**: On the EMI due day of each month, system automatically:\n  - Calculates interest for the month based on outstanding principal balance and all transactions in loan account during the month
+  - Considers all payments, additional payments, and principal adjustments made during the month
+  - Adds calculated monthly interest amount to the loan account balance
+  - Records interest addition as a system-generated transaction in loan account statement
+  - Updates total accrued interest on dashboard and loan account detail page
+- Sends notification to user about monthly interest addition
+- Interest calculation uses daily balance method considering all intra-month transactions
+- System maintains complete audit trail of all automatic interest additions
+\n#### 2.2.5 Floating Interest Rate Management
 - Record all interest rate changes from loan inception to current date
 - User can update floating interest rate at any time
 - System maintains complete historical record of rate changes
@@ -108,10 +114,11 @@ A comprehensive financial management web application designed for tracking and m
 - Chart visualization showing floating interest rate history over time
 - **EMI Recalculation on Rate Change**: When floating interest rate is updated, system recalculates principal and interest components for all subsequent EMI payments
 - Updated interest breakdown reflected in loan account statement
-\n#### 2.2.6 Data Security
-- **End-to-End Encryption**: All user data encrypted in database using industry-standard encryption algorithms
+- Automatic monthly interest calculation uses current applicable interest rate
+\n#### 2.2.6 Data Security\n- **End-to-End Encryption**: All user data encrypted in database using industry-standard encryption algorithms
 - **Zero-Knowledge Architecture**: Application creator and administrators have no access to decrypted user data
-- **Client-Side Encryption**: User data encrypted on client side before transmission to server\n- **User-Specific Encryption Keys**: Each user's data encrypted with unique encryption key derived from user credentials
+- **Client-Side Encryption**: User data encrypted on client side before transmission to server
+- **User-Specific Encryption Keys**: Each user's data encrypted with unique encryption key derived from user credentials
 - Encryption keys never stored on server in plain text
 - Bank account numbers encrypted in database
 - Credit card numbers encrypted in database
@@ -134,18 +141,23 @@ A comprehensive financial management web application designed for tracking and m
 - Bank-to-bank transfers
 - Loan payments
 - Credit card payments
+- System-generated interest additions (for loan accounts)
 \n#### 2.3.2 Transaction Processing Logic
-- Credit card accounts displayed as negative balances\n- Loan accounts displayed as negative balances
+- Credit card accounts displayed as negative balances
+- Loan accounts displayed as negative balances
 - Cash withdrawal from credit card increases card balance (more negative)
 - Payments to loan accounts decrease loan balance (less negative)
 - Payments to credit card decrease card balance (less negative)
 - During expense transaction entry, display remaining budget balance for the selected budget category for current month
 - Show budget balance information prominently before transaction confirmation to help user make informed spending decisions
 - Dashboard auto-updates after each transaction\n- Screen refreshes automatically after transaction entry
+- **Automatic Interest Transaction**: On EMI due day, system automatically creates interest transaction in loan account
+- Interest transaction increases loan balance (more negative)
+- Interest transaction marked as system-generated and non-editable by user
+- All loan account transactions considered in monthly interest calculation
 \n#### 2.3.3 Credit Card Transaction with EMI Option
 - **EMI Payment Option**: During credit card transaction entry, system prompts user to select payment method\n- Payment options: Full Payment or EMI (Equated Monthly Installment)
-- **EMI Configuration**: If EMI option selected, user provides:
-  - EMI Duration: Number of months for installment plan
+- **EMI Configuration**: If EMI option selected, user provides:\n  - EMI Duration: Number of months for installment plan
   - Bank EMI Charges: Processing fee or interest charges applied by bank
 - **EMI Calculation**: System automatically calculates monthly EMI amount based on transaction amount, duration, and bank charges
 - **Statement Amount Calculation**: System calculates EMI amount to be included in monthly credit card statement
@@ -163,7 +175,9 @@ A comprehensive financial management web application designed for tracking and m
 - Monthly EMI amount automatically added to credit card statement on statement generation day
 \n#### 2.3.4 Transaction Modification
 - Edit any transaction record\n- Delete transactions with automatic balance recalculation
-\n### 2.4 Dashboard Display
+- System-generated interest transactions cannot be edited or deleted by user
+
+### 2.4 Dashboard Display
 \n#### 2.4.1 Financial Summary
 - Current Assets: Sum of Cash and Bank Account balances
 - Current Liabilities: Sum of Credit Card balances only
@@ -171,12 +185,13 @@ A comprehensive financial management web application designed for tracking and m
 - Loan accounts excluded from Current Liabilities calculation
 - Loan accounts excluded from Liquid Assets calculation
 - Total accrued interest displayed for each loan account
+- Monthly interest additions reflected in real-time
 \n#### 2.4.2 Visual Analytics
 - 3D pie chart showing Cash and Bank Account balance distribution
 - 3D pie chart showing Expenses breakdown by category
 - Line chart displaying Floating Interest Rate history for loan accounts
 \n#### 2.4.3 Account Display Cards
-- Bank or financial institution logo\n- Account type indicator\n- Last 4 digits of account number only\n- Real-time current balance\n- For loan accounts: Total accrued interest till date
+- Bank or financial institution logo\n- Account type indicator\n- Last 4 digits of account number only\n- Real-time current balance\n- For loan accounts: Total accrued interest till date including automatic monthly interest additions
 - **For credit card accounts**: \n  - Display next statement date and payment due date as reminders
   - Show user-defined credit limit
   - Display available credit remaining
@@ -184,11 +199,12 @@ A comprehensive financial management web application designed for tracking and m
   - Display total outstanding EMI balance
   - Show next EMI installment amount and due date
 - Visual indicators highlighting upcoming statement dates and due dates within7 days
+- **For loan accounts**: Visual indicator showing next EMI due date and automatic interest calculation date
 
 #### 2.4.4 Account Quick View
 - **Click-to-View Statement**: When user clicks on any account card on dashboard, system displays popup window showing last 90 days statement for that account
 - Popup includes transaction history, balance changes, and account activity for the 90-day period
-- **For loan accounts**: Popup displays detailed EMI payment history with principal and interest breakdown for each payment within the 90-day period
+- **For loan accounts**: Popup displays detailed EMI payment history with principal and interest breakdown for each payment within the 90-day period, including automatic monthly interest additions
 - Statement popup available for all account types: Cash, Bank, Credit Card, and Loan accounts
 - Close button to dismiss popup and return to dashboard
 
@@ -207,7 +223,8 @@ A comprehensive financial management web application designed for tracking and m
 - Income and expense summary reports
 - Account balance reports across all accounts
 - Budget vs. actual analysis reports
-- **Credit Card Monthly Statement Report**: Reports section includes credit card statement view with month selector\n- User selects specific month from dropdown to view credit card statement for that period
+- **Credit Card Monthly Statement Report**: Reports section includes credit card statement view with month selector
+- User selects specific month from dropdown to view credit card statement for that period
 - Statement displays all transactions, payments, EMI installments, interest charges, and balance for selected month
 - Statement shows opening balance, closing balance, total spending, and payment due information
 - **EMI Transaction Reports**: Detailed reports showing all EMI transactions, payment schedules, and outstanding balances
@@ -217,6 +234,10 @@ A comprehensive financial management web application designed for tracking and m
     - Principal payment component (including user corrections)
     - Interest payment component (including user corrections)
     - Outstanding principal balance after each payment
+  - **Automatic Monthly Interest Additions**: Complete record of all system-generated monthly interest transactions with:
+    - Interest calculation date
+    - Interest amount added\n    - Outstanding balance after interest addition
+    - Interest rate applied for calculation
   - **Future EMI Payments**: Scheduled upcoming EMI payments with:
     - Projected payment dates
     - Estimated EMI amounts
@@ -227,16 +248,14 @@ A comprehensive financial management web application designed for tracking and m
   - Total accrued interest\n  - Remaining loan tenure
   - Complete amortization schedule showing full loan lifecycle
 - Date range filter for loan statement reports
-- Export reports functionality\n
-## 3. Design Style
+- Export reports functionality\n\n## 3. Design Style
 
 ### 3.1 Color Scheme
 - Primary color: Deep blue (#1E3A8A) conveying trust and financial stability
 - Secondary color: Emerald green (#10B981) for positive balances and income indicators
 - Accent color: Amber (#F59E0B) for alerts and important notifications
 - Negative indicator: Coral red (#EF4444) for liabilities and overspending
-
-### 3.2 Visual Details
+\n### 3.2 Visual Details
 - Card-based layout with subtle drop shadows for depth
 - Rounded corners (8px radius) for modern, approachable aesthetic
 - Smooth hover transitions on interactive elements
