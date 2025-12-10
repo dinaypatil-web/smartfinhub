@@ -1,9 +1,10 @@
-import { accountApi, transactionApi, interestRateApi } from '@/db/api';
-import type { Account, Transaction } from '@/types/types';
+import { accountApi, transactionApi, interestRateApi, loanEMIPaymentApi } from '@/db/api';
+import type { Account, Transaction, LoanEMIPayment } from '@/types/types';
 
 /**
  * Calculate interest for a loan account for a given period
  * Considers transactions during the period that affect the principal
+ * Also considers historical EMI payment data entered by user
  */
 async function calculateLoanInterestForPeriod(
   account: Account,
@@ -14,6 +15,26 @@ async function calculateLoanInterestForPeriod(
     return 0;
   }
 
+  // Get EMI payment history for this account
+  const emiPayments = await loanEMIPaymentApi.getPaymentsByAccount(account.id);
+  
+  // Check if there are EMI payments in this period
+  const emiPaymentsInPeriod = emiPayments.filter(payment => {
+    const paymentDate = new Date(payment.payment_date);
+    return paymentDate >= startDate && paymentDate <= endDate;
+  });
+
+  // If there are EMI payments in this period, use their interest components
+  // This ensures user-entered data takes precedence over calculated values
+  if (emiPaymentsInPeriod.length > 0) {
+    const totalInterestFromEMI = emiPaymentsInPeriod.reduce(
+      (sum, payment) => sum + payment.interest_component,
+      0
+    );
+    return Math.round(totalInterestFromEMI * 100) / 100;
+  }
+
+  // No EMI payments in period, calculate interest based on daily balance
   // Get interest rate history if floating rate
   let rateHistory: Array<{ effective_date: string; interest_rate: number }> = [];
   if (account.interest_rate_type === 'floating' && account.id) {
@@ -117,6 +138,7 @@ function getApplicableRate(
 
 /**
  * Get the last interest posting date for a loan account
+ * Considers both interest_charge transactions and EMI payments
  */
 async function getLastInterestPostingDate(account: Account): Promise<Date | null> {
   const allTransactions = await transactionApi.getTransactions(account.user_id);
@@ -131,8 +153,32 @@ async function getLastInterestPostingDate(account: Account): Promise<Date | null
       new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime()
     );
 
-  if (interestTransactions.length > 0) {
-    return new Date(interestTransactions[0].transaction_date);
+  // Also check EMI payment history
+  const emiPayments = await loanEMIPaymentApi.getPaymentsByAccount(account.id);
+  const sortedEMIPayments = [...emiPayments].sort((a, b) => 
+    new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime()
+  );
+
+  // Get the most recent date from either source
+  const lastInterestTransactionDate = interestTransactions.length > 0 
+    ? new Date(interestTransactions[0].transaction_date) 
+    : null;
+  const lastEMIPaymentDate = sortedEMIPayments.length > 0 
+    ? new Date(sortedEMIPayments[0].payment_date) 
+    : null;
+
+  if (lastInterestTransactionDate && lastEMIPaymentDate) {
+    return lastInterestTransactionDate > lastEMIPaymentDate 
+      ? lastInterestTransactionDate 
+      : lastEMIPaymentDate;
+  }
+
+  if (lastInterestTransactionDate) {
+    return lastInterestTransactionDate;
+  }
+
+  if (lastEMIPaymentDate) {
+    return lastEMIPaymentDate;
   }
 
   // If no interest posted yet, use loan start date
