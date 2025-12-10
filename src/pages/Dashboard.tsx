@@ -21,7 +21,7 @@ import {
 import {
   getBillingCycleInfo
 } from '@/utils/billingCycleCalculations';
-import { checkAndPostInterestForAllLoans } from '@/utils/loanInterestPosting';
+import { checkAndPostInterestForAllLoans, getAccruedInterestReference } from '@/utils/loanInterestPosting';
 import { useToast } from '@/hooks/use-toast';
 import InterestRateChart from '@/components/InterestRateChart';
 import InterestRateTable from '@/components/InterestRateTable';
@@ -91,24 +91,14 @@ export default function Dashboard() {
             let accruedInterest = 0;
             if (account.loan_start_date) {
               try {
-                // Check if there are EMI payment records
-                const emiPayments = await loanEMIPaymentApi.getPaymentsByAccount(account.id);
+                // Get the reference point considering both EMI payments and interest_charge transactions
+                const reference = await getAccruedInterestReference(account);
                 const history = await interestRateApi.getInterestRateHistory(account.id);
                 
-                if (emiPayments.length > 0) {
-                  // Use last EMI payment as reference
-                  const lastPayment = emiPayments[emiPayments.length - 1];
+                if (reference) {
                   accruedInterest = calculateAccruedInterest(
-                    lastPayment.payment_date,
-                    lastPayment.outstanding_principal,
-                    history,
-                    Number(account.current_interest_rate)
-                  );
-                } else {
-                  // No EMI payments, use loan start date and current balance
-                  accruedInterest = calculateAccruedInterest(
-                    account.loan_start_date,
-                    Number(account.balance),
+                    reference.referenceDate,
+                    reference.referenceBalance,
                     history,
                     Number(account.current_interest_rate)
                   );

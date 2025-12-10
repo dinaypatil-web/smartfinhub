@@ -334,3 +334,92 @@ export async function checkAndPostInterestForAllLoans(
 
   return { totalPosted, results };
 }
+
+/**
+ * Get the reference point for accrued interest calculation
+ * Returns the date and balance to use as starting point
+ * Considers both EMI payments and interest_charge transactions
+ */
+export async function getAccruedInterestReference(
+  account: Account
+): Promise<{
+  referenceDate: string;
+  referenceBalance: number;
+} | null> {
+  if (account.account_type !== 'loan') {
+    return null;
+  }
+
+  const allTransactions = await transactionApi.getTransactions(account.user_id);
+  
+  // Find the most recent interest_charge transaction for this account
+  const interestTransactions = allTransactions
+    .filter(t => 
+      t.transaction_type === 'interest_charge' && 
+      t.to_account_id === account.id
+    )
+    .sort((a, b) => 
+      new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime()
+    );
+
+  // Get EMI payment history
+  const emiPayments = await loanEMIPaymentApi.getPaymentsByAccount(account.id);
+  const sortedEMIPayments = [...emiPayments].sort((a, b) => 
+    new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime()
+  );
+
+  // Determine the most recent interest event
+  const lastInterestTransaction = interestTransactions.length > 0 
+    ? interestTransactions[0] 
+    : null;
+  const lastEMIPayment = sortedEMIPayments.length > 0 
+    ? sortedEMIPayments[0] 
+    : null;
+
+  // Compare dates and use the most recent
+  if (lastInterestTransaction && lastEMIPayment) {
+    const interestDate = new Date(lastInterestTransaction.transaction_date);
+    const emiDate = new Date(lastEMIPayment.payment_date);
+    
+    if (interestDate > emiDate) {
+      // Interest transaction is more recent
+      // Calculate balance after this transaction
+      const balanceAfterInterest = Number(account.balance);
+      return {
+        referenceDate: lastInterestTransaction.transaction_date,
+        referenceBalance: balanceAfterInterest
+      };
+    } else {
+      // EMI payment is more recent
+      return {
+        referenceDate: lastEMIPayment.payment_date,
+        referenceBalance: lastEMIPayment.outstanding_principal
+      };
+    }
+  }
+
+  if (lastInterestTransaction) {
+    const balanceAfterInterest = Number(account.balance);
+    return {
+      referenceDate: lastInterestTransaction.transaction_date,
+      referenceBalance: balanceAfterInterest
+    };
+  }
+
+  if (lastEMIPayment) {
+    return {
+      referenceDate: lastEMIPayment.payment_date,
+      referenceBalance: lastEMIPayment.outstanding_principal
+    };
+  }
+
+  // No interest events yet, use loan start date and current balance
+  if (account.loan_start_date) {
+    return {
+      referenceDate: account.loan_start_date,
+      referenceBalance: Number(account.balance)
+    };
+  }
+
+  return null;
+}
