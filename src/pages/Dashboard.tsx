@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { formatCurrency, formatAccountNumber } from '@/utils/format';
-import { Plus, Wallet, CreditCard, TrendingUp, TrendingDown, Building2, AlertCircle } from 'lucide-react';
+import { Plus, Wallet, CreditCard, TrendingUp, TrendingDown, Building2, AlertCircle, Calculator } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { calculateEMI, calculateAccruedInterest } from '@/utils/loanCalculations';
@@ -21,6 +21,8 @@ import {
 import {
   getBillingCycleInfo
 } from '@/utils/billingCycleCalculations';
+import { checkAndPostInterestForAllLoans } from '@/utils/loanInterestPosting';
+import { useToast } from '@/hooks/use-toast';
 import InterestRateChart from '@/components/InterestRateChart';
 import InterestRateTable from '@/components/InterestRateTable';
 import BankLogo from '@/components/BankLogo';
@@ -29,10 +31,12 @@ import AccountStatementDialog from '@/components/AccountStatementDialog';
 export default function Dashboard() {
   const { user, profile } = useAuth();
   const location = useLocation();
+  const { toast } = useToast();
   const [summary, setSummary] = useState<FinancialSummary | null>(null);
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
   const [allExpenses, setAllExpenses] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [postingInterest, setPostingInterest] = useState(false);
   const [loanCalculations, setLoanCalculations] = useState<Record<string, { emi: number; accruedInterest: number }>>({});
   const [accountEMIs, setAccountEMIs] = useState<Record<string, EMITransaction[]>>({});
   const [accountTransactions, setAccountTransactions] = useState<Record<string, Transaction[]>>({});
@@ -164,6 +168,58 @@ export default function Dashboard() {
     }
   };
 
+  const handlePostMonthlyInterest = async () => {
+    if (!user || !summary) return;
+
+    setPostingInterest(true);
+    try {
+      const loanAccounts = summary.accounts_by_type.loan || [];
+      const result = await checkAndPostInterestForAllLoans(loanAccounts, user.id);
+
+      if (result.results.length === 0) {
+        toast({
+          title: 'No Interest to Post',
+          description: 'No loan accounts are due for interest posting today.',
+        });
+      } else {
+        const successCount = result.results.filter(r => r.success).length;
+        const failCount = result.results.length - successCount;
+
+        if (successCount > 0) {
+          toast({
+            title: 'Interest Posted Successfully',
+            description: `Posted interest for ${successCount} loan account(s). Total: ${formatCurrency(result.totalPosted, currency)}`,
+          });
+          
+          // Reload dashboard data to reflect changes
+          await loadDashboardData();
+        }
+
+        if (failCount > 0) {
+          const failedAccounts = result.results
+            .filter(r => !r.success)
+            .map(r => r.accountName)
+            .join(', ');
+          
+          toast({
+            title: 'Some Interest Postings Failed',
+            description: `Failed to post interest for: ${failedAccounts}`,
+            variant: 'destructive',
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error posting interest:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to post monthly interest. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setPostingInterest(false);
+    }
+  };
+
   const getAccountTypeLabel = (type: string) => {
     switch (type) {
       case 'cash':
@@ -273,6 +329,18 @@ export default function Dashboard() {
               Add Transaction
             </Button>
           </Link>
+          {summary?.accounts_by_type.loan && summary.accounts_by_type.loan.length > 0 && (
+            <Button 
+              variant="secondary" 
+              size="sm" 
+              className="md:size-default hover-lift"
+              onClick={handlePostMonthlyInterest}
+              disabled={postingInterest}
+            >
+              <Calculator className="mr-2 h-4 w-4" />
+              {postingInterest ? 'Posting...' : 'Post Monthly Interest'}
+            </Button>
+          )}
         </div>
       </div>
 

@@ -99,6 +99,8 @@ export default function AccountStatementDialog({
         return <Building2 className="h-4 w-4 text-primary" />;
       case 'credit_card_payment':
         return <CreditCard className="h-4 w-4 text-primary" />;
+      case 'interest_charge':
+        return <TrendingUp className="h-4 w-4 text-warning" />;
       default:
         return <ArrowRightLeft className="h-4 w-4" />;
     }
