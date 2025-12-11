@@ -45,6 +45,7 @@ export default function Dashboard() {
   const [statementDialogOpen, setStatementDialogOpen] = useState(false);
   const [cashFlow, setCashFlow] = useState<{
     openingBalance: number;
+    incomeReceived: number;
     expensesIncurred: number;
     remainingBudget: number;
     expectedBalance: number;
@@ -455,8 +456,14 @@ export default function Dashboard() {
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">Opening Balance</span>
-                    <span className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">
+                    <span className="text-lg font-semibold text-blue-600 dark:text-blue-400">
                       {formatCurrency(cashFlow.openingBalance, currency)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Income Received</span>
+                    <span className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">
+                      + {formatCurrency(cashFlow.incomeReceived, currency)}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
@@ -498,7 +505,7 @@ export default function Dashboard() {
 
               <div className="pt-2 border-t border-muted">
                 <p className="text-xs text-muted-foreground">
-                  This summary shows your projected cash position for the current month based on opening balance, expenses incurred, remaining budget allocation, and credit card dues.
+                  This summary shows your projected cash position for the current month based on opening balance, income received, expenses incurred, remaining budget allocation, and credit card dues.
                 </p>
               </div>
             </div>

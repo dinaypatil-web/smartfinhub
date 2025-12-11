@@ -84,6 +84,36 @@ export function calculateMonthExpenses(
 }
 
 /**
+ * Calculate total income received in the current month till date
+ */
+export function calculateMonthIncome(
+  transactions: Transaction[],
+  month: number,
+  year: number
+): number {
+  const monthStart = new Date(year, month - 1, 1);
+  const today = new Date();
+
+  const incomeTransactions = transactions.filter(t => {
+    const transactionDate = new Date(t.transaction_date);
+    return (
+      transactionDate >= monthStart &&
+      transactionDate <= today &&
+      (t.transaction_type === 'income' || 
+       t.category === 'Income' ||
+       t.category === 'Salary')
+    );
+  });
+
+  const totalIncome = incomeTransactions.reduce(
+    (sum, t) => sum + Number(t.amount),
+    0
+  );
+
+  return Math.round(totalIncome * 100) / 100;
+}
+
+/**
  * Calculate remaining budget for the month
  */
 export function calculateRemainingBudget(
@@ -128,6 +158,7 @@ export function calculateMonthlyCashFlow(
   year: number
 ): {
   openingBalance: number;
+  incomeReceived: number;
   expensesIncurred: number;
   remainingBudget: number;
   expectedBalance: number;
@@ -135,14 +166,16 @@ export function calculateMonthlyCashFlow(
   netAvailable: number;
 } {
   const openingBalance = calculateOpeningBalance(accounts, transactions, month, year);
+  const incomeReceived = calculateMonthIncome(transactions, month, year);
   const expensesIncurred = calculateMonthExpenses(transactions, month, year);
   const remainingBudget = calculateRemainingBudget(budget, expensesIncurred);
-  const expectedBalance = openingBalance - expensesIncurred - remainingBudget;
+  const expectedBalance = openingBalance + incomeReceived - expensesIncurred - remainingBudget;
   const creditCardDues = calculateCreditCardDues(accounts);
   const netAvailable = expectedBalance - creditCardDues;
 
   return {
     openingBalance,
+    incomeReceived,
     expensesIncurred,
     remainingBudget,
     expectedBalance,
