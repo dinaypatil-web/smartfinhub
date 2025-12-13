@@ -714,7 +714,8 @@ export default function Dashboard() {
                   // Only show due amount after statement date
                   showDueAmount = shouldDisplayDueAmount(account.statement_day);
                   if (showDueAmount) {
-                    dueAmount = statementAmount;
+                    // After statement date, the entire balance is due
+                    dueAmount = Math.abs(account.balance);
                     if (account.due_day) {
                       dueDate = getStatementDueDate(account.statement_day, account.due_day);
                     }
@@ -722,7 +723,7 @@ export default function Dashboard() {
                 } else {
                   // Fallback to old calculation if no statement day
                   statementAmount = calculateStatementAmount(account.balance, emis);
-                  dueAmount = account.balance;
+                  dueAmount = Math.abs(account.balance);
                   showDueAmount = true;
                 }
                 
