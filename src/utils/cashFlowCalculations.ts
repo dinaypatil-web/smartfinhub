@@ -151,6 +151,60 @@ export function getNextStatementDate(statementDay: number | null, referenceDate:
 }
 
 /**
+ * Get next due date for a credit card
+ */
+export function getNextDueDate(
+  statementDay: number | null,
+  dueDay: number | null,
+  referenceDate: Date = new Date()
+): Date | null {
+  if (!statementDay || !dueDay || statementDay < 1 || statementDay > 31 || dueDay < 1 || dueDay > 31) {
+    return null;
+  }
+
+  const year = referenceDate.getFullYear();
+  const month = referenceDate.getMonth();
+  const day = referenceDate.getDate();
+  
+  // Determine which statement period we're in
+  let dueDate: Date;
+  
+  if (day >= statementDay) {
+    // We're after the statement date, so next due date is in current/next month
+    if (dueDay >= statementDay) {
+      // Due date is in the same month as statement
+      dueDate = new Date(year, month, dueDay);
+      // If due date has passed, get next month's due date
+      if (dueDate <= referenceDate) {
+        dueDate = new Date(year, month + 1, dueDay);
+      }
+    } else {
+      // Due date is in the next month after statement
+      dueDate = new Date(year, month + 1, dueDay);
+    }
+  } else {
+    // We're before the statement date, so due date is based on last statement
+    if (dueDay >= statementDay) {
+      // Due date is in the same month as statement (current month)
+      dueDate = new Date(year, month, dueDay);
+      // If due date has passed, get next month's due date
+      if (dueDate <= referenceDate) {
+        dueDate = new Date(year, month + 1, dueDay);
+      }
+    } else {
+      // Due date is in the month after statement
+      dueDate = new Date(year, month, dueDay);
+      // If due date has passed, get next month's due date
+      if (dueDate <= referenceDate) {
+        dueDate = new Date(year, month + 1, dueDay);
+      }
+    }
+  }
+  
+  return dueDate;
+}
+
+/**
  * Calculate expected credit card dues for the month
  */
 export function calculateCreditCardDues(
@@ -190,6 +244,7 @@ export function calculateCreditCardDues(
 
 /**
  * Get detailed credit card dues with statement dates
+ * Returns only credit cards with the nearest upcoming due date
  */
 export function getCreditCardDuesDetails(
   accounts: Account[]
@@ -197,16 +252,45 @@ export function getCreditCardDuesDetails(
   account: Account;
   dueAmount: number;
   nextStatementDate: Date | null;
+  nextDueDate: Date | null;
 }> {
   const creditCardAccounts = accounts.filter(
-    acc => acc.account_type === 'credit_card'
+    acc => acc.account_type === 'credit_card' && Math.abs(Number(acc.balance)) > 0
   );
 
-  return creditCardAccounts.map(acc => ({
+  if (creditCardAccounts.length === 0) {
+    return [];
+  }
+
+  // Calculate due dates for all credit cards
+  const cardsWithDueDates = creditCardAccounts.map(acc => ({
     account: acc,
     dueAmount: Math.abs(Number(acc.balance)),
-    nextStatementDate: getNextStatementDate(acc.statement_day)
+    nextStatementDate: getNextStatementDate(acc.statement_day),
+    nextDueDate: getNextDueDate(acc.statement_day, acc.due_day)
   }));
+
+  // Filter out cards without due dates
+  const cardsWithValidDueDates = cardsWithDueDates.filter(card => card.nextDueDate !== null);
+
+  if (cardsWithValidDueDates.length === 0) {
+    // If no cards have valid due dates, return all cards with statement dates
+    return cardsWithDueDates;
+  }
+
+  // Find the nearest upcoming due date
+  const nearestDueDate = cardsWithValidDueDates.reduce((nearest, card) => {
+    if (!nearest || (card.nextDueDate && card.nextDueDate < nearest)) {
+      return card.nextDueDate;
+    }
+    return nearest;
+  }, null as Date | null);
+
+  // Return only cards with the nearest due date
+  return cardsWithValidDueDates.filter(card => 
+    card.nextDueDate && nearestDueDate && 
+    card.nextDueDate.getTime() === nearestDueDate.getTime()
+  );
 }
 
 /**

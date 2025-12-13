@@ -61,6 +61,7 @@ export default function Dashboard() {
     account: Account;
     dueAmount: number;
     nextStatementDate: Date | null;
+    nextDueDate: Date | null;
   }>>([]);
 
   const currency = profile?.default_currency || 'INR';
@@ -526,16 +527,16 @@ export default function Dashboard() {
               {/* Credit Card Dues Breakdown */}
               {creditCardDuesDetails.length > 0 && (
                 <div className="pt-3 border-t border-muted space-y-2">
-                  <h4 className="text-sm font-semibold text-muted-foreground">Credit Card Dues Breakdown</h4>
-                  {creditCardDuesDetails.map(({ account, dueAmount, nextStatementDate }) => (
+                  <h4 className="text-sm font-semibold text-muted-foreground">Upcoming Credit Card Dues</h4>
+                  {creditCardDuesDetails.map(({ account, dueAmount, nextDueDate }) => (
                     <div key={account.id} className="flex items-center justify-between text-sm p-2 rounded bg-purple-50 dark:bg-purple-950/20">
                       <div className="flex items-center gap-2">
                         <CreditCard className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                         <div>
                           <p className="font-medium">{account.account_name}</p>
-                          {nextStatementDate && (
+                          {nextDueDate && (
                             <p className="text-xs text-muted-foreground">
-                              Statement: {nextStatementDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              Due: {nextDueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                             </p>
                           )}
                         </div>
