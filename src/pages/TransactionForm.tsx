@@ -22,6 +22,7 @@ import {
 } from '@/utils/emiCalculations';
 import { getTransactionStatementInfo } from '@/utils/statementCalculations';
 
+// Transaction form for creating and editing transactions
 export default function TransactionForm() {
   const { id } = useParams();
   const navigate = useNavigate();
