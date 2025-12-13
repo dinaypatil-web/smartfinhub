@@ -129,12 +129,14 @@ export function isTransactionInCurrentCycle(
 /**
  * Calculate due amount from regular transactions in current billing cycle
  * Excludes transactions where EMI payment option is selected
+ * @param accountId - The credit card account ID
  * @param transactions - All transactions for the account
  * @param emis - All EMI transactions (to identify which transactions are converted to EMI)
  * @param statementDay - Day of month when statement is generated
  * @returns Total amount due from transactions
  */
 export function calculateTransactionsDueAmount(
+  accountId: string,
   transactions: Transaction[],
   emis: EMITransaction[],
   statementDay: number
@@ -159,8 +161,8 @@ export function calculateTransactionsDueAmount(
       if (tx.transaction_type === 'expense' || tx.transaction_type === 'withdrawal') {
         return sum + tx.amount;
       }
-      // Payments reduce the balance
-      if (tx.transaction_type === 'credit_card_payment') {
+      // Transfers to credit card (payments) reduce the balance
+      if (tx.transaction_type === 'transfer' && tx.to_account_id === accountId) {
         return sum - tx.amount;
       }
       return sum;
@@ -192,17 +194,19 @@ export function calculateEMIDueAmount(emis: EMITransaction[], statementDay: numb
 
 /**
  * Calculate total due amount for a credit card
+ * @param accountId - The credit card account ID
  * @param transactions - All transactions for the account
  * @param emis - All active EMI transactions for the account
  * @param statementDay - Day of month when statement is generated
  * @returns Total amount due (transactions + EMIs)
  */
 export function calculateTotalDueAmount(
+  accountId: string,
   transactions: Transaction[],
   emis: EMITransaction[],
   statementDay: number
 ): number {
-  const transactionsDue = calculateTransactionsDueAmount(transactions, emis, statementDay);
+  const transactionsDue = calculateTransactionsDueAmount(accountId, transactions, emis, statementDay);
   const emisDue = calculateEMIDueAmount(emis, statementDay);
   
   return transactionsDue + emisDue;

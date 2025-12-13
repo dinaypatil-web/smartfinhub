@@ -97,8 +97,6 @@ export default function AccountStatementDialog({
         return <TrendingDown className="h-4 w-4 text-warning" />;
       case 'loan_payment':
         return <Building2 className="h-4 w-4 text-primary" />;
-      case 'credit_card_payment':
-        return <CreditCard className="h-4 w-4 text-primary" />;
       case 'interest_charge':
         return <TrendingUp className="h-4 w-4 text-warning" />;
       default:

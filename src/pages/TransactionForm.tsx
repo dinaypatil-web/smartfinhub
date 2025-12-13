@@ -380,14 +380,12 @@ export default function TransactionForm() {
                   <SelectItem value="withdrawal">Withdrawal</SelectItem>
                   <SelectItem value="transfer">Transfer</SelectItem>
                   <SelectItem value="loan_payment">Loan Payment</SelectItem>
-                  <SelectItem value="credit_card_payment">Credit Card Payment</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             {(formData.transaction_type === 'expense' || formData.transaction_type === 'withdrawal' || 
-              formData.transaction_type === 'transfer' || formData.transaction_type === 'loan_payment' || 
-              formData.transaction_type === 'credit_card_payment') && (
+              formData.transaction_type === 'transfer' || formData.transaction_type === 'loan_payment') && (
               <div className="space-y-2">
                 <Label htmlFor="from_account_id">
                   {formData.transaction_type === 'withdrawal' ? 'From Bank/Credit Card *' : 'From Account *'}
@@ -418,8 +416,7 @@ export default function TransactionForm() {
             )}
 
             {(formData.transaction_type === 'income' || formData.transaction_type === 'transfer' || 
-              formData.transaction_type === 'withdrawal' || formData.transaction_type === 'loan_payment' || 
-              formData.transaction_type === 'credit_card_payment') && (
+              formData.transaction_type === 'withdrawal' || formData.transaction_type === 'loan_payment') && (
               <div className="space-y-2">
                 <Label htmlFor="to_account_id">
                   {formData.transaction_type === 'withdrawal' ? 'To Cash Account *' : 'To Account *'}
