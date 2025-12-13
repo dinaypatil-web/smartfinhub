@@ -219,6 +219,17 @@ export default function TransactionForm() {
       return;
     }
 
+    // Validate amount is positive
+    const amount = parseFloat(formData.amount);
+    if (isNaN(amount) || amount <= 0) {
+      toast({
+        title: 'Error',
+        description: 'Amount must be a positive number',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     // Validate EMI fields if EMI is selected
     if (formData.is_emi) {
       if (!formData.emi_months || parseInt(formData.emi_months) <= 0) {
@@ -445,6 +456,7 @@ export default function TransactionForm() {
                   id="amount"
                   type="number"
                   step="0.01"
+                  min="0"
                   value={formData.amount}
                   onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                   placeholder="0.00"
