@@ -32,10 +32,12 @@ A comprehensive financial management web application designed for tracking and m
   - Biometric Verification: Fingerprint or face recognition on supported devices
 
 ## 2. Core Features
-\n### 2.1 User Preferences
+
+### 2.1 User Preferences
 - Select default country from dropdown list
 - Choose preferred currency for dashboard display
-- Country and currency settings saved to user profile\n- Settings apply across all dashboard views and reports
+- Country and currency settings saved to user profile
+- Settings apply across all dashboard views and reports
 
 ### 2.2 Account Management
 \n#### 2.2.1 Account Types
@@ -65,11 +67,11 @@ A comprehensive financial management web application designed for tracking and m
 - **Credit Limit Alert**: System triggers alert notification when user attempts transaction that would exceed their set credit limit
 - Alert displayed before transaction confirmation to prevent overspending
 - Current available credit displayed on credit card account page and dashboard
-
-#### 2.2.4 Loan Account Configuration
+\n#### 2.2.4 Loan Account Configuration
 - Select interest rate type: Fixed or Floating
 - Input total principal loan amount
-- **EMI Due Day of Month**: User inputs the day of month when EMI payment is due (1-31)\n- EMI due day saved to loan account profile for automatic interest calculation
+- **EMI Due Day of Month**: User inputs the day of month when EMI payment is due (1-31)
+- EMI due day saved to loan account profile for automatic interest calculation
 - Auto-calculate EMI based on principal, interest rate, and tenure
 - **EMI Payment History Entry**: During loan account creation or editing, system prompts user to provide details of every EMI payment already made:\n  - EMI Payment Date: Date when each EMI was paid
   - EMI Amount Paid: Actual amount paid for each EMI installment
@@ -86,7 +88,8 @@ A comprehensive financial management web application designed for tracking and m
   - Each EMI payment with date and amount
   - Principal and interest breakdown for each payment (including user corrections)
   - Running balance of outstanding principal after each payment
-  - Cumulative interest paid to date\n  - Remaining loan balance
+  - Cumulative interest paid to date
+  - Remaining loan balance
 - **Accurate Accrued Interest Calculation**: System calculates precise accrued interest based on:
   - Historical EMI payment records
   - Interest component extracted from each EMI (including user corrections)
@@ -104,8 +107,7 @@ A comprehensive financial management web application designed for tracking and m
 - Sends notification to user about monthly interest addition
 - Interest calculation uses daily balance method considering all intra-month transactions
 - System maintains complete audit trail of all automatic interest additions
-
-#### 2.2.5 Floating Interest Rate Management
+\n#### 2.2.5 Floating Interest Rate Management
 - Record all interest rate changes from loan inception to current date
 - User can update floating interest rate at any time
 - System maintains complete historical record of rate changes
@@ -139,14 +141,12 @@ A comprehensive financial management web application designed for tracking and m
 - Expense transactions\n- Cash withdrawals (from bank account or credit card)
 - Bank-to-bank transfers
 - Loan payments
-- Credit card payments
 - System-generated interest additions (for loan accounts)
 \n#### 2.3.2 Transaction Processing Logic
 - Credit card accounts displayed as negative balances
 - Loan accounts displayed as negative balances
 - Cash withdrawal from credit card increases card balance (more negative)
 - Payments to loan accounts decrease loan balance (less negative)
-- Payments to credit card decrease card balance (less negative)
 - During expense transaction entry, display remaining budget balance for the selected budget category for current month
 - Show budget balance information prominently before transaction confirmation to help user make informed spending decisions
 - Dashboard auto-updates after each transaction\n- Screen refreshes automatically after transaction entry
@@ -156,9 +156,11 @@ A comprehensive financial management web application designed for tracking and m
 - All loan account transactions considered in monthly interest calculation
 \n#### 2.3.3 Credit Card Transaction with EMI Option
 - **EMI Payment Option**: During credit card transaction entry, system prompts user to select payment method\n- Payment options: Full Payment or EMI (Equated Monthly Installment)
-- **EMI Configuration**: If EMI option selected, user provides:\n  - EMI Duration: Number of months for installment plan
+- **EMI Configuration**: If EMI option selected, user provides:
+  - EMI Duration: Number of months for installment plan
   - Bank EMI Charges: Processing fee or interest charges applied by bank
-- **EMI Calculation**: System automatically calculates monthly EMI amount based on transaction amount, duration, and bank charges\n- **Statement Amount Calculation**: System calculates EMI amount to be included in monthly credit card statement
+- **EMI Calculation**: System automatically calculates monthly EMI amount based on transaction amount, duration, and bank charges
+- **Statement Amount Calculation**: System calculates EMI amount to be included in monthly credit card statement
 - **Dashboard Display**: EMI details displayed on dashboard including:
   - Total EMI amount
   - Monthly installment amount
@@ -236,10 +238,12 @@ A comprehensive financial management web application designed for tracking and m
 - Income and expense summary reports
 - Account balance reports across all accounts
 - Budget vs. actual analysis reports
-- **Credit Card Monthly Statement Report**: Reports section includes credit card statement view with month selector\n- User selects specific month from dropdown to view credit card statement for that period
+- **Credit Card Monthly Statement Report**: Reports section includes credit card statement view with month selector
+- User selects specific month from dropdown to view credit card statement for that period
 - Statement displays all transactions, payments, EMI installments, interest charges, and balance for selected month
 - Statement shows opening balance, closing balance, total spending, and payment due information
-- **EMI Transaction Reports**: Detailed reports showing all EMI transactions, payment schedules, and outstanding balances\n- **Loan Account Statement Report**: Comprehensive loan statement report included in Reports section showing:
+- **EMI Transaction Reports**: Detailed reports showing all EMI transactions, payment schedules, and outstanding balances
+- **Loan Account Statement Report**: Comprehensive loan statement report included in Reports section showing:
   - **Historical EMI Payments**: Complete record of all EMI payments already made with:\n    - Payment date for each EMI
     - Total EMI amount paid
     - Principal payment component (including user corrections)
@@ -278,3 +282,8 @@ A comprehensive financial management web application designed for tracking and m
 - Responsive design adapting seamlessly to desktop, tablet, and mobile screens
 - Clear visual hierarchy with prominent balance displays and chart visualizations
 - Sticky header for easy navigation access
+
+## 4. Reference Images
+- IMG_7736.jpeg: Credit card account display showing ICICI Bank credit card with balance, credit utilization, and payment due information
+- IMG_7737.png: Credit card account detail page showing card number, outstanding balance, credit utilization, available credit, limit, and payment due information
+- IMG_7738.png: Transaction list view showing credit card payment transaction with description, category, and amount

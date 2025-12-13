@@ -414,7 +414,6 @@ export const transactionApi = {
         break;
       
       case 'loan_payment':
-      case 'credit_card_payment':
         if (transaction.from_account_id) {
           await this.adjustBalance(transaction.from_account_id, -amount);
         }
@@ -490,7 +489,6 @@ export const transactionApi = {
         break;
       
       case 'loan_payment':
-      case 'credit_card_payment':
         if (transaction.from_account_id) {
           await this.adjustBalance(transaction.from_account_id, amount);
         }

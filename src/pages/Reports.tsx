@@ -125,17 +125,12 @@ export default function Reports() {
       .filter(t => t.transaction_type === 'loan_payment')
       .reduce((sum, t) => sum + t.amount, 0);
 
-    const creditCardPayments = filtered
-      .filter(t => t.transaction_type === 'credit_card_payment')
-      .reduce((sum, t) => sum + t.amount, 0);
-
     return {
       income,
       expenses,
       withdrawals,
       transfers,
       loanPayments,
-      creditCardPayments,
       netPosition: income - expenses,
       totalTransactions: filtered.length,
     };
@@ -213,7 +208,7 @@ export default function Reports() {
     });
 
     // Calculate due amount
-    const dueAmount = calculateTotalDueAmount(accountTransactions, accountEMIs, account.statement_day);
+    const dueAmount = calculateTotalDueAmount(selectedCreditCard, accountTransactions, accountEMIs, account.statement_day);
 
     return {
       account,
@@ -312,7 +307,6 @@ export default function Reports() {
                   <SelectItem value="withdrawal">Withdrawal</SelectItem>
                   <SelectItem value="transfer">Transfer</SelectItem>
                   <SelectItem value="loan_payment">Loan Payment</SelectItem>
-                  <SelectItem value="credit_card_payment">Credit Card Payment</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -398,10 +392,6 @@ export default function Reports() {
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium">Loan Payments</span>
                   <span className="text-sm font-semibold">{formatCurrency(summary.loanPayments, currency)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium">Credit Card Payments</span>
-                  <span className="text-sm font-semibold">{formatCurrency(summary.creditCardPayments, currency)}</span>
                 </div>
               </div>
             </CardContent>

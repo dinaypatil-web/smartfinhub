@@ -20,7 +20,6 @@ import {
   calculateStatementAmount 
 } from '@/utils/emiCalculations';
 import {
-  calculateTotalDueAmount,
   getBillingCycleInfo,
   isDueDatePassed
 } from '@/utils/billingCycleCalculations';

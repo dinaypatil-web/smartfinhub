@@ -1,7 +1,7 @@
 export type UserRole = 'user' | 'admin';
 export type AccountType = 'cash' | 'bank' | 'credit_card' | 'loan';
 export type InterestRateType = 'fixed' | 'floating';
-export type TransactionType = 'income' | 'expense' | 'withdrawal' | 'transfer' | 'loan_payment' | 'credit_card_payment' | 'interest_charge';
+export type TransactionType = 'income' | 'expense' | 'withdrawal' | 'transfer' | 'loan_payment' | 'interest_charge';
 
 export interface Profile {
   id: string;
