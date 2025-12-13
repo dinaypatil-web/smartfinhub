@@ -280,6 +280,34 @@ export function getCreditCardDuesDetails(
 }
 
 /**
+ * Calculate total credit card repayments made in the current month till date
+ */
+export function calculateCreditCardRepayments(
+  transactions: Transaction[],
+  month: number,
+  year: number
+): number {
+  const monthStart = new Date(year, month - 1, 1);
+  const today = new Date();
+
+  const repaymentTransactions = transactions.filter(t => {
+    const transactionDate = new Date(t.transaction_date);
+    return (
+      transactionDate >= monthStart &&
+      transactionDate <= today &&
+      t.transaction_type === 'credit_card_repayment'
+    );
+  });
+
+  const totalRepayments = repaymentTransactions.reduce(
+    (sum, t) => sum + Number(t.amount),
+    0
+  );
+
+  return Math.round(totalRepayments * 100) / 100;
+}
+
+/**
  * Calculate complete monthly cash flow summary
  */
 export function calculateMonthlyCashFlow(
@@ -292,6 +320,7 @@ export function calculateMonthlyCashFlow(
   openingBalance: number;
   incomeReceived: number;
   expensesIncurred: number;
+  creditCardRepayments: number;
   remainingBudget: number;
   expectedBalance: number;
   creditCardDues: number;
@@ -300,8 +329,9 @@ export function calculateMonthlyCashFlow(
   const openingBalance = calculateOpeningBalance(accounts, transactions, month, year);
   const incomeReceived = calculateMonthIncome(transactions, month, year);
   const expensesIncurred = calculateMonthExpenses(transactions, month, year);
+  const creditCardRepayments = calculateCreditCardRepayments(transactions, month, year);
   const remainingBudget = calculateRemainingBudget(budget, expensesIncurred);
-  const expectedBalance = openingBalance + incomeReceived - expensesIncurred - remainingBudget;
+  const expectedBalance = openingBalance + incomeReceived - expensesIncurred - creditCardRepayments - remainingBudget;
   const creditCardDues = calculateCreditCardDues(accounts, month, year);
   const netAvailable = expectedBalance - creditCardDues;
 
@@ -309,6 +339,7 @@ export function calculateMonthlyCashFlow(
     openingBalance,
     incomeReceived,
     expensesIncurred,
+    creditCardRepayments,
     remainingBudget,
     expectedBalance,
     creditCardDues,

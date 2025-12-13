@@ -52,6 +52,7 @@ export default function Dashboard() {
     openingBalance: number;
     incomeReceived: number;
     expensesIncurred: number;
+    creditCardRepayments: number;
     remainingBudget: number;
     expectedBalance: number;
     creditCardDues: number;
@@ -487,6 +488,14 @@ export default function Dashboard() {
                       - {formatCurrency(cashFlow.expensesIncurred, currency)}
                     </span>
                   </div>
+                  {cashFlow.creditCardRepayments > 0 && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Credit Card Repayments</span>
+                      <span className="text-lg font-semibold text-purple-600 dark:text-purple-400">
+                        - {formatCurrency(cashFlow.creditCardRepayments, currency)}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">Remaining Budget</span>
                     <span className="text-lg font-semibold text-amber-600 dark:text-amber-400">
@@ -520,7 +529,7 @@ export default function Dashboard() {
 
               <div className="pt-2 border-t border-muted">
                 <p className="text-xs text-muted-foreground">
-                  This summary shows your projected cash position for the current month based on opening balance, income received, expenses incurred, remaining budget allocation, and credit card dues.
+                  This summary shows your projected cash position for the current month based on opening balance, income received, expenses incurred, credit card repayments, remaining budget allocation, and credit card dues.
                 </p>
               </div>
 
