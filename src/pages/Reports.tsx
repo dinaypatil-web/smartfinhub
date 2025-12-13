@@ -125,12 +125,17 @@ export default function Reports() {
       .filter(t => t.transaction_type === 'loan_payment')
       .reduce((sum, t) => sum + t.amount, 0);
 
+    const creditCardRepayments = filtered
+      .filter(t => t.transaction_type === 'credit_card_repayment')
+      .reduce((sum, t) => sum + t.amount, 0);
+
     return {
       income,
       expenses,
       withdrawals,
       transfers,
       loanPayments,
+      creditCardRepayments,
       netPosition: income - expenses,
       totalTransactions: filtered.length,
     };
@@ -307,6 +312,7 @@ export default function Reports() {
                   <SelectItem value="withdrawal">Withdrawal</SelectItem>
                   <SelectItem value="transfer">Transfer</SelectItem>
                   <SelectItem value="loan_payment">Loan Payment</SelectItem>
+                  <SelectItem value="credit_card_repayment">Credit Card Repayment</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -392,6 +398,10 @@ export default function Reports() {
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium">Loan Payments</span>
                   <span className="text-sm font-semibold">{formatCurrency(summary.loanPayments, currency)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium">Credit Card Repayments</span>
+                  <span className="text-sm font-semibold">{formatCurrency(summary.creditCardRepayments, currency)}</span>
                 </div>
               </div>
             </CardContent>

@@ -421,6 +421,17 @@ export const transactionApi = {
           await this.adjustBalance(transaction.to_account_id, -amount);
         }
         break;
+      
+      case 'credit_card_repayment':
+        // FROM account (bank/cash): decrease balance
+        if (transaction.from_account_id) {
+          await this.adjustBalance(transaction.from_account_id, -amount);
+        }
+        // TO account (credit card): decrease balance (reduce liability)
+        if (transaction.to_account_id) {
+          await this.adjustBalance(transaction.to_account_id, -amount);
+        }
+        break;
     }
   },
 
@@ -492,6 +503,17 @@ export const transactionApi = {
         if (transaction.from_account_id) {
           await this.adjustBalance(transaction.from_account_id, amount);
         }
+        if (transaction.to_account_id) {
+          await this.adjustBalance(transaction.to_account_id, amount);
+        }
+        break;
+      
+      case 'credit_card_repayment':
+        // Reverse: FROM account (bank/cash): increase balance
+        if (transaction.from_account_id) {
+          await this.adjustBalance(transaction.from_account_id, amount);
+        }
+        // Reverse: TO account (credit card): increase balance (restore liability)
         if (transaction.to_account_id) {
           await this.adjustBalance(transaction.to_account_id, amount);
         }

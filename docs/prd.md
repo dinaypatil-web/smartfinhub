@@ -54,8 +54,7 @@ A comprehensive financial management web application designed for tracking and m
 - Fetched logos displayed on both account pages and dashboard
 - System caches fetched logos for future use
 - Optional account number entry (encrypted storage, only last 4 digits visible on dashboard)
-
-#### 2.2.3 Credit Card Configuration
+\n#### 2.2.3 Credit Card Configuration
 - **Statement Day of Month**: User inputs the day of month when credit card statement is generated (1-31)
 - **Due Day of Month**: User inputs the day of month when credit card payment is due (1-31)
 - **Credit Card Limit**: User inputs their own credit limit for the card
@@ -141,12 +140,20 @@ A comprehensive financial management web application designed for tracking and m
 - Expense transactions\n- Cash withdrawals (from bank account or credit card)
 - Bank-to-bank transfers
 - Loan payments
+- **Credit card repayment transactions**
 - System-generated interest additions (for loan accounts)
 \n#### 2.3.2 Transaction Processing Logic
-- Credit card accounts displayed as negative balances
-- Loan accounts displayed as negative balances
-- Cash withdrawal from credit card increases card balance (more negative)
-- Payments to loan accounts decrease loan balance (less negative)
+- **Credit card accounts displayed as negative balances (liabilities)**
+- **Expense transactions from credit card increase card balance (more negative, higher liability)**
+- **Cash withdrawals from credit card increase card balance (more negative, higher liability)**
+- Loan accounts displayed as negative balances\n- Payments to loan accounts decrease loan balance (less negative)\n- **Credit Card Repayment Transaction**: New transaction type for paying credit card bills
+  - User selects source bank account from which repayment is made
+  - User selects target credit card account being paid
+  - User enters repayment amount
+  - System simultaneously:\n    - Reduces source bank account balance by repayment amount
+    - Reduces credit card liability (makes balance less negative) by repayment amount
+  - Transaction recorded in both bank account and credit card account statements
+  - Repayment transaction clearly labeled in transaction history
 - During expense transaction entry, display remaining budget balance for the selected budget category for current month
 - Show budget balance information prominently before transaction confirmation to help user make informed spending decisions
 - Dashboard auto-updates after each transaction\n- Screen refreshes automatically after transaction entry
@@ -176,8 +183,8 @@ A comprehensive financial management web application designed for tracking and m
 \n#### 2.3.4 Transaction Modification
 - Edit any transaction record\n- Delete transactions with automatic balance recalculation
 - System-generated interest transactions cannot be edited or deleted by user
-
-### 2.4 Dashboard Display
+- Credit card repayment transactions can be edited or deleted with automatic recalculation of both bank and credit card balances
+\n### 2.4 Dashboard Display
 
 #### 2.4.1 Financial Summary
 - Current Assets: Sum of Cash and Bank Account balances
@@ -208,7 +215,8 @@ A comprehensive financial management web application designed for tracking and m
 - Line chart displaying Floating Interest Rate history for loan accounts
 \n#### 2.4.4 Account Display Cards
 - Bank or financial institution logo\n- Account type indicator\n- Last 4 digits of account number only\n- Real-time current balance\n- For loan accounts: Total accrued interest till date including automatic monthly interest additions
-- **For credit card accounts**: \n  - Display next statement date and payment due date as reminders
+- **For credit card accounts**:
+  - Display next statement date and payment due date as reminders
   - Show user-defined credit limit
   - Display available credit remaining
   - Show active EMI transactions count
@@ -221,6 +229,7 @@ A comprehensive financial management web application designed for tracking and m
 - **Click-to-View Statement**: When user clicks on any account card on dashboard, system displays popup window showing last 90 days statement for that account
 - Popup includes transaction history, balance changes, and account activity for the 90-day period
 - **For loan accounts**: Popup displays detailed EMI payment history with principal and interest breakdown for each payment within the 90-day period, including automatic monthly interest additions
+- **For credit card accounts**: Popup displays all transactions including expenses, withdrawals, and repayment transactions for the 90-day period
 - Statement popup available for all account types: Cash, Bank, Credit Card, and Loan accounts
 - Close button to dismiss popup and return to dashboard
 
@@ -234,17 +243,17 @@ A comprehensive financial management web application designed for tracking and m
 - Real-time recalculation of budget variance when budget values are modified
 - Updated Budget vs. Actual analysis immediately reflected on dashboard and reports
 - System recalculates remaining budget for each category after budget modification
-\n### 2.6 Reporting\n- Transaction history reports with date range filters
+\n### 2.6 Reporting
+- Transaction history reports with date range filters
 - Income and expense summary reports
 - Account balance reports across all accounts
 - Budget vs. actual analysis reports
-- **Credit Card Monthly Statement Report**: Reports section includes credit card statement view with month selector
-- User selects specific month from dropdown to view credit card statement for that period
-- Statement displays all transactions, payments, EMI installments, interest charges, and balance for selected month
-- Statement shows opening balance, closing balance, total spending, and payment due information
+- **Credit Card Monthly Statement Report**: Reports section includes credit card statement view with month selector\n- User selects specific month from dropdown to view credit card statement for that period
+- Statement displays all transactions, payments, repayments, EMI installments, interest charges, and balance for selected month
+- Statement shows opening balance, closing balance, total spending, repayments made, and payment due information
 - **EMI Transaction Reports**: Detailed reports showing all EMI transactions, payment schedules, and outstanding balances
-- **Loan Account Statement Report**: Comprehensive loan statement report included in Reports section showing:
-  - **Historical EMI Payments**: Complete record of all EMI payments already made with:\n    - Payment date for each EMI
+- **Credit Card Repayment Reports**: Detailed reports showing all credit card repayment transactions with source bank account, target credit card, repayment amount, and date
+- **Loan Account Statement Report**: Comprehensive loan statement report included in Reports section showing:\n  - **Historical EMI Payments**: Complete record of all EMI payments already made with:\n    - Payment date for each EMI
     - Total EMI amount paid
     - Principal payment component (including user corrections)
     - Interest payment component (including user corrections)
