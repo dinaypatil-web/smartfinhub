@@ -20,6 +20,7 @@ import {
   validateCreditLimit,
   getCreditLimitWarningMessage 
 } from '@/utils/emiCalculations';
+import { getStatementPeriod, getStatementDueDate } from '@/utils/statementCalculations';
 
 export default function TransactionForm() {
   const { id } = useParams();
@@ -55,12 +56,41 @@ export default function TransactionForm() {
   } | null>(null);
 
   const [creditLimitWarning, setCreditLimitWarning] = useState<string | null>(null);
+  const [statementInfo, setStatementInfo] = useState<{
+    statementDate: Date;
+    dueDate: Date;
+  } | null>(null);
 
   useEffect(() => {
     if (user) {
       loadData();
     }
   }, [user]);
+
+  // Calculate statement and due dates for credit card transactions
+  useEffect(() => {
+    if (formData.from_account_id && formData.transaction_date && !formData.is_emi) {
+      const account = accounts.find((a: Account) => a.id === formData.from_account_id);
+      if (account && account.account_type === 'credit_card' && account.statement_day && account.due_day) {
+        const transactionDate = new Date(formData.transaction_date);
+        const { currentStatementDate } = getStatementPeriod(account.statement_day, transactionDate);
+        const dueDate = getStatementDueDate(account.statement_day, account.due_day, transactionDate);
+        
+        if (dueDate) {
+          setStatementInfo({
+            statementDate: currentStatementDate,
+            dueDate: dueDate
+          });
+        } else {
+          setStatementInfo(null);
+        }
+      } else {
+        setStatementInfo(null);
+      }
+    } else {
+      setStatementInfo(null);
+    }
+  }, [formData.from_account_id, formData.transaction_date, formData.is_emi, accounts]);
 
   useEffect(() => {
     // Load budget info when category changes and transaction type is expense
@@ -617,6 +647,48 @@ export default function TransactionForm() {
                   </>
                 )}
               </div>
+            )}
+
+            {/* Statement and Due Date Info for Credit Card Transactions (Non-EMI) */}
+            {formData.from_account_id && 
+             !formData.is_emi &&
+             accounts.find((a: Account) => a.id === formData.from_account_id)?.account_type === 'credit_card' && 
+             statementInfo && (
+              <Alert className="border-purple-500 bg-purple-50 dark:bg-purple-950/20">
+                <CreditCard className="h-4 w-4 text-purple-600" />
+                <AlertDescription>
+                  <div className="space-y-2">
+                    <div className="font-semibold text-sm text-purple-900 dark:text-purple-200">
+                      Credit Card Billing Information
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <div className="text-muted-foreground">Statement Date</div>
+                        <div className="font-medium text-purple-600 dark:text-purple-400">
+                          {statementInfo.statementDate.toLocaleDateString('en-US', { 
+                            month: 'short', 
+                            day: 'numeric', 
+                            year: 'numeric' 
+                          })}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground">Payment Due Date</div>
+                        <div className="font-medium text-purple-600 dark:text-purple-400">
+                          {statementInfo.dueDate.toLocaleDateString('en-US', { 
+                            month: 'short', 
+                            day: 'numeric', 
+                            year: 'numeric' 
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      This transaction will be included in the statement generated on {statementInfo.statementDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} and payment will be due on {statementInfo.dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}.
+                    </p>
+                  </div>
+                </AlertDescription>
+              </Alert>
             )}
 
             <div className="space-y-2">
