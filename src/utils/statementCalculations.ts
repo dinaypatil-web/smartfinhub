@@ -87,11 +87,11 @@ export function calculateCreditCardStatementAmount(
     .filter(t => !emiTransactionIds.has(t.id))
     .reduce((sum, t) => {
       // For credit cards, expenses increase the balance (positive)
-      // Payments (transfers to credit card) decrease the balance (negative)
+      // Payments (transfers or credit_card_repayment to credit card) decrease the balance (negative)
       if (t.from_account_id === accountId) {
         return sum + Math.abs(Number(t.amount));
       }
-      if (t.to_account_id === accountId && t.transaction_type === 'transfer') {
+      if (t.to_account_id === accountId && (t.transaction_type === 'transfer' || t.transaction_type === 'credit_card_repayment')) {
         return sum - Math.abs(Number(t.amount));
       }
       return sum;

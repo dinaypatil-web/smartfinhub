@@ -161,8 +161,8 @@ export function calculateTransactionsDueAmount(
       if (tx.transaction_type === 'expense' || tx.transaction_type === 'withdrawal') {
         return sum + tx.amount;
       }
-      // Transfers to credit card (payments) reduce the balance
-      if (tx.transaction_type === 'transfer' && tx.to_account_id === accountId) {
+      // Transfers or credit_card_repayment to credit card (payments) reduce the balance
+      if ((tx.transaction_type === 'transfer' || tx.transaction_type === 'credit_card_repayment') && tx.to_account_id === accountId) {
         return sum - tx.amount;
       }
       return sum;

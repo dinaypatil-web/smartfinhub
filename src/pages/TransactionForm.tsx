@@ -380,15 +380,18 @@ export default function TransactionForm() {
                   <SelectItem value="withdrawal">Withdrawal</SelectItem>
                   <SelectItem value="transfer">Transfer</SelectItem>
                   <SelectItem value="loan_payment">Loan Payment</SelectItem>
+                  <SelectItem value="credit_card_repayment">Credit Card Repayment</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             {(formData.transaction_type === 'expense' || formData.transaction_type === 'withdrawal' || 
-              formData.transaction_type === 'transfer' || formData.transaction_type === 'loan_payment') && (
+              formData.transaction_type === 'transfer' || formData.transaction_type === 'loan_payment' ||
+              formData.transaction_type === 'credit_card_repayment') && (
               <div className="space-y-2">
                 <Label htmlFor="from_account_id">
-                  {formData.transaction_type === 'withdrawal' ? 'From Bank/Credit Card *' : 'From Account *'}
+                  {formData.transaction_type === 'withdrawal' ? 'From Bank/Credit Card *' : 
+                   formData.transaction_type === 'credit_card_repayment' ? 'From Bank Account *' : 'From Account *'}
                 </Label>
                 <Select
                   value={formData.from_account_id}
@@ -404,6 +407,12 @@ export default function TransactionForm() {
                             {account.account_name} ({account.account_type})
                           </SelectItem>
                         ))
+                      : formData.transaction_type === 'credit_card_repayment'
+                      ? accounts.filter(a => a.account_type === 'bank' || a.account_type === 'cash').map(account => (
+                          <SelectItem key={account.id} value={account.id}>
+                            {account.account_name}
+                          </SelectItem>
+                        ))
                       : accounts.map(account => (
                           <SelectItem key={account.id} value={account.id}>
                             {account.account_name} ({account.account_type})
@@ -416,10 +425,12 @@ export default function TransactionForm() {
             )}
 
             {(formData.transaction_type === 'income' || formData.transaction_type === 'transfer' || 
-              formData.transaction_type === 'withdrawal' || formData.transaction_type === 'loan_payment') && (
+              formData.transaction_type === 'withdrawal' || formData.transaction_type === 'loan_payment' ||
+              formData.transaction_type === 'credit_card_repayment') && (
               <div className="space-y-2">
                 <Label htmlFor="to_account_id">
-                  {formData.transaction_type === 'withdrawal' ? 'To Cash Account *' : 'To Account *'}
+                  {formData.transaction_type === 'withdrawal' ? 'To Cash Account *' : 
+                   formData.transaction_type === 'credit_card_repayment' ? 'To Credit Card *' : 'To Account *'}
                 </Label>
                 <Select
                   value={formData.to_account_id}
@@ -431,6 +442,12 @@ export default function TransactionForm() {
                   <SelectContent>
                     {formData.transaction_type === 'withdrawal' 
                       ? accounts.filter(a => a.account_type === 'cash').map(account => (
+                          <SelectItem key={account.id} value={account.id}>
+                            {account.account_name}
+                          </SelectItem>
+                        ))
+                      : formData.transaction_type === 'credit_card_repayment'
+                      ? accounts.filter(a => a.account_type === 'credit_card').map(account => (
                           <SelectItem key={account.id} value={account.id}>
                             {account.account_name}
                           </SelectItem>
