@@ -24,6 +24,11 @@ import {
   getBillingCycleInfo,
   isDueDatePassed
 } from '@/utils/billingCycleCalculations';
+import { 
+  calculateCreditCardStatementAmount, 
+  shouldDisplayDueAmount, 
+  getStatementDueDate 
+} from '@/utils/statementCalculations';
 import BankLogo from '@/components/BankLogo';
 import {
   AlertDialog,
@@ -392,21 +397,45 @@ export default function Accounts() {
                 {groupedAccounts.credit_card.map(account => {
                   const emis = accountEMIs[account.id] || [];
                   const transactions = accountTransactions[account.id] || [];
-                  const statementAmount = calculateStatementAmount(account.balance, emis);
-                  const utilization = account.credit_limit ? calculateCreditUtilization(account.balance, account.credit_limit) : null;
-                  const warningLevel = account.credit_limit ? getCreditLimitWarningLevel(account.balance, account.credit_limit) : 'safe';
-                  const availableCredit = account.credit_limit ? calculateAvailableCredit(account.balance, account.credit_limit) : null;
                   
-                  // Calculate due amount if statement_day is available and due date hasn't passed
+                  // Calculate statement amount using proper statement period logic
+                  let statementAmount = account.balance;
                   let dueAmount = 0;
+                  let showDueAmount = false;
+                  let dueDate: Date | null = null;
                   let billingInfo = null;
-                  if (account.statement_day && account.due_day) {
-                    // Only show due amount if due date hasn't passed
-                    if (!isDueDatePassed(account.statement_day, account.due_day)) {
-                      dueAmount = calculateTotalDueAmount(transactions, emis, account.statement_day);
+                  
+                  if (account.statement_day) {
+                    const statementCalc = calculateCreditCardStatementAmount(
+                      account.id,
+                      account.statement_day,
+                      transactions,
+                      emis
+                    );
+                    statementAmount = statementCalc.statementAmount;
+                    
+                    // Only show due amount after statement date
+                    showDueAmount = shouldDisplayDueAmount(account.statement_day);
+                    if (showDueAmount) {
+                      dueAmount = statementAmount;
+                      if (account.due_day) {
+                        dueDate = getStatementDueDate(account.statement_day, account.due_day);
+                        billingInfo = getBillingCycleInfo(account.statement_day, account.due_day);
+                      }
+                    }
+                  } else {
+                    // Fallback to old calculation if no statement day
+                    statementAmount = calculateStatementAmount(account.balance, emis);
+                    dueAmount = account.balance;
+                    showDueAmount = true;
+                    if (account.statement_day && account.due_day) {
                       billingInfo = getBillingCycleInfo(account.statement_day, account.due_day);
                     }
                   }
+                  
+                  const utilization = account.credit_limit ? calculateCreditUtilization(account.balance, account.credit_limit) : null;
+                  const warningLevel = account.credit_limit ? getCreditLimitWarningLevel(account.balance, account.credit_limit) : 'safe';
+                  const availableCredit = account.credit_limit ? calculateAvailableCredit(account.balance, account.credit_limit) : null;
                   
                   return (
                     <Card key={account.id} className="hover:shadow-lg transition-shadow">
@@ -517,8 +546,8 @@ export default function Accounts() {
                           </div>
                         )}
 
-                        {/* Due Amount Section */}
-                        {billingInfo && (
+                        {/* Due Amount Section - Only show after statement date */}
+                        {showDueAmount && (billingInfo || dueDate) && (
                           <div className="space-y-2 pt-2 border-t">
                             <div className="flex items-center justify-between">
                               <p className="text-sm text-muted-foreground">Payment Due</p>
@@ -527,7 +556,17 @@ export default function Accounts() {
                               </p>
                             </div>
                             <div className="text-xs text-muted-foreground text-right">
-                              Due on {billingInfo.dueDateStr}
+                              Due on {dueDate 
+                                ? dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                                : billingInfo?.dueDateStr
+                              }
+                            </div>
+                          </div>
+                        )}
+                        {!showDueAmount && account.statement_day && (
+                          <div className="space-y-2 pt-2 border-t">
+                            <div className="text-sm text-muted-foreground text-center">
+                              Statement will be generated on day {account.statement_day}
                             </div>
                           </div>
                         )}
