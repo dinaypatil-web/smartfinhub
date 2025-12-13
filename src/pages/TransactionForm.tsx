@@ -20,7 +20,7 @@ import {
   validateCreditLimit,
   getCreditLimitWarningMessage 
 } from '@/utils/emiCalculations';
-import { getStatementPeriod, getStatementDueDate } from '@/utils/statementCalculations';
+import { getTransactionStatementInfo } from '@/utils/statementCalculations';
 
 export default function TransactionForm() {
   const { id } = useParams();
@@ -73,17 +73,16 @@ export default function TransactionForm() {
       const account = accounts.find((a: Account) => a.id === formData.from_account_id);
       if (account && account.account_type === 'credit_card' && account.statement_day && account.due_day) {
         const transactionDate = new Date(formData.transaction_date);
-        const { currentStatementDate } = getStatementPeriod(account.statement_day, transactionDate);
-        const dueDate = getStatementDueDate(account.statement_day, account.due_day, transactionDate);
+        const { statementDate, dueDate } = getTransactionStatementInfo(
+          account.statement_day,
+          account.due_day,
+          transactionDate
+        );
         
-        if (dueDate) {
-          setStatementInfo({
-            statementDate: currentStatementDate,
-            dueDate: dueDate
-          });
-        } else {
-          setStatementInfo(null);
-        }
+        setStatementInfo({
+          statementDate,
+          dueDate
+        });
       } else {
         setStatementInfo(null);
       }
