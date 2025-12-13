@@ -21,6 +21,11 @@ import {
 import {
   getBillingCycleInfo
 } from '@/utils/billingCycleCalculations';
+import { 
+  calculateCreditCardStatementAmount, 
+  shouldDisplayDueAmount, 
+  getStatementDueDate 
+} from '@/utils/statementCalculations';
 import { checkAndPostInterestForAllLoans, getAccruedInterestReference } from '@/utils/loanInterestPosting';
 import { calculateMonthlyCashFlow, getCreditCardDuesDetails } from '@/utils/cashFlowCalculations';
 import { useToast } from '@/hooks/use-toast';
@@ -689,14 +694,41 @@ export default function Dashboard() {
               {summary?.accounts_by_type.credit_card.map(account => {
                 const emis = accountEMIs[account.id] || [];
                 const transactions = accountTransactions[account.id] || [];
-                const statementAmount = calculateStatementAmount(account.balance, emis);
+                
+                // Calculate statement amount using proper statement period logic
+                let statementAmount = account.balance;
+                let dueAmount = 0;
+                let showDueAmount = false;
+                let dueDate: Date | null = null;
+                
+                if (account.statement_day) {
+                  const statementCalc = calculateCreditCardStatementAmount(
+                    account.id,
+                    account.statement_day,
+                    transactions,
+                    emis
+                  );
+                  statementAmount = statementCalc.statementAmount;
+                  
+                  // Only show due amount after statement date
+                  showDueAmount = shouldDisplayDueAmount(account.statement_day);
+                  if (showDueAmount) {
+                    dueAmount = statementAmount;
+                    if (account.due_day) {
+                      dueDate = getStatementDueDate(account.statement_day, account.due_day);
+                    }
+                  }
+                } else {
+                  // Fallback to old calculation if no statement day
+                  statementAmount = calculateStatementAmount(account.balance, emis);
+                  dueAmount = account.balance;
+                  showDueAmount = true;
+                }
+                
                 const utilization = account.credit_limit ? calculateCreditUtilization(account.balance, account.credit_limit) : null;
                 const warningLevel = account.credit_limit ? getCreditLimitWarningLevel(account.balance, account.credit_limit) : 'safe';
                 const availableCredit = account.credit_limit ? calculateAvailableCredit(account.balance, account.credit_limit) : null;
                 
-                // Due amount is the total outstanding balance on the credit card
-                // This represents the total amount owed at any time
-                const dueAmount = account.balance;
                 const billingInfo = (account.statement_day && account.due_day) 
                   ? getBillingCycleInfo(account.statement_day, account.due_day)
                   : null;
@@ -796,21 +828,36 @@ export default function Dashboard() {
                       </div>
                     )}
 
-                    {/* Due Amount Information - Always show total outstanding balance */}
-                    <div className="pt-2 border-t border-purple-200 dark:border-purple-800">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">
-                          {dueAmount > 0 
-                            ? billingInfo 
-                              ? `${formatCurrency(dueAmount, account.currency)} due on ${billingInfo.dueDateStr}`
-                              : `${formatCurrency(dueAmount, account.currency)} outstanding balance`
-                            : billingInfo
-                              ? `No amount due (Next due: ${billingInfo.dueDateStr})`
-                              : 'No outstanding balance'
-                          }
-                        </span>
+                    {/* Due Amount Information - Only show after statement date */}
+                    {showDueAmount && (
+                      <div className="pt-2 border-t border-purple-200 dark:border-purple-800">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">
+                            {dueAmount > 0 
+                              ? dueDate
+                                ? `${formatCurrency(dueAmount, account.currency)} due on ${dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                                : billingInfo 
+                                  ? `${formatCurrency(dueAmount, account.currency)} due on ${billingInfo.dueDateStr}`
+                                  : `${formatCurrency(dueAmount, account.currency)} outstanding balance`
+                              : dueDate
+                                ? `No amount due (Next due: ${dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`
+                                : billingInfo
+                                  ? `No amount due (Next due: ${billingInfo.dueDateStr})`
+                                  : 'No outstanding balance'
+                            }
+                          </span>
+                        </div>
                       </div>
-                    </div>
+                    )}
+                    {!showDueAmount && account.statement_day && (
+                      <div className="pt-2 border-t border-purple-200 dark:border-purple-800">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">
+                            Statement will be generated on day {account.statement_day}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
