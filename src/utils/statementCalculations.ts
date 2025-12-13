@@ -179,3 +179,53 @@ export function shouldDisplayDueAmount(statementDay: number, referenceDate: Date
   const { isAfterStatementDate } = getStatementPeriod(statementDay, referenceDate);
   return isAfterStatementDate;
 }
+
+/**
+ * Get the statement date and due date for a transaction
+ * This determines which statement the transaction will be included in
+ * 
+ * Logic:
+ * - Transactions on or after statement_day of current month → included in NEXT month's statement
+ * - Transactions before statement_day of current month → included in THIS month's statement
+ * 
+ * Example: statement_day = 13, due_day = 20
+ * - Transaction on Jan 15 → Statement on Feb 13, Due on Feb 20
+ * - Transaction on Jan 10 → Statement on Jan 13, Due on Jan 20
+ */
+export function getTransactionStatementInfo(
+  statementDay: number,
+  dueDay: number,
+  transactionDate: Date
+): {
+  statementDate: Date;
+  dueDate: Date;
+} {
+  const txYear = transactionDate.getFullYear();
+  const txMonth = transactionDate.getMonth();
+  const txDay = transactionDate.getDate();
+
+  let statementDate: Date;
+  
+  // If transaction is on or after statement day, it goes to NEXT month's statement
+  if (txDay >= statementDay) {
+    statementDate = new Date(txYear, txMonth + 1, statementDay);
+  } else {
+    // If transaction is before statement day, it goes to THIS month's statement
+    statementDate = new Date(txYear, txMonth, statementDay);
+  }
+
+  // Calculate due date based on statement date
+  let dueDate: Date;
+  if (dueDay >= statementDay) {
+    // Due date is in the same month as statement
+    dueDate = new Date(statementDate.getFullYear(), statementDate.getMonth(), dueDay);
+  } else {
+    // Due date is in the next month after statement
+    dueDate = new Date(statementDate.getFullYear(), statementDate.getMonth() + 1, dueDay);
+  }
+
+  return {
+    statementDate,
+    dueDate
+  };
+}
