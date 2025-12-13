@@ -45,8 +45,8 @@ export function calculateStatementAmount(
  * Available Credit = Credit Limit - Current Balance
  */
 export function calculateAvailableCredit(
-  creditLimit: number | null,
-  currentBalance: number
+  currentBalance: number,
+  creditLimit: number | null
 ): number {
   if (!creditLimit) return 0;
   return Math.max(0, creditLimit - currentBalance);
@@ -66,19 +66,19 @@ export function calculateCreditUtilization(
 
 /**
  * Check if credit limit is being approached or exceeded
- * Returns warning level: 'none', 'warning' (>80%), 'danger' (>100%)
+ * Returns warning level: 'safe', 'warning' (>80%), 'danger' (>100%)
  */
 export function getCreditLimitWarningLevel(
   currentBalance: number,
   creditLimit: number | null
-): 'none' | 'warning' | 'danger' {
-  if (!creditLimit) return 'none';
+): 'safe' | 'warning' | 'danger' {
+  if (!creditLimit) return 'safe';
   
   const utilization = calculateCreditUtilization(currentBalance, creditLimit);
   
   if (utilization >= 100) return 'danger';
   if (utilization >= 80) return 'warning';
-  return 'none';
+  return 'safe';
 }
 
 /**
