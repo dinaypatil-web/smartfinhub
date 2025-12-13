@@ -361,7 +361,14 @@ export const transactionApi = {
       
       case 'expense':
         if (transaction.from_account_id) {
-          await this.adjustBalance(transaction.from_account_id, -amount);
+          const account = await accountApi.getAccountById(transaction.from_account_id);
+          if (account?.account_type === 'credit_card') {
+            // Credit card: expense increases balance (debt)
+            await this.adjustBalance(transaction.from_account_id, amount);
+          } else {
+            // Bank/Cash account: expense decreases balance
+            await this.adjustBalance(transaction.from_account_id, -amount);
+          }
         }
         break;
       
@@ -385,10 +392,24 @@ export const transactionApi = {
       
       case 'transfer':
         if (transaction.from_account_id) {
-          await this.adjustBalance(transaction.from_account_id, -amount);
+          const fromAccount = await accountApi.getAccountById(transaction.from_account_id);
+          if (fromAccount?.account_type === 'credit_card') {
+            // Credit card: transfer from credit card increases balance (cash advance/debt)
+            await this.adjustBalance(transaction.from_account_id, amount);
+          } else {
+            // Bank/Cash account: transfer decreases balance
+            await this.adjustBalance(transaction.from_account_id, -amount);
+          }
         }
         if (transaction.to_account_id) {
-          await this.adjustBalance(transaction.to_account_id, amount);
+          const toAccount = await accountApi.getAccountById(transaction.to_account_id);
+          if (toAccount?.account_type === 'credit_card') {
+            // Credit card: transfer to credit card decreases balance (payment/reduces debt)
+            await this.adjustBalance(transaction.to_account_id, -amount);
+          } else {
+            // Bank/Cash account: transfer increases balance
+            await this.adjustBalance(transaction.to_account_id, amount);
+          }
         }
         break;
       
@@ -416,7 +437,14 @@ export const transactionApi = {
       
       case 'expense':
         if (transaction.from_account_id) {
-          await this.adjustBalance(transaction.from_account_id, amount);
+          const account = await accountApi.getAccountById(transaction.from_account_id);
+          if (account?.account_type === 'credit_card') {
+            // Credit card: reverse expense decreases balance (debt)
+            await this.adjustBalance(transaction.from_account_id, -amount);
+          } else {
+            // Bank/Cash account: reverse expense increases balance
+            await this.adjustBalance(transaction.from_account_id, amount);
+          }
         }
         break;
       
@@ -440,10 +468,24 @@ export const transactionApi = {
       
       case 'transfer':
         if (transaction.from_account_id) {
-          await this.adjustBalance(transaction.from_account_id, amount);
+          const fromAccount = await accountApi.getAccountById(transaction.from_account_id);
+          if (fromAccount?.account_type === 'credit_card') {
+            // Credit card: reverse transfer from credit card decreases balance (reverse cash advance)
+            await this.adjustBalance(transaction.from_account_id, -amount);
+          } else {
+            // Bank/Cash account: reverse transfer increases balance
+            await this.adjustBalance(transaction.from_account_id, amount);
+          }
         }
         if (transaction.to_account_id) {
-          await this.adjustBalance(transaction.to_account_id, -amount);
+          const toAccount = await accountApi.getAccountById(transaction.to_account_id);
+          if (toAccount?.account_type === 'credit_card') {
+            // Credit card: reverse transfer to credit card increases balance (reverse payment)
+            await this.adjustBalance(transaction.to_account_id, amount);
+          } else {
+            // Bank/Cash account: reverse transfer decreases balance
+            await this.adjustBalance(transaction.to_account_id, -amount);
+          }
         }
         break;
       
