@@ -244,7 +244,7 @@ export function calculateCreditCardDues(
 
 /**
  * Get detailed credit card dues with statement dates
- * Returns only credit cards with the nearest upcoming due date
+ * Returns all credit cards with their respective upcoming due dates
  */
 export function getCreditCardDuesDetails(
   accounts: Account[]
@@ -262,7 +262,7 @@ export function getCreditCardDuesDetails(
     return [];
   }
 
-  // Calculate due dates for all credit cards
+  // Calculate due dates for all credit cards and return them
   const cardsWithDueDates = creditCardAccounts.map(acc => ({
     account: acc,
     dueAmount: Math.abs(Number(acc.balance)),
@@ -270,27 +270,13 @@ export function getCreditCardDuesDetails(
     nextDueDate: getNextDueDate(acc.statement_day, acc.due_day)
   }));
 
-  // Filter out cards without due dates
-  const cardsWithValidDueDates = cardsWithDueDates.filter(card => card.nextDueDate !== null);
-
-  if (cardsWithValidDueDates.length === 0) {
-    // If no cards have valid due dates, return all cards with statement dates
-    return cardsWithDueDates;
-  }
-
-  // Find the nearest upcoming due date
-  const nearestDueDate = cardsWithValidDueDates.reduce((nearest, card) => {
-    if (!nearest || (card.nextDueDate && card.nextDueDate < nearest)) {
-      return card.nextDueDate;
-    }
-    return nearest;
-  }, null as Date | null);
-
-  // Return only cards with the nearest due date
-  return cardsWithValidDueDates.filter(card => 
-    card.nextDueDate && nearestDueDate && 
-    card.nextDueDate.getTime() === nearestDueDate.getTime()
-  );
+  // Sort by due date (nearest first)
+  return cardsWithDueDates.sort((a, b) => {
+    if (!a.nextDueDate && !b.nextDueDate) return 0;
+    if (!a.nextDueDate) return 1;
+    if (!b.nextDueDate) return -1;
+    return a.nextDueDate.getTime() - b.nextDueDate.getTime();
+  });
 }
 
 /**
