@@ -22,7 +22,7 @@ import {
   getBillingCycleInfo
 } from '@/utils/billingCycleCalculations';
 import { checkAndPostInterestForAllLoans, getAccruedInterestReference } from '@/utils/loanInterestPosting';
-import { calculateMonthlyCashFlow } from '@/utils/cashFlowCalculations';
+import { calculateMonthlyCashFlow, getCreditCardDuesDetails } from '@/utils/cashFlowCalculations';
 import { useToast } from '@/hooks/use-toast';
 import InterestRateChart from '@/components/InterestRateChart';
 import InterestRateTable from '@/components/InterestRateTable';
@@ -52,6 +52,11 @@ export default function Dashboard() {
     creditCardDues: number;
     netAvailable: number;
   } | null>(null);
+  const [creditCardDuesDetails, setCreditCardDuesDetails] = useState<Array<{
+    account: Account;
+    dueAmount: number;
+    nextStatementDate: Date | null;
+  }>>([]);
 
   const currency = profile?.default_currency || 'INR';
 
@@ -172,6 +177,10 @@ export default function Dashboard() {
         currentYear
       );
       setCashFlow(cashFlowData);
+      
+      // Get credit card dues details with statement dates
+      const creditCardDetails = getCreditCardDuesDetails(allAccounts);
+      setCreditCardDuesDetails(creditCardDetails);
     } catch (error) {
       console.error('Error loading dashboard:', error);
     } finally {
@@ -508,6 +517,31 @@ export default function Dashboard() {
                   This summary shows your projected cash position for the current month based on opening balance, income received, expenses incurred, remaining budget allocation, and credit card dues.
                 </p>
               </div>
+
+              {/* Credit Card Dues Breakdown */}
+              {creditCardDuesDetails.length > 0 && (
+                <div className="pt-3 border-t border-muted space-y-2">
+                  <h4 className="text-sm font-semibold text-muted-foreground">Credit Card Dues Breakdown</h4>
+                  {creditCardDuesDetails.map(({ account, dueAmount, nextStatementDate }) => (
+                    <div key={account.id} className="flex items-center justify-between text-sm p-2 rounded bg-purple-50 dark:bg-purple-950/20">
+                      <div className="flex items-center gap-2">
+                        <CreditCard className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                        <div>
+                          <p className="font-medium">{account.account_name}</p>
+                          {nextStatementDate && (
+                            <p className="text-xs text-muted-foreground">
+                              Statement: {nextStatementDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <span className="font-semibold text-purple-600 dark:text-purple-400">
+                        {formatCurrency(dueAmount, account.currency)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
