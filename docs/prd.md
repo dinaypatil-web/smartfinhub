@@ -14,15 +14,13 @@ A comprehensive financial management web application designed for tracking and m
 - **Twilio Integration**: Use Twilio API for sending OTP to mobile numbers during sign-up process
 - Verified email or mobile number serves as username for secure data retrieval
 - **Google Sign-In Integration**: Users can sign in using their Google account
-  - Implement OSS Google login method for authentication
+  - Implement Auth0 service for Google authentication
   - One-click sign-in with Google credentials
   - Automatic account creation for first-time Google sign-in users
   - Google account email automatically linked to user profile
 - **Apple Sign-In Integration**: Users can sign in using their Apple ID
-  - Native Apple Sign-In authentication
-  - One-click sign-in with Apple credentials
-  - Support for 'Hide My Email' feature
-  - Automatic account creation for first-time Apple sign-in users
+  - Implement Auth0 service for Apple authentication\n  - One-click sign-in with Apple credentials
+  - Support for 'Hide My Email' feature\n  - Automatic account creation for first-time Apple sign-in users
   - Apple ID email automatically linked to user profile
 - **Unified Account Management**: Users who sign in via Google or Apple can later add mobile number or alternative email in account settings
 - **Forgot Password Option**: Forgot password link displayed on login page
@@ -162,7 +160,9 @@ A comprehensive financial management web application designed for tracking and m
 - Clicking UPI app link opens the respective payment app (if installed) or redirects to app download page
 - System detects user's country from account settings to display relevant payment app options
 - User can customize which UPI/payment app links to display in dashboard settings
-\n### 2.3 Transaction Management\n\n#### 2.3.1 Transaction Types
+
+### 2.3 Transaction Management
+\n#### 2.3.1 Transaction Types
 - Income transactions\n- Expense transactions
 - Cash withdrawals (from bank account or credit card)
 - Bank-to-bank transfers
@@ -300,7 +300,7 @@ A comprehensive financial management web application designed for tracking and m
   - Total accrued interest\n  - Remaining loan tenure
   - Complete amortization schedule showing full loan lifecycle
 - Date range filter for loan statement reports
-- Export reports functionality\n\n##3. Design Style\n
+- Export reports functionality\n\n## 3. Design Style\n
 ### 3.1 Color Scheme
 - Primary color: Deep blue (#1E3A8A) conveying trust and financial stability
 - Secondary color: Emerald green (#10B981) for positive balances and income indicators
@@ -320,7 +320,4 @@ A comprehensive financial management web application designed for tracking and m
 - Sticky header for easy navigation access
 
 ## 4. Reference Images
-- IMG_7736.jpeg: Credit card account display showing ICICI Bank credit card with balance, credit utilization, and payment due information
-- IMG_7737.png: Credit card account detail page showing card number, outstanding balance, credit utilization, available credit, limit, and payment due information
-- IMG_7738.png: Transaction list view showing credit card payment transaction with description, category, and amount
 - IMG_7739.jpeg: Credit card repayment transaction form showing source bank account, target credit card, repayment amount, date, and description fields

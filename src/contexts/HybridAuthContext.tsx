@@ -1,0 +1,352 @@
+/**
+ * Hybrid Authentication Context
+ * 
+ * Combines Auth0 (for social login) with Supabase (for database)
+ * - Auth0 handles: Google Sign-in, Apple Sign-in, authentication tokens
+ * - Supabase handles: Database operations, user profiles, RLS policies
+ */
+
+import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
+import { useAuth0 } from '@auth0/auth0-react';
+import { supabase } from '@/db/supabase';
+import type { Profile } from '@/types/types';
+import { profileApi } from '@/db/api';
+import { keyManager } from '@/utils/encryption';
+import { useToast } from '@/hooks/use-toast';
+
+interface HybridAuthContextType {
+  // User info
+  user: any | null;
+  profile: Profile | null;
+  loading: boolean;
+  
+  // Auth0 methods
+  loginWithGoogle: () => Promise<void>;
+  loginWithApple: () => Promise<void>;
+  loginWithEmail: (email: string, password: string) => Promise<void>;
+  signUpWithEmail: (email: string, password: string) => Promise<void>;
+  
+  // Common methods
+  signOut: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
+  
+  // Encryption
+  hasEncryptionKey: boolean;
+  updateEncryptionKeyStatus: () => void;
+  
+  // Auth provider info
+  authProvider: 'auth0' | 'supabase' | null;
+}
+
+const HybridAuthContext = createContext<HybridAuthContextType | undefined>(undefined);
+
+export function HybridAuthProvider({ children }: { children: ReactNode }) {
+  const { toast } = useToast();
+  const {
+    user: auth0User,
+    isAuthenticated: isAuth0Authenticated,
+    isLoading: isAuth0Loading,
+    loginWithRedirect,
+    logout: auth0Logout,
+    getAccessTokenSilently,
+  } = useAuth0();
+
+  const [user, setUser] = useState<any | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [hasEncryptionKey, setHasEncryptionKey] = useState(false);
+  const [authProvider, setAuthProvider] = useState<'auth0' | 'supabase' | null>(null);
+
+  // Sync Auth0 user with Supabase
+  const syncAuth0UserWithSupabase = useCallback(async (auth0User: any) => {
+    try {
+      // Check if profile exists in Supabase
+      const { data: existingProfile, error: fetchError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('email', auth0User.email)
+        .maybeSingle();
+
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        console.error('Error fetching profile:', fetchError);
+        return;
+      }
+
+      if (!existingProfile) {
+        // Create new profile for Auth0 user
+        const { data: newProfile, error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            email: auth0User.email,
+            nickname: auth0User.name || auth0User.email?.split('@')[0],
+            auth0_sub: auth0User.sub,
+            default_country: 'US',
+            default_currency: 'USD',
+          })
+          .select()
+          .single();
+
+        if (insertError) {
+          console.error('Error creating profile:', insertError);
+          toast({
+            title: 'Error',
+            description: 'Failed to create user profile',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        setProfile(newProfile);
+      } else {
+        // Update auth0_sub if not set
+        if (!existingProfile.auth0_sub) {
+          await supabase
+            .from('profiles')
+            .update({ auth0_sub: auth0User.sub })
+            .eq('id', existingProfile.id);
+        }
+        setProfile(existingProfile);
+      }
+    } catch (error) {
+      console.error('Error syncing Auth0 user:', error);
+    }
+  }, [toast]);
+
+  // Refresh profile from Supabase
+  const refreshProfile = useCallback(async () => {
+    if (user) {
+      try {
+        let userProfile: Profile | null = null;
+
+        if (authProvider === 'auth0' && user.email) {
+          // For Auth0 users, fetch by email
+          const { data } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('email', user.email)
+            .maybeSingle();
+          userProfile = data;
+        } else if (authProvider === 'supabase' && user.id) {
+          // For Supabase users, fetch by ID
+          userProfile = await profileApi.getProfile(user.id);
+        }
+
+        setProfile(userProfile);
+      } catch (error) {
+        console.error('Error fetching profile:', error);
+      }
+    }
+  }, [user, authProvider]);
+
+  const updateEncryptionKeyStatus = useCallback(() => {
+    setHasEncryptionKey(keyManager.hasKey());
+  }, []);
+
+  // Auth0 login methods
+  const loginWithGoogle = useCallback(async () => {
+    try {
+      await loginWithRedirect({
+        authorizationParams: {
+          connection: 'google-oauth2',
+          prompt: 'select_account',
+        },
+      });
+    } catch (error) {
+      console.error('Google login error:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to sign in with Google',
+        variant: 'destructive',
+      });
+    }
+  }, [loginWithRedirect, toast]);
+
+  const loginWithApple = useCallback(async () => {
+    try {
+      await loginWithRedirect({
+        authorizationParams: {
+          connection: 'apple',
+        },
+      });
+    } catch (error) {
+      console.error('Apple login error:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to sign in with Apple',
+        variant: 'destructive',
+      });
+    }
+  }, [loginWithRedirect, toast]);
+
+  // Supabase email/password methods
+  const loginWithEmail = useCallback(async (email: string, password: string) => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
+      setUser(data.user);
+      setAuthProvider('supabase');
+      
+      toast({
+        title: 'Success',
+        description: 'Signed in successfully',
+      });
+    } catch (error: any) {
+      console.error('Email login error:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to sign in',
+        variant: 'destructive',
+      });
+      throw error;
+    }
+  }, [toast]);
+
+  const signUpWithEmail = useCallback(async (email: string, password: string) => {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: 'Account created! Please check your email to verify your account.',
+      });
+    } catch (error: any) {
+      console.error('Email signup error:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to create account',
+        variant: 'destructive',
+      });
+      throw error;
+    }
+  }, [toast]);
+
+  // Sign out
+  const signOut = useCallback(async () => {
+    try {
+      if (authProvider === 'auth0') {
+        await auth0Logout({
+          logoutParams: {
+            returnTo: window.location.origin,
+          },
+        });
+      } else if (authProvider === 'supabase') {
+        await supabase.auth.signOut();
+      }
+
+      setUser(null);
+      setProfile(null);
+      setAuthProvider(null);
+      keyManager.clearKey();
+      setHasEncryptionKey(false);
+
+      toast({
+        title: 'Signed out',
+        description: 'You have been signed out successfully',
+      });
+    } catch (error) {
+      console.error('Sign out error:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to sign out',
+        variant: 'destructive',
+      });
+    }
+  }, [authProvider, auth0Logout, toast]);
+
+  // Initialize authentication state
+  useEffect(() => {
+    const initAuth = async () => {
+      setLoading(true);
+
+      // Check Auth0 first
+      if (isAuth0Authenticated && auth0User) {
+        setUser(auth0User);
+        setAuthProvider('auth0');
+        await syncAuth0UserWithSupabase(auth0User);
+        setHasEncryptionKey(keyManager.hasKey());
+        setLoading(false);
+        return;
+      }
+
+      // Check Supabase session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setUser(session.user);
+        setAuthProvider('supabase');
+        setHasEncryptionKey(keyManager.hasKey());
+      }
+
+      setLoading(false);
+    };
+
+    if (!isAuth0Loading) {
+      initAuth();
+    }
+  }, [isAuth0Authenticated, auth0User, isAuth0Loading, syncAuth0UserWithSupabase]);
+
+  // Listen to Supabase auth changes
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user && !isAuth0Authenticated) {
+        setUser(session.user);
+        setAuthProvider('supabase');
+      } else if (!session?.user && !isAuth0Authenticated) {
+        setUser(null);
+        setProfile(null);
+        setAuthProvider(null);
+        keyManager.clearKey();
+        setHasEncryptionKey(false);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [isAuth0Authenticated]);
+
+  // Fetch profile when user changes
+  useEffect(() => {
+    if (user && !profile) {
+      refreshProfile();
+    }
+  }, [user, profile, refreshProfile]);
+
+  const value: HybridAuthContextType = {
+    user,
+    profile,
+    loading: loading || isAuth0Loading,
+    loginWithGoogle,
+    loginWithApple,
+    loginWithEmail,
+    signUpWithEmail,
+    signOut,
+    refreshProfile,
+    hasEncryptionKey,
+    updateEncryptionKeyStatus,
+    authProvider,
+  };
+
+  return (
+    <HybridAuthContext.Provider value={value}>
+      {children}
+    </HybridAuthContext.Provider>
+  );
+}
+
+export function useHybridAuth() {
+  const context = useContext(HybridAuthContext);
+  if (context === undefined) {
+    throw new Error('useHybridAuth must be used within a HybridAuthProvider');
+  }
+  return context;
+}
