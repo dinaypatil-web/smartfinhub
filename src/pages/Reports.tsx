@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useHybridAuth as useAuth } from '@/contexts/HybridAuthContext';
 import { transactionApi, accountApi, emiApi } from '@/db/api';
 import type { Transaction, Account, EMITransaction } from '@/types/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
