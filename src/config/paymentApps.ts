@@ -17,7 +17,7 @@ export const paymentAppsByCountry: Record<string, PaymentApp[]> = {
     {
       name: 'Google Pay',
       icon: '💳',
-      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/dd9c2067-f53d-48ba-8e61-a39bf8a56861.jpg',
+      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/b6546586-62f8-4d3a-b956-4b3c04dda498.jpg',
       deepLink: 'gpay://',
       webUrl: 'https://pay.google.com',
       androidPackage: 'com.google.android.apps.nbu.paisa.user',
@@ -27,7 +27,7 @@ export const paymentAppsByCountry: Record<string, PaymentApp[]> = {
     {
       name: 'PhonePe',
       icon: '📱',
-      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/822cebfa-bfcf-4eab-88e0-c97931160eb5.jpg',
+      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/972548ef-8d14-43cb-a682-a25c9cb8eeda.jpg',
       deepLink: 'phonepe://',
       webUrl: 'https://www.phonepe.com',
       androidPackage: 'com.phonepe.app',
@@ -37,7 +37,7 @@ export const paymentAppsByCountry: Record<string, PaymentApp[]> = {
     {
       name: 'Paytm',
       icon: '💰',
-      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/a5ec91c4-2f0a-4890-b530-70078069fd86.jpg',
+      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/41557651-f500-42a4-8182-16124b46d8e3.jpg',
       deepLink: 'paytmmp://',
       webUrl: 'https://paytm.com',
       androidPackage: 'net.one97.paytm',
@@ -47,7 +47,7 @@ export const paymentAppsByCountry: Record<string, PaymentApp[]> = {
     {
       name: 'BHIM',
       icon: '🏦',
-      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/554c659b-c731-46ef-9c43-0b840097fead.jpg',
+      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/ff781539-daec-45ef-aa15-61feec37e01a.jpg',
       deepLink: 'bhim://',
       webUrl: 'https://www.npci.org.in/what-we-do/bhim/product-overview',
       androidPackage: 'in.org.npci.upiapp',
@@ -60,7 +60,7 @@ export const paymentAppsByCountry: Record<string, PaymentApp[]> = {
     {
       name: 'PayPal',
       icon: '💙',
-      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/1b29587b-fe09-4299-98a1-8b60b073f0a1.jpg',
+      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/8604ca5d-7b51-48e9-8690-048b7dde87ce.jpg',
       deepLink: 'paypal://',
       webUrl: 'https://www.paypal.com',
       androidPackage: 'com.paypal.android.p2pmobile',
@@ -70,7 +70,7 @@ export const paymentAppsByCountry: Record<string, PaymentApp[]> = {
     {
       name: 'Venmo',
       icon: '💸',
-      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/cd44b2cd-6b2f-4951-a57e-c48c243f996b.jpg',
+      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/e95a9821-3dea-496a-97ed-8bb814dc131e.jpg',
       deepLink: 'venmo://',
       webUrl: 'https://venmo.com',
       androidPackage: 'com.venmo',
@@ -80,7 +80,7 @@ export const paymentAppsByCountry: Record<string, PaymentApp[]> = {
     {
       name: 'Cash App',
       icon: '💵',
-      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/53b2bacc-0769-4f15-a980-8cb615719f30.jpg',
+      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/4b8fab20-6487-4496-a942-043e0591d584.jpg',
       deepLink: 'cashapp://',
       webUrl: 'https://cash.app',
       androidPackage: 'com.squareup.cash',
@@ -90,7 +90,7 @@ export const paymentAppsByCountry: Record<string, PaymentApp[]> = {
     {
       name: 'Zelle',
       icon: '⚡',
-      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/60cba470-266a-479c-a836-a77395a6bebd.jpg',
+      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/87313cec-fe8a-455e-8d7a-3265f5516250.jpg',
       deepLink: 'zelle://',
       webUrl: 'https://www.zellepay.com',
       androidPackage: 'com.zellepay.zelle',
@@ -103,7 +103,7 @@ export const paymentAppsByCountry: Record<string, PaymentApp[]> = {
     {
       name: 'PayPal',
       icon: '💙',
-      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/1b29587b-fe09-4299-98a1-8b60b073f0a1.jpg',
+      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/8604ca5d-7b51-48e9-8690-048b7dde87ce.jpg',
       deepLink: 'paypal://',
       webUrl: 'https://www.paypal.com',
       androidPackage: 'com.paypal.android.p2pmobile',
@@ -113,7 +113,7 @@ export const paymentAppsByCountry: Record<string, PaymentApp[]> = {
     {
       name: 'Revolut',
       icon: '🔵',
-      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/fd2bbbc5-ea86-48a0-a07e-ceaf79c85f5a.jpg',
+      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/2cf7a03e-44d9-4dac-8fa5-f5f3b83c8db7.jpg',
       deepLink: 'revolut://',
       webUrl: 'https://www.revolut.com',
       androidPackage: 'com.revolut.revolut',
@@ -123,7 +123,7 @@ export const paymentAppsByCountry: Record<string, PaymentApp[]> = {
     {
       name: 'Monzo',
       icon: '🔴',
-      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/3cf63e37-1b13-4cbd-b8ba-39770b102e67.jpg',
+      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/32a547a3-acf5-44d0-93aa-034f3747c314.jpg',
       deepLink: 'monzo://',
       webUrl: 'https://monzo.com',
       androidPackage: 'co.uk.getmondo',
@@ -136,7 +136,7 @@ export const paymentAppsByCountry: Record<string, PaymentApp[]> = {
     {
       name: 'Alipay',
       icon: '🔵',
-      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/7eb759a0-2f50-4301-8256-529abd17ffb8.jpg',
+      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/a3fb3c1a-dbe0-4e78-9c9b-1fd467616bf5.jpg',
       deepLink: 'alipay://',
       webUrl: 'https://www.alipay.com',
       androidPackage: 'com.eg.android.AlipayGphone',
@@ -146,7 +146,7 @@ export const paymentAppsByCountry: Record<string, PaymentApp[]> = {
     {
       name: 'WeChat Pay',
       icon: '💚',
-      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/0276dd37-7404-490c-80d1-d7b35b0aee3f.jpg',
+      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/7154d3ba-8209-445e-a704-2331841059e1.jpg',
       deepLink: 'weixin://',
       webUrl: 'https://pay.weixin.qq.com',
       androidPackage: 'com.tencent.mm',
@@ -166,7 +166,7 @@ export const paymentAppsByCountry: Record<string, PaymentApp[]> = {
     {
       name: 'GrabPay',
       icon: '🟢',
-      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/19c2a13c-b04a-4b3f-b37c-d36ad39092b9.jpg',
+      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/e0b13125-da42-4726-ae23-810fdab1c4f7.jpg',
       deepLink: 'grab://',
       webUrl: 'https://www.grab.com/sg/pay/',
       androidPackage: 'com.grabtaxi.passenger',
@@ -179,7 +179,7 @@ export const paymentAppsByCountry: Record<string, PaymentApp[]> = {
     {
       name: 'PayPal',
       icon: '💙',
-      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/1b29587b-fe09-4299-98a1-8b60b073f0a1.jpg',
+      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/8604ca5d-7b51-48e9-8690-048b7dde87ce.jpg',
       deepLink: 'paypal://',
       webUrl: 'https://www.paypal.com',
       androidPackage: 'com.paypal.android.p2pmobile',
@@ -189,7 +189,7 @@ export const paymentAppsByCountry: Record<string, PaymentApp[]> = {
     {
       name: 'CommBank',
       icon: '🟡',
-      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/814856ba-b1cb-47a1-a7e9-59f050d8c0fa.jpg',
+      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/0423864a-ce60-41b6-b7b2-57be0611ce4a.jpg',
       deepLink: 'commbank://',
       webUrl: 'https://www.commbank.com.au',
       androidPackage: 'com.commbank.netbank',
@@ -202,7 +202,7 @@ export const paymentAppsByCountry: Record<string, PaymentApp[]> = {
     {
       name: 'PayPal',
       icon: '💙',
-      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/1b29587b-fe09-4299-98a1-8b60b073f0a1.jpg',
+      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/8604ca5d-7b51-48e9-8690-048b7dde87ce.jpg',
       deepLink: 'paypal://',
       webUrl: 'https://www.paypal.com',
       androidPackage: 'com.paypal.android.p2pmobile',
@@ -222,7 +222,7 @@ export const paymentAppsByCountry: Record<string, PaymentApp[]> = {
     {
       name: 'PayPal',
       icon: '💙',
-      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/1b29587b-fe09-4299-98a1-8b60b073f0a1.jpg',
+      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/8604ca5d-7b51-48e9-8690-048b7dde87ce.jpg',
       deepLink: 'paypal://',
       webUrl: 'https://www.paypal.com',
       androidPackage: 'com.paypal.android.p2pmobile',
