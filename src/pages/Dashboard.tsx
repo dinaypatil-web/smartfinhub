@@ -504,8 +504,15 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Quick Payment Apps Links */}
-      <QuickLinks countryCode={profile?.default_country || 'US'} />
+      {/* Quick Links - Bank Apps and Payment Apps */}
+      <QuickLinks 
+        countryCode={profile?.default_country || 'US'} 
+        accounts={summary ? [
+          ...summary.accounts_by_type.bank,
+          ...summary.accounts_by_type.credit_card,
+          ...summary.accounts_by_type.loan
+        ] : []}
+      />
 
       {cashFlow && (
         <Card className="border-l-4 border-l-indigo-500 bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-950/20 dark:to-blue-950/20 shadow-card">
@@ -719,8 +726,8 @@ export default function Dashboard() {
                       <Wallet className="h-5 w-5 text-white" />
                     </div>
                     <div>
-                      <p className="font-medium">{account.account_name}</p>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="font-medium break-words line-clamp-2">{account.account_name}</p>
+                      <p className="text-sm text-muted-foreground break-words">
                         {getAccountTypeLabel(account.account_type)}
                       </p>
                     </div>
@@ -743,8 +750,8 @@ export default function Dashboard() {
                         <BankLogo src={account.institution_logo} alt={account.institution_name || 'Bank'} bankName={account.institution_name || undefined} className="h-8 w-8" />
                       </div>
                       <div>
-                        <p className="font-medium">{account.account_name}</p>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="font-medium break-words line-clamp-2">{account.account_name}</p>
+                        <p className="text-sm text-muted-foreground break-words">
                           {getAccountTypeLabel(account.account_type)} • {formatAccountNumber(account.last_4_digits)}
                         </p>
                       </div>
@@ -824,8 +831,8 @@ export default function Dashboard() {
                           <BankLogo src={account.institution_logo} alt={account.institution_name || 'Credit Card'} bankName={account.institution_name || undefined} className="h-8 w-8" />
                         </div>
                         <div>
-                          <p className="font-medium">{account.account_name}</p>
-                          <p className="text-sm text-muted-foreground">
+                          <p className="font-medium break-words line-clamp-2">{account.account_name}</p>
+                          <p className="text-sm text-muted-foreground break-words">
                             {getAccountTypeLabel(account.account_type)} • {formatAccountNumber(account.last_4_digits)}
                           </p>
                         </div>
@@ -966,8 +973,8 @@ export default function Dashboard() {
                         <BankLogo src={account.institution_logo} alt={account.institution_name || 'Loan'} bankName={account.institution_name || undefined} className="h-8 w-8" />
                       </div>
                       <div>
-                        <p className="font-medium">{account.account_name}</p>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="font-medium break-words line-clamp-2">{account.account_name}</p>
+                        <p className="text-sm text-muted-foreground break-words">
                           {getAccountTypeLabel(account.account_type)} • {account.interest_rate_type}
                         </p>
                         {loanCalculations[account.id] && (
@@ -1022,14 +1029,14 @@ export default function Dashboard() {
           <CardContent>
             <div className="space-y-4">
               {recentTransactions.map(transaction => (
-                <div key={transaction.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <p className="font-medium">{transaction.description || transaction.transaction_type}</p>
-                    <p className="text-sm text-muted-foreground">
+                <div key={transaction.id} className="flex items-center justify-between p-4 border rounded-lg gap-4">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium break-words line-clamp-2">{transaction.description || transaction.transaction_type}</p>
+                    <p className="text-sm text-muted-foreground break-words">
                       {transaction.category} • {new Date(transaction.transaction_date).toLocaleDateString()}
                     </p>
                   </div>
-                  <div className={`font-semibold ${
+                  <div className={`font-semibold flex-shrink-0 ${
                     transaction.transaction_type === 'income' ? 'text-success' : 'text-danger'
                   }`}>
                     {transaction.transaction_type === 'income' ? '+' : '-'}
