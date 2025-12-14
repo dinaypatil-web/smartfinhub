@@ -18,7 +18,8 @@ A comprehensive financial management web application designed for tracking and m
   - One-click sign-in with Google credentials
   - Automatic account creation for first-time Google sign-in users
   - Google account email automatically linked to user profile
-- **Apple Sign-In Integration**: Users can sign in using their Apple ID\n  - Native Apple Sign-In authentication
+- **Apple Sign-In Integration**: Users can sign in using their Apple ID
+  - Native Apple Sign-In authentication
   - One-click sign-in with Apple credentials
   - Support for 'Hide My Email' feature\n  - Automatic account creation for first-time Apple sign-in users
   - Apple ID email automatically linked to user profile
@@ -42,8 +43,7 @@ A comprehensive financial management web application designed for tracking and m
   - Biometric Verification: Fingerprint or face recognition on supported devices
 
 ## 2. Core Features
-
-### 2.1 User Preferences
+\n### 2.1 User Preferences
 - Select default country from dropdown list
 - Choose preferred currency for dashboard display
 - Country and currency settings saved to user profile
@@ -145,10 +145,21 @@ A comprehensive financial management web application designed for tracking and m
 
 #### 2.2.7 Account Modification\n- Edit any account information at any time
 - Delete accounts with user confirmation
+\n#### 2.2.8 External App Integration
+- **Bank App Quick Link**: Each bank account card on dashboard displays clickable link icon to open the associated bank's mobile app or web banking portal
+- Link automatically configured based on selected bank during account creation
+- Clicking link redirects user to bank's official app (if installed) or web banking login page
+- **UPI App Integration**: Dashboard displays quick access links to popular UPI payment apps based on user's selected country
+- For India: Links to PhonePe, Google Pay, Paytm, BHIM UPI, and other major UPI apps
+- For other countries: Links to country-specific popular payment apps (e.g., Venmo for USA, Alipay for China, PayPal for global)
+- UPI app links displayed as icon buttons in dashboard header or dedicated quick access section
+- Clicking UPI app link opens the respective payment app (if installed) or redirects to app download page
+- System detects user's country from account settings to display relevant payment app options
+- User can customize which UPI/payment app links to display in dashboard settings
 \n### 2.3 Transaction Management\n
 #### 2.3.1 Transaction Types
-- Income transactions
-- Expense transactions\n- Cash withdrawals (from bank account or credit card)
+- Income transactions\n- Expense transactions
+- Cash withdrawals (from bank account or credit card)
 - Bank-to-bank transfers
 - Loan payments
 - **Credit card repayment transactions**
@@ -173,8 +184,7 @@ A comprehensive financial management web application designed for tracking and m
 - Interest transaction marked as system-generated and non-editable by user
 - All loan account transactions considered in monthly interest calculation
 \n#### 2.3.3 Credit Card Transaction with EMI Option
-- **EMI Payment Option**: During credit card transaction entry, system prompts user to select payment method\n- Payment options: Full Payment or EMI (Equated Monthly Installment)
-- **EMI Configuration**: If EMI option selected, user provides:
+- **EMI Payment Option**: During credit card transaction entry, system prompts user to select payment method\n- Payment options: Full Payment or EMI (Equated Monthly Installment)\n- **EMI Configuration**: If EMI option selected, user provides:
   - EMI Duration: Number of months for installment plan
   - Bank EMI Charges: Processing fee or interest charges applied by bank
 - **EMI Calculation**: System automatically calculates monthly EMI amount based on transaction amount, duration, and bank charges
@@ -221,8 +231,7 @@ A comprehensive financial management web application designed for tracking and m
 - Breakdown view available showing each component of the calculation including individual credit card dues
 
 #### 2.4.3 Visual Analytics
-- 3D pie chart showing Cash and Bank Account balance distribution
-- 3D pie chart showing Expenses breakdown by category
+- 3D pie chart showing Cash and Bank Account balance distribution\n- 3D pie chart showing Expenses breakdown by category
 - Line chart displaying Floating Interest Rate history for loan accounts
 \n#### 2.4.4 Account Display Cards
 - Bank or financial institution logo\n- Account type indicator\n- Last 4 digits of account number only\n- Real-time current balance\n- For loan accounts: Total accrued interest till date including automatic monthly interest additions
@@ -235,8 +244,8 @@ A comprehensive financial management web application designed for tracking and m
   - Show next EMI installment amount and due date
 - Visual indicators highlighting upcoming statement dates and due dates within7 days
 - **For loan accounts**: Visual indicator showing next EMI due date and automatic interest calculation date
-
-#### 2.4.5 Account Quick View
+- **Bank App Quick Access Icon**: Clickable icon on each bank account card to open bank's mobile app or web banking portal
+\n#### 2.4.5 Account Quick View
 - **Click-to-View Statement**: When user clicks on any account card on dashboard, system displays popup window showing last 90 days statement for that account
 - Popup includes transaction history, balance changes, and account activity for the 90-day period
 - **For loan accounts**: Popup displays detailed EMI payment history with principal and interest breakdown for each payment within the 90-day period, including automatic monthly interest additions
@@ -244,7 +253,11 @@ A comprehensive financial management web application designed for tracking and m
 - Statement popup available for all account types: Cash, Bank, Credit Card, and Loan accounts
 - Close button to dismiss popup and return to dashboard
 
-### 2.5 Budget Management
+#### 2.4.6 Quick Access to Payment Apps
+- **UPI/Payment App Links Section**: Dedicated section in dashboard header or sidebar displaying quick access icons for popular payment apps\n- Icons displayed based on user's country selection
+- Clicking icon opens respective payment app or redirects to download page
+- User can customize displayed payment apps in settings
+\n### 2.5 Budget Management
 - Input monthly budgeted income amounts
 - Input monthly budgeted expense amounts by category
 - Compare actual expenses against budgeted amounts
@@ -254,8 +267,7 @@ A comprehensive financial management web application designed for tracking and m
 - Real-time recalculation of budget variance when budget values are modified
 - Updated Budget vs. Actual analysis immediately reflected on dashboard and reports
 - System recalculates remaining budget for each category after budget modification
-\n### 2.6 Reporting
-- Transaction history reports with date range filters
+\n### 2.6 Reporting\n- Transaction history reports with date range filters
 - Income and expense summary reports
 - Account balance reports across all accounts
 - Budget vs. actual analysis reports
@@ -283,7 +295,7 @@ A comprehensive financial management web application designed for tracking and m
   - Total accrued interest\n  - Remaining loan tenure
   - Complete amortization schedule showing full loan lifecycle
 - Date range filter for loan statement reports
-- Export reports functionality\n\n## 3. Design Style\n
+- Export reports functionality\n\n##3. Design Style\n
 ### 3.1 Color Scheme
 - Primary color: Deep blue (#1E3A8A) conveying trust and financial stability
 - Secondary color: Emerald green (#10B981) for positive balances and income indicators
