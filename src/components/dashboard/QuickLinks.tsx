@@ -68,7 +68,15 @@ export default function QuickLinks({ countryCode }: QuickLinksProps) {
               onClick={() => handleOpenApp(app)}
             >
               <div className="flex items-center gap-2 w-full mb-2">
-                <span className="text-2xl">{app.icon}</span>
+                {app.logoUrl ? (
+                  <img 
+                    src={app.logoUrl} 
+                    alt={`${app.name} logo`}
+                    className="h-8 w-8 object-contain rounded"
+                  />
+                ) : (
+                  <span className="text-2xl">{app.icon}</span>
+                )}
                 <span className="font-semibold text-sm">{app.name}</span>
                 <ExternalLink className="h-3 w-3 ml-auto opacity-50" />
               </div>
