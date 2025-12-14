@@ -277,7 +277,7 @@ export default function Accounts() {
                           <Wallet className="h-6 w-6 text-primary" />
                         </div>
                         <div>
-                          <CardTitle className="text-lg">{account.account_name}</CardTitle>
+                          <CardTitle className="text-lg break-words line-clamp-2">{account.account_name}</CardTitle>
                           <p className="text-sm text-muted-foreground">Physical Cash</p>
                         </div>
                       </div>
@@ -338,9 +338,9 @@ export default function Accounts() {
                           alt={account.institution_name || 'Bank'} 
                           className="h-10 w-10"
                         />
-                        <div>
-                          <CardTitle className="text-lg">{account.account_name}</CardTitle>
-                          <p className="text-sm text-muted-foreground">{account.institution_name}</p>
+                        <div className="flex-1 min-w-0">
+                          <CardTitle className="text-lg break-words line-clamp-2">{account.account_name}</CardTitle>
+                          <p className="text-sm text-muted-foreground break-words line-clamp-1">{account.institution_name}</p>
                         </div>
                       </div>
                       <Badge variant={getAccountTypeBadgeVariant(account.account_type)}>
@@ -446,9 +446,9 @@ export default function Accounts() {
                             alt={account.institution_name || 'Credit Card'} 
                             className="h-10 w-10"
                           />
-                          <div>
-                            <CardTitle className="text-lg">{account.account_name}</CardTitle>
-                            <p className="text-sm text-muted-foreground">{account.institution_name}</p>
+                          <div className="flex-1 min-w-0">
+                            <CardTitle className="text-lg break-words line-clamp-2">{account.account_name}</CardTitle>
+                            <p className="text-sm text-muted-foreground break-words line-clamp-1">{account.institution_name}</p>
                           </div>
                         </div>
                         <Badge variant={getAccountTypeBadgeVariant(account.account_type)}>
@@ -616,9 +616,9 @@ export default function Accounts() {
                           alt={account.institution_name || 'Loan'} 
                           className="h-10 w-10"
                         />
-                        <div>
-                          <CardTitle className="text-lg">{account.account_name}</CardTitle>
-                          <p className="text-sm text-muted-foreground">{account.institution_name}</p>
+                        <div className="flex-1 min-w-0">
+                          <CardTitle className="text-lg break-words line-clamp-2">{account.account_name}</CardTitle>
+                          <p className="text-sm text-muted-foreground break-words line-clamp-1">{account.institution_name}</p>
                         </div>
                       </div>
                       <Badge variant={getAccountTypeBadgeVariant(account.account_type)}>

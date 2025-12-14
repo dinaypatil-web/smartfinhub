@@ -179,8 +179,12 @@ export default function Transactions() {
                         </Badge>
                       </div>
                     </TableCell>
-                    <TableCell>{transaction.description || '-'}</TableCell>
-                    <TableCell>{transaction.category || '-'}</TableCell>
+                    <TableCell className="max-w-xs">
+                      <div className="break-words line-clamp-2">{transaction.description || '-'}</div>
+                    </TableCell>
+                    <TableCell className="max-w-xs">
+                      <div className="break-words">{transaction.category || '-'}</div>
+                    </TableCell>
                     <TableCell className={`text-right font-semibold ${
                       transaction.transaction_type === 'income' ? 'text-success' : 'text-danger'
                     }`}>
