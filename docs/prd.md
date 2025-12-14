@@ -21,7 +21,8 @@ A comprehensive financial management web application designed for tracking and m
 - **Apple Sign-In Integration**: Users can sign in using their Apple ID
   - Native Apple Sign-In authentication
   - One-click sign-in with Apple credentials
-  - Support for 'Hide My Email' feature\n  - Automatic account creation for first-time Apple sign-in users
+  - Support for 'Hide My Email' feature
+  - Automatic account creation for first-time Apple sign-in users
   - Apple ID email automatically linked to user profile
 - **Unified Account Management**: Users who sign in via Google or Apple can later add mobile number or alternative email in account settings
 - **Forgot Password Option**: Forgot password link displayed on login page
@@ -41,9 +42,9 @@ A comprehensive financial management web application designed for tracking and m
   - Password Re-entry: Require user to re-enter account password to authorize phone number change
   - Authenticator App: Use third-party authenticator apps (Google Authenticator, Microsoft Authenticator) to generate verification codes
   - Biometric Verification: Fingerprint or face recognition on supported devices
+\n## 2. Core Features
 
-## 2. Core Features
-\n### 2.1 User Preferences
+### 2.1 User Preferences
 - Select default country from dropdown list
 - Choose preferred currency for dashboard display
 - Country and currency settings saved to user profile
@@ -149,15 +150,19 @@ A comprehensive financial management web application designed for tracking and m
 - **Bank App Quick Link**: Each bank account card on dashboard displays clickable link icon to open the associated bank's mobile app or web banking portal
 - Link automatically configured based on selected bank during account creation
 - Clicking link redirects user to bank's official app (if installed) or web banking login page
+- **Automatic Bank App Logo Fetching**: When bank app logo is not available in system database, automatically fetch the official bank app logo from internet sources
+- Fetched bank app logos displayed on account cards and quick access sections
+- System caches fetched bank app logos for future use
 - **UPI App Integration**: Dashboard displays quick access links to popular UPI payment apps based on user's selected country
 - For India: Links to PhonePe, Google Pay, Paytm, BHIM UPI, and other major UPI apps
 - For other countries: Links to country-specific popular payment apps (e.g., Venmo for USA, Alipay for China, PayPal for global)
-- UPI app links displayed as icon buttons in dashboard header or dedicated quick access section
+- **Automatic UPI App Logo Fetching**: When UPI/payment app logo is not available in system database, automatically fetch the official app logo from internet sources
+- Fetched UPI app logos displayed as icon buttons in dashboard header or dedicated quick access section
+- System caches fetched UPI app logos for future use\n- UPI app links displayed as icon buttons in dashboard header or dedicated quick access section
 - Clicking UPI app link opens the respective payment app (if installed) or redirects to app download page
 - System detects user's country from account settings to display relevant payment app options
 - User can customize which UPI/payment app links to display in dashboard settings
-\n### 2.3 Transaction Management\n
-#### 2.3.1 Transaction Types
+\n### 2.3 Transaction Management\n\n#### 2.3.1 Transaction Types
 - Income transactions\n- Expense transactions
 - Cash withdrawals (from bank account or credit card)
 - Bank-to-bank transfers
