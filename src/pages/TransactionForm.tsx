@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { useHybridAuth as useAuth } from '@/contexts/HybridAuthContext';
 import { transactionApi, accountApi, categoryApi, budgetApi, emiApi } from '@/db/api';
 import type { TransactionType, Account } from '@/types/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
