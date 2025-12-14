@@ -13,16 +13,6 @@ A comprehensive financial management web application designed for tracking and m
 - Mobile number verification via OTP (One-Time Password)
 - **Twilio Integration**: Use Twilio API for sending OTP to mobile numbers during sign-up process
 - Verified email or mobile number serves as username for secure data retrieval
-- **Google Sign-In Integration**: Users can sign in using their Google account
-  - Implement Auth0 service for Google authentication
-  - One-click sign-in with Google credentials
-  - Automatic account creation for first-time Google sign-in users
-  - Google account email automatically linked to user profile
-- **Apple Sign-In Integration**: Users can sign in using their Apple ID
-  - Implement Auth0 service for Apple authentication\n  - One-click sign-in with Apple credentials
-  - Support for 'Hide My Email' feature\n  - Automatic account creation for first-time Apple sign-in users
-  - Apple ID email automatically linked to user profile
-- **Unified Account Management**: Users who sign in via Google or Apple can later add mobile number or alternative email in account settings
 - **Forgot Password Option**: Forgot password link displayed on login page
 - Password reset via email verification link or mobile OTP
 - User receives password reset link/OTP to registered email or mobile number
@@ -30,7 +20,7 @@ A comprehensive financial management web application designed for tracking and m
 - **Change Password on Dashboard**: Password change option available in user account settings on dashboard
 - User must enter current password before setting new password
 - Password change confirmation sent to registered email and mobile number
-- **Mobile Number Update**: After registration through email ID or third-party sign-in, users can update their mobile number in account settings without OTP verification
+- **Mobile Number Update**: After registration through email ID, users can update their mobile number in account settings without OTP verification
 - Updated mobile number immediately activated and available for login
 - Once updated, users can login using either their registered email or updated mobile number
 - Mobile number update feature accessible from user profile settings
@@ -40,7 +30,8 @@ A comprehensive financial management web application designed for tracking and m
   - Password Re-entry: Require user to re-enter account password to authorize phone number change
   - Authenticator App: Use third-party authenticator apps (Google Authenticator, Microsoft Authenticator) to generate verification codes
   - Biometric Verification: Fingerprint or face recognition on supported devices
-\n## 2. Core Features
+
+## 2. Core Features
 
 ### 2.1 User Preferences
 - Select default country from dropdown list
@@ -76,7 +67,8 @@ A comprehensive financial management web application designed for tracking and m
 - **Credit Limit Alert**: System triggers alert notification when user attempts transaction that would exceed their set credit limit
 - Alert displayed before transaction confirmation to prevent overspending
 - Current available credit displayed on credit card account page and dashboard
-\n#### 2.2.4 Loan Account Configuration
+
+#### 2.2.4 Loan Account Configuration
 - Select interest rate type: Fixed or Floating
 - Input total principal loan amount
 - **EMI Due Day of Month**: User inputs the day of month when EMI payment is due (1-31)
@@ -160,8 +152,7 @@ A comprehensive financial management web application designed for tracking and m
 - Clicking UPI app link opens the respective payment app (if installed) or redirects to app download page
 - System detects user's country from account settings to display relevant payment app options
 - User can customize which UPI/payment app links to display in dashboard settings
-
-### 2.3 Transaction Management
+\n### 2.3 Transaction Management
 \n#### 2.3.1 Transaction Types
 - Income transactions\n- Expense transactions
 - Cash withdrawals (from bank account or credit card)
