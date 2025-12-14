@@ -8,11 +8,21 @@ SmartFinHub\n
 A comprehensive financial management web application designed for tracking and managing multiple financial accounts including cash, bank accounts, credit cards, and loans. The platform provides real-time balance updates, transaction recording, budget analysis, and detailed financial reporting.
 
 ### 1.3 Authentication System
-- Login using email address or mobile number
+- **Email/Mobile Login**: Login using email address or mobile number
 - Email verification via verification link
 - Mobile number verification via OTP (One-Time Password)
 - **Twilio Integration**: Use Twilio API for sending OTP to mobile numbers during sign-up process
 - Verified email or mobile number serves as username for secure data retrieval
+- **Google Sign-In Integration**: Users can sign in using their Google account
+  - Implement OSS Google login method for authentication
+  - One-click sign-in with Google credentials
+  - Automatic account creation for first-time Google sign-in users
+  - Google account email automatically linked to user profile
+- **Apple Sign-In Integration**: Users can sign in using their Apple ID\n  - Native Apple Sign-In authentication
+  - One-click sign-in with Apple credentials
+  - Support for 'Hide My Email' feature\n  - Automatic account creation for first-time Apple sign-in users
+  - Apple ID email automatically linked to user profile
+- **Unified Account Management**: Users who sign in via Google or Apple can later add mobile number or alternative email in account settings
 - **Forgot Password Option**: Forgot password link displayed on login page
 - Password reset via email verification link or mobile OTP
 - User receives password reset link/OTP to registered email or mobile number
@@ -20,7 +30,7 @@ A comprehensive financial management web application designed for tracking and m
 - **Change Password on Dashboard**: Password change option available in user account settings on dashboard
 - User must enter current password before setting new password
 - Password change confirmation sent to registered email and mobile number
-- **Mobile Number Update**: After registration through email ID, users can update their mobile number in account settings without OTP verification
+- **Mobile Number Update**: After registration through email ID or third-party sign-in, users can update their mobile number in account settings without OTP verification
 - Updated mobile number immediately activated and available for login
 - Once updated, users can login using either their registered email or updated mobile number
 - Mobile number update feature accessible from user profile settings
@@ -54,7 +64,8 @@ A comprehensive financial management web application designed for tracking and m
 - Fetched logos displayed on both account pages and dashboard
 - System caches fetched logos for future use
 - Optional account number entry (encrypted storage, only last 4 digits visible on dashboard)
-\n#### 2.2.3 Credit Card Configuration
+
+#### 2.2.3 Credit Card Configuration
 - **Statement Day of Month**: User inputs the day of month when credit card statement is generated (1-31)
 - **Due Day of Month**: User inputs the day of month when credit card payment is due (1-31)
 - **Credit Card Limit**: User inputs their own credit limit for the card
@@ -272,8 +283,7 @@ A comprehensive financial management web application designed for tracking and m
   - Total accrued interest\n  - Remaining loan tenure
   - Complete amortization schedule showing full loan lifecycle
 - Date range filter for loan statement reports
-- Export reports functionality\n\n## 3. Design Style
-
+- Export reports functionality\n\n## 3. Design Style\n
 ### 3.1 Color Scheme
 - Primary color: Deep blue (#1E3A8A) conveying trust and financial stability
 - Secondary color: Emerald green (#10B981) for positive balances and income indicators
@@ -296,3 +306,4 @@ A comprehensive financial management web application designed for tracking and m
 - IMG_7736.jpeg: Credit card account display showing ICICI Bank credit card with balance, credit utilization, and payment due information
 - IMG_7737.png: Credit card account detail page showing card number, outstanding balance, credit utilization, available credit, limit, and payment due information
 - IMG_7738.png: Transaction list view showing credit card payment transaction with description, category, and amount
+- IMG_7739.jpeg: Credit card repayment transaction form showing source bank account, target credit card, repayment amount, date, and description fields

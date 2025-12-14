@@ -11,6 +11,7 @@ import Settings from './pages/Settings';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ResetPassword from './pages/ResetPassword';
+import AuthCallback from './pages/AuthCallback';
 
 interface RouteConfig {
   name: string;
@@ -37,6 +38,12 @@ const routes: RouteConfig[] = [
     name: 'Reset Password',
     path: '/reset-password',
     element: <ResetPassword />,
+    visible: false,
+  },
+  {
+    name: 'Auth Callback',
+    path: '/auth/callback',
+    element: <AuthCallback />,
     visible: false,
   },
   {
