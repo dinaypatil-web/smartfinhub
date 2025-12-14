@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { formatCurrency, formatAccountNumber } from '@/utils/format';
-import { Plus, Wallet, CreditCard, TrendingUp, TrendingDown, Building2, AlertCircle, Calculator, DollarSign } from 'lucide-react';
+import { Plus, Wallet, CreditCard, TrendingUp, TrendingDown, Building2, AlertCircle, Calculator, DollarSign, ExternalLink } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { calculateEMI, calculateAccruedInterest } from '@/utils/loanCalculations';
@@ -33,6 +33,8 @@ import InterestRateChart from '@/components/InterestRateChart';
 import InterestRateTable from '@/components/InterestRateTable';
 import BankLogo from '@/components/BankLogo';
 import AccountStatementDialog from '@/components/AccountStatementDialog';
+import QuickLinks from '@/components/dashboard/QuickLinks';
+import { getBankAppLink } from '@/config/paymentApps';
 
 export default function Dashboard() {
   const { user, profile } = useAuth();
@@ -262,6 +264,52 @@ export default function Dashboard() {
     }
   };
 
+  const handleOpenBankApp = (e: React.MouseEvent, bankName: string, webUrl?: string) => {
+    e.stopPropagation(); // Prevent account card click
+    
+    const bankLink = getBankAppLink(bankName);
+    if (!bankLink) {
+      // No deep link configured, open web URL if available
+      if (webUrl) {
+        window.open(webUrl, '_blank');
+      } else {
+        toast({
+          title: 'Bank App Not Configured',
+          description: `No app link available for ${bankName}`,
+          variant: 'destructive',
+        });
+      }
+      return;
+    }
+
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    
+    if (isMobile && bankLink.urlScheme) {
+      // Try deep link on mobile
+      window.location.href = bankLink.urlScheme;
+      
+      // Fallback to web URL after delay
+      setTimeout(() => {
+        if (document.hidden) {
+          return; // App opened successfully
+        }
+        if (bankLink.webUrl) {
+          window.open(bankLink.webUrl, '_blank');
+        }
+      }, 1500);
+    } else {
+      // On desktop, open web URL
+      if (bankLink.webUrl) {
+        window.open(bankLink.webUrl, '_blank');
+      } else {
+        toast({
+          title: 'Web URL Not Available',
+          description: `Please use the mobile app for ${bankName}`,
+        });
+      }
+    }
+  };
+
   const getAccountTypeLabel = (type: string) => {
     switch (type) {
       case 'cash':
@@ -455,6 +503,9 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Quick Payment Apps Links */}
+      <QuickLinks countryCode={profile?.default_country || 'US'} />
 
       {cashFlow && (
         <Card className="border-l-4 border-l-indigo-500 bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-950/20 dark:to-blue-950/20 shadow-card">
@@ -679,31 +730,48 @@ export default function Dashboard() {
                   </div>
                 </div>
               ))}
-              {summary?.accounts_by_type.bank.map(account => (
-                <div 
-                  key={account.id} 
-                  className="flex items-center justify-between p-4 border-l-4 border-l-blue-500 rounded-lg bg-gradient-to-r from-blue-50/50 to-transparent dark:from-blue-950/20 hover-lift shadow-card cursor-pointer"
-                  onClick={() => handleAccountClick(account)}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center shadow-elegant border-2 border-blue-200 dark:border-blue-800">
-                      <BankLogo src={account.institution_logo} alt={account.institution_name || 'Bank'} bankName={account.institution_name || undefined} className="h-8 w-8" />
+              {summary?.accounts_by_type.bank.map(account => {
+                const bankLink = getBankAppLink(account.institution_name || '');
+                return (
+                  <div 
+                    key={account.id} 
+                    className="flex items-center justify-between p-4 border-l-4 border-l-blue-500 rounded-lg bg-gradient-to-r from-blue-50/50 to-transparent dark:from-blue-950/20 hover-lift shadow-card cursor-pointer"
+                    onClick={() => handleAccountClick(account)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center shadow-elegant border-2 border-blue-200 dark:border-blue-800">
+                        <BankLogo src={account.institution_logo} alt={account.institution_name || 'Bank'} bankName={account.institution_name || undefined} className="h-8 w-8" />
+                      </div>
+                      <div>
+                        <p className="font-medium">{account.account_name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {getAccountTypeLabel(account.account_type)} • {formatAccountNumber(account.last_4_digits)}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium">{account.account_name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {getAccountTypeLabel(account.account_type)} • {formatAccountNumber(account.last_4_digits)}
-                      </p>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right font-semibold text-blue-600 dark:text-blue-400">
+                        {formatCurrency(Number(account.balance), account.currency)}
+                      </div>
+                      {bankLink && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0"
+                          onClick={(e) => handleOpenBankApp(e, account.institution_name || '', bankLink.webUrl)}
+                          title={`Open ${account.institution_name} app`}
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
-                  <div className="text-right font-semibold text-blue-600 dark:text-blue-400">
-                    {formatCurrency(Number(account.balance), account.currency)}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
               {summary?.accounts_by_type.credit_card.map(account => {
                 const emis = accountEMIs[account.id] || [];
                 const transactions = accountTransactions[account.id] || [];
+                const bankLink = getBankAppLink(account.institution_name || '');
                 
                 // Calculate statement amount using proper statement period logic
                 let statementAmount = account.balance;
@@ -762,14 +830,27 @@ export default function Dashboard() {
                           </p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="font-semibold text-purple-600 dark:text-purple-400">
-                          {formatCurrency(Number(account.balance), account.currency)}
-                        </div>
-                        {emis.length > 0 && (
-                          <div className="text-xs text-muted-foreground mt-1">
-                            + {formatCurrency(statementAmount - account.balance, account.currency)} EMI
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <div className="font-semibold text-purple-600 dark:text-purple-400">
+                            {formatCurrency(Number(account.balance), account.currency)}
                           </div>
+                          {emis.length > 0 && (
+                            <div className="text-xs text-muted-foreground mt-1">
+                              + {formatCurrency(statementAmount - account.balance, account.currency)} EMI
+                            </div>
+                          )}
+                        </div>
+                        {bankLink && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0"
+                            onClick={(e) => handleOpenBankApp(e, account.institution_name || '', bankLink.webUrl)}
+                            title={`Open ${account.institution_name} app`}
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
                         )}
                       </div>
                     </div>
@@ -872,38 +953,54 @@ export default function Dashboard() {
                   </div>
                 );
               })}
-              {summary?.accounts_by_type.loan.map(account => (
-                <div 
-                  key={account.id} 
-                  className="flex items-center justify-between p-4 border-l-4 border-l-orange-500 rounded-lg bg-gradient-to-r from-orange-50/50 to-transparent dark:from-orange-950/20 hover:shadow-md transition-shadow cursor-pointer"
-                  onClick={() => handleAccountClick(account)}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center shadow-md border-2 border-orange-200 dark:border-orange-800">
-                      <BankLogo src={account.institution_logo} alt={account.institution_name || 'Loan'} bankName={account.institution_name || undefined} className="h-8 w-8" />
-                    </div>
-                    <div>
-                      <p className="font-medium">{account.account_name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {getAccountTypeLabel(account.account_type)} • {account.interest_rate_type}
-                      </p>
-                      {loanCalculations[account.id] && (
-                        <p className="text-xs text-orange-600 dark:text-orange-400 font-medium mt-1">
-                          EMI: {formatCurrency(loanCalculations[account.id].emi, account.currency)}
+              {summary?.accounts_by_type.loan.map(account => {
+                const bankLink = getBankAppLink(account.institution_name || '');
+                return (
+                  <div 
+                    key={account.id} 
+                    className="flex items-center justify-between p-4 border-l-4 border-l-orange-500 rounded-lg bg-gradient-to-r from-orange-50/50 to-transparent dark:from-orange-950/20 hover:shadow-md transition-shadow cursor-pointer"
+                    onClick={() => handleAccountClick(account)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center shadow-md border-2 border-orange-200 dark:border-orange-800">
+                        <BankLogo src={account.institution_logo} alt={account.institution_name || 'Loan'} bankName={account.institution_name || undefined} className="h-8 w-8" />
+                      </div>
+                      <div>
+                        <p className="font-medium">{account.account_name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {getAccountTypeLabel(account.account_type)} • {account.interest_rate_type}
                         </p>
+                        {loanCalculations[account.id] && (
+                          <p className="text-xs text-orange-600 dark:text-orange-400 font-medium mt-1">
+                            EMI: {formatCurrency(loanCalculations[account.id].emi, account.currency)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <div className="font-semibold text-orange-600 dark:text-orange-400">
+                          {formatCurrency(Number(account.balance), account.currency)}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {account.current_interest_rate}% APR
+                        </div>
+                      </div>
+                      {bankLink && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0"
+                          onClick={(e) => handleOpenBankApp(e, account.institution_name || '', bankLink.webUrl)}
+                          title={`Open ${account.institution_name} app`}
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
                       )}
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="font-semibold text-orange-600 dark:text-orange-400">
-                      {formatCurrency(Number(account.balance), account.currency)}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {account.current_interest_rate}% APR
-                    </div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
               {!summary || (summary.accounts_by_type.bank.length === 0 && 
                 summary.accounts_by_type.credit_card.length === 0 && 
                 summary.accounts_by_type.loan.length === 0) && (
