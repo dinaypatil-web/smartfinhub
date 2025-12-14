@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { supabase } from '@/db/supabase';
+import { useHybridAuth } from '@/contexts/HybridAuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,11 +17,13 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, AlertCircle, Mail } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
+import { supabase } from '@/db/supabase';
 
 export default function Login() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { loginWithGoogle, loginWithApple, loginWithEmail } = useHybridAuth();
   const [loading, setLoading] = useState(false);
   const [emailLogin, setEmailLogin] = useState({ email: '', password: '' });
   const [phoneLogin, setPhoneLogin] = useState({ phone: '', password: '' });
@@ -37,26 +39,10 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: emailLogin.email,
-        password: emailLogin.password,
-      });
-
-      if (error) throw error;
-
-      if (data.user) {
-        toast({
-          title: 'Success',
-          description: 'Logged in successfully!',
-        });
-        navigate('/');
-      }
+      await loginWithEmail(emailLogin.email, emailLogin.password);
+      navigate('/');
     } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to login',
-        variant: 'destructive',
-      });
+      // Error already handled in context
     } finally {
       setLoading(false);
     }
@@ -226,20 +212,10 @@ export default function Login() {
   const handleGoogleLogin = async () => {
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-
-      if (error) throw error;
+      await loginWithGoogle();
+      // Auth0 will handle the redirect
     } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to sign in with Google',
-        variant: 'destructive',
-      });
+      // Error already handled in context
       setLoading(false);
     }
   };
@@ -247,20 +223,10 @@ export default function Login() {
   const handleAppleLogin = async () => {
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'apple',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-
-      if (error) throw error;
+      await loginWithApple();
+      // Auth0 will handle the redirect
     } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to sign in with Apple',
-        variant: 'destructive',
-      });
+      // Error already handled in context
       setLoading(false);
     }
   };
