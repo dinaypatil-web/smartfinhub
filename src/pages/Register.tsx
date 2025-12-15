@@ -48,16 +48,26 @@ export default function Register() {
         email: emailRegister.email,
         password: emailRegister.password,
         options: {
-          emailRedirectTo: window.location.origin,
+          emailRedirectTo: `${window.location.origin}/confirm-email`,
         },
       });
 
       if (error) throw error;
 
       if (data.user) {
+        // Check if email confirmation is required
+        if (data.user.identities && data.user.identities.length === 0) {
+          toast({
+            title: 'Account Already Exists',
+            description: 'This email is already registered. Please login instead.',
+            variant: 'destructive',
+          });
+          return;
+        }
+
         toast({
           title: 'Success',
-          description: 'Please check your email to verify your account.',
+          description: 'Registration successful! Please check your email to verify your account.',
         });
         navigate('/login');
       }

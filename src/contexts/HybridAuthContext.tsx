@@ -211,9 +211,22 @@ export function HybridAuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/confirm-email`,
+        },
       });
 
       if (error) throw error;
+
+      // Check if email confirmation is required
+      if (data.user && data.user.identities && data.user.identities.length === 0) {
+        toast({
+          title: 'Account Already Exists',
+          description: 'This email is already registered. Please login instead.',
+          variant: 'destructive',
+        });
+        throw new Error('Email already registered');
+      }
 
       toast({
         title: 'Success',
