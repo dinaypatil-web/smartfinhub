@@ -52,7 +52,7 @@ export default function AuthCallback() {
             description: 'Logged in successfully!',
           });
 
-          navigate('/dashboard');
+          navigate('/');
         } else {
           throw new Error('No session found');
         }
