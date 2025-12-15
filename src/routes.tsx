@@ -12,6 +12,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import ResetPassword from './pages/ResetPassword';
 import AuthCallback from './pages/AuthCallback';
+import ConfirmEmail from './pages/ConfirmEmail';
 
 interface RouteConfig {
   name: string;
@@ -44,6 +45,12 @@ const routes: RouteConfig[] = [
     name: 'Auth Callback',
     path: '/auth/callback',
     element: <AuthCallback />,
+    visible: false,
+  },
+  {
+    name: 'Confirm Email',
+    path: '/confirm-email',
+    element: <ConfirmEmail />,
     visible: false,
   },
   {
