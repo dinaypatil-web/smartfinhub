@@ -13,6 +13,15 @@ A comprehensive financial management web application designed for tracking and m
 - Mobile number verification via OTP (One-Time Password)
 - **Twilio Integration**: Use Twilio API for sending OTP to mobile numbers during sign-up process
 - Verified email or mobile number serves as username for secure data retrieval
+- **Google Account Sign-In**: Integration with Google OAuth through Supabase authentication services
+- Users can sign in directly using their Google account credentials
+- Google sign-in implemented via Supabase Auth Google provider
+- Automatic account creation on first Google sign-in
+- **Apple Account Sign-In**: Integration with Apple Sign-In through Supabase authentication services
+- Users can sign in directly using their Apple ID credentials
+- Apple sign-in implemented via Supabase Auth Apple provider
+- Automatic account creation on first Apple sign-in
+- Support for 'Hide My Email' feature from Apple Sign-In
 - **Forgot Password Option**: Forgot password link displayed on login page
 - Password reset via email verification link or mobile OTP
 - User receives password reset link/OTP to registered email or mobile number
@@ -30,10 +39,8 @@ A comprehensive financial management web application designed for tracking and m
   - Password Re-entry: Require user to re-enter account password to authorize phone number change
   - Authenticator App: Use third-party authenticator apps (Google Authenticator, Microsoft Authenticator) to generate verification codes
   - Biometric Verification: Fingerprint or face recognition on supported devices
-
-## 2. Core Features
-
-### 2.1 User Preferences
+\n## 2. Core Features
+\n### 2.1 User Preferences
 - Select default country from dropdown list
 - Choose preferred currency for dashboard display
 - Country and currency settings saved to user profile
@@ -63,8 +70,7 @@ A comprehensive financial management web application designed for tracking and m
 - Statement day and due day saved to credit card account profile
 - System displays statement date and due date reminders on dashboard
 - Payment reminders shown on credit card account detail page
-- Visual indicators for upcoming statement dates and due dates
-- **Credit Limit Alert**: System triggers alert notification when user attempts transaction that would exceed their set credit limit
+- Visual indicators for upcoming statement dates and due dates\n- **Credit Limit Alert**: System triggers alert notification when user attempts transaction that would exceed their set credit limit
 - Alert displayed before transaction confirmation to prevent overspending
 - Current available credit displayed on credit card account page and dashboard
 
@@ -97,18 +103,17 @@ A comprehensive financial management web application designed for tracking and m
   - Current outstanding principal balance
   - Interest rate and payment schedule
 - Accrued interest displayed on dashboard and loan account detail page
-- **Edit EMI History**: User can add, edit, or delete historical EMI payment records at any time
-- User can modify principal and interest breakdown for any EMI payment record
+- **Edit EMI History**: User can add, edit, or delete historical EMI payment records at any time\n- User can modify principal and interest breakdown for any EMI payment record
 - System recalculates principal/interest breakdown and accrued interest automatically when EMI history is modified
-- **Automatic Monthly Interest Calculation and Addition**: On the EMI due day of each month, system automatically:\n  - Calculates interest for the month based on outstanding principal balance and all transactions in loan account during the month
+- **Automatic Monthly Interest Calculation and Addition**: On the EMI due day of each month, system automatically:
+  - Calculates interest for the month based on outstanding principal balance and all transactions in loan account during the month
   - Considers all payments, additional payments, and principal adjustments made during the month
-  - Adds calculated monthly interest amount to the loan account balance
-  - Records interest addition as a system-generated transaction in loan account statement
+  - Adds calculated monthly interest amount to the loan account balance\n  - Records interest addition as a system-generated transaction in loan account statement
   - Updates total accrued interest on dashboard and loan account detail page
 - Sends notification to user about monthly interest addition
 - Interest calculation uses daily balance method considering all intra-month transactions
-- System maintains complete audit trail of all automatic interest additions
-\n#### 2.2.5 Floating Interest Rate Management
+- System maintains complete audit trail of all automatic interest additions\n
+#### 2.2.5 Floating Interest Rate Management
 - Record all interest rate changes from loan inception to current date
 - User can update floating interest rate at any time
 - System maintains complete historical record of rate changes
@@ -118,7 +123,8 @@ A comprehensive financial management web application designed for tracking and m
 - **EMI Recalculation on Rate Change**: When floating interest rate is updated, system recalculates principal and interest components for all subsequent EMI payments
 - Updated interest breakdown reflected in loan account statement
 - Automatic monthly interest calculation uses current applicable interest rate
-\n#### 2.2.6 Data Security\n- **End-to-End Encryption**: All user data encrypted in database using industry-standard encryption algorithms
+\n#### 2.2.6 Data Security
+- **End-to-End Encryption**: All user data encrypted in database using industry-standard encryption algorithms
 - **Zero-Knowledge Architecture**: Application creator and administrators have no access to decrypted user data
 - **Client-Side Encryption**: User data encrypted on client side before transmission to server
 - **User-Specific Encryption Keys**: Each user's data encrypted with unique encryption key derived from user credentials
@@ -152,10 +158,11 @@ A comprehensive financial management web application designed for tracking and m
 - Clicking UPI app link opens the respective payment app (if installed) or redirects to app download page
 - System detects user's country from account settings to display relevant payment app options
 - User can customize which UPI/payment app links to display in dashboard settings
-\n### 2.3 Transaction Management
-\n#### 2.3.1 Transaction Types
-- Income transactions\n- Expense transactions
-- Cash withdrawals (from bank account or credit card)
+
+### 2.3 Transaction Management\n
+#### 2.3.1 Transaction Types
+- Income transactions
+- Expense transactions\n- Cash withdrawals (from bank account or credit card)
 - Bank-to-bank transfers
 - Loan payments
 - **Credit card repayment transactions**
@@ -174,7 +181,8 @@ A comprehensive financial management web application designed for tracking and m
   - Repayment transaction clearly labeled in transaction history
 - During expense transaction entry, display remaining budget balance for the selected budget category for current month
 - Show budget balance information prominently before transaction confirmation to help user make informed spending decisions
-- Dashboard auto-updates after each transaction\n- Screen refreshes automatically after transaction entry
+- Dashboard auto-updates after each transaction
+- Screen refreshes automatically after transaction entry
 - **Automatic Interest Transaction**: On EMI due day, system automatically creates interest transaction in loan account
 - Interest transaction increases loan balance (more negative)
 - Interest transaction marked as system-generated and non-editable by user
@@ -291,7 +299,8 @@ A comprehensive financial management web application designed for tracking and m
   - Total accrued interest\n  - Remaining loan tenure
   - Complete amortization schedule showing full loan lifecycle
 - Date range filter for loan statement reports
-- Export reports functionality\n\n## 3. Design Style\n
+- Export reports functionality\n\n## 3. Design Style
+
 ### 3.1 Color Scheme
 - Primary color: Deep blue (#1E3A8A) conveying trust and financial stability
 - Secondary color: Emerald green (#10B981) for positive balances and income indicators
