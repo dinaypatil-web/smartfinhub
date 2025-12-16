@@ -31,7 +31,7 @@ export default function QuickLinks({ countryCode, accounts = [] }: QuickLinksPro
         if (bankLink && !banksMap.has(account.institution_name)) {
           banksMap.set(account.institution_name, {
             name: account.institution_name,
-            logo: account.institution_logo,
+            logo: account.institution_logo || bankLink.logoUrl || null,
             link: bankLink,
           });
         }

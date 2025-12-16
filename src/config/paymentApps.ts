@@ -159,6 +159,7 @@ export const paymentAppsByCountry: Record<string, PaymentApp[]> = {
     {
       name: 'PayNow',
       icon: '🇸🇬',
+      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/e36c6a42-c276-4cde-ab9d-71051c364126.jpg',
       deepLink: 'paynow://',
       webUrl: 'https://www.abs.org.sg/consumer-banking/pay-now',
       description: 'Instant bank transfers',
@@ -212,6 +213,7 @@ export const paymentAppsByCountry: Record<string, PaymentApp[]> = {
     {
       name: 'Interac',
       icon: '🔴',
+      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/7c0cfdd2-d0de-47db-8b09-42c50078c092.jpg',
       deepLink: 'interac://',
       webUrl: 'https://www.interac.ca',
       description: 'e-Transfer and payments',
@@ -238,6 +240,7 @@ export interface BankAppLink {
   androidPackage?: string;
   iosScheme?: string;
   webUrl?: string;
+  logoUrl?: string;
 }
 
 // Popular bank app URL schemes (examples - actual schemes may vary)
@@ -248,24 +251,28 @@ export const bankAppLinks: Record<string, BankAppLink> = {
     androidPackage: 'com.sbi.lotusintouch',
     iosScheme: 'sbi://',
     webUrl: 'https://www.onlinesbi.sbi',
+    logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/68667f2f-dcaf-4f85-a9e6-36842cf8ce73.jpg',
   },
   'HDFC Bank': {
     urlScheme: 'hdfcbank://',
     androidPackage: 'com.snapwork.hdfc',
     iosScheme: 'hdfcbank://',
     webUrl: 'https://www.hdfcbank.com',
+    logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/e1c7d8c4-9a49-4280-ad10-73dcb7e08c54.jpg',
   },
   'ICICI Bank': {
     urlScheme: 'icicibank://',
     androidPackage: 'com.csam.icici.bank.imobile',
     iosScheme: 'icicibank://',
     webUrl: 'https://www.icicibank.com',
+    logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/6c3d5951-9293-451a-825f-8cd83791c23f.jpg',
   },
   'Axis Bank': {
     urlScheme: 'axisbank://',
     androidPackage: 'com.axis.mobile',
     iosScheme: 'axisbank://',
     webUrl: 'https://www.axisbank.com',
+    logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/0773c564-23f7-4967-b8d8-af4de31f32d2.jpg',
   },
   // US
   'Chase': {
@@ -273,24 +280,28 @@ export const bankAppLinks: Record<string, BankAppLink> = {
     androidPackage: 'com.chase.sig.android',
     iosScheme: 'chase://',
     webUrl: 'https://www.chase.com',
+    logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/0d827186-32d7-4c1d-a6d9-98d719092964.jpg',
   },
   'Bank of America': {
     urlScheme: 'bankofamerica://',
     androidPackage: 'com.infonow.bofa',
     iosScheme: 'bankofamerica://',
     webUrl: 'https://www.bankofamerica.com',
+    logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/6004dde2-ec96-454e-9472-ca8979f89bb6.jpg',
   },
   'Wells Fargo': {
     urlScheme: 'wellsfargo://',
     androidPackage: 'com.wf.wellsfargomobile',
     iosScheme: 'wellsfargo://',
     webUrl: 'https://www.wellsfargo.com',
+    logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/e40de849-4359-4169-8213-a0d7fbadcb8a.jpg',
   },
   'Citi': {
     urlScheme: 'citi://',
     androidPackage: 'com.citi.citimobile',
     iosScheme: 'citi://',
     webUrl: 'https://www.citi.com',
+    logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/b1e4a10d-b245-49f5-a89e-9b1d1f66f006.jpg',
   },
   // UK
   'Barclays': {
@@ -298,18 +309,21 @@ export const bankAppLinks: Record<string, BankAppLink> = {
     androidPackage: 'com.barclays.android.barclaysmobilebanking',
     iosScheme: 'barclays://',
     webUrl: 'https://www.barclays.co.uk',
+    logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/4b8d7904-a733-409c-9fc8-3ed574ed35e8.jpg',
   },
   'HSBC': {
     urlScheme: 'hsbc://',
     androidPackage: 'uk.co.hsbc.hsbcukmobilebanking',
     iosScheme: 'hsbc://',
     webUrl: 'https://www.hsbc.co.uk',
+    logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/0ebbf850-9d2c-4cdd-bf94-210714d7fe2f.jpg',
   },
   'Lloyds Bank': {
     urlScheme: 'lloydsbank://',
     androidPackage: 'com.grppl.android.shell.CMBlloydsTSB73',
     iosScheme: 'lloydsbank://',
     webUrl: 'https://www.lloydsbank.com',
+    logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/a0ea9443-62f0-489a-88f9-ecd9ca358518.jpg',
   },
 };
 
