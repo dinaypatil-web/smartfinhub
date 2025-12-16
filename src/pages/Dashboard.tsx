@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatCurrency, formatAccountNumber } from '@/utils/format';
 import { Plus, Wallet, CreditCard, TrendingUp, TrendingDown, Building2, AlertCircle, Calculator, DollarSign, ExternalLink } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
@@ -434,6 +435,16 @@ export default function Dashboard() {
         </div>
       </div>
 
+      <Tabs defaultValue="overview" className="w-full">
+        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="accounts">Accounts</TabsTrigger>
+          <TabsTrigger value="charts">Charts & Analytics</TabsTrigger>
+          <TabsTrigger value="transactions">Transactions</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-6 mt-6">
+
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 min-w-max md:min-w-0">
         <Card className="border-l-4 border-l-emerald-500 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20 hover-lift shadow-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -619,7 +630,9 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       )}
+        </TabsContent>
 
+        <TabsContent value="charts" className="space-y-6 mt-6">
       <div className="grid gap-6 md:grid-cols-2 min-w-max md:min-w-0">
         <Card className="shadow-card hover-lift">
           <CardHeader>
@@ -700,6 +713,45 @@ export default function Dashboard() {
         </Card>
       </div>
 
+      {/* Interest Rate Charts for Floating Rate Loans */}
+      {summary?.accounts_by_type.loan.filter(account => account.interest_rate_type === 'floating').length > 0 && (
+        <div className="space-y-6">
+          <h2 className="text-2xl font-bold">Floating Interest Rate Trends</h2>
+          <div className="grid gap-6 xl:grid-cols-1">
+            {summary.accounts_by_type.loan
+              .filter(account => account.interest_rate_type === 'floating')
+              .map(account => (
+                <InterestRateChart
+                  key={account.id}
+                  accountId={account.id}
+                  accountName={account.account_name}
+                />
+              ))}
+          </div>
+        </div>
+      )}
+
+      {/* Interest Rate History Tables for All Loans */}
+      {summary?.accounts_by_type.loan.length > 0 && (
+        <div className="space-y-6">
+          <h2 className="text-2xl font-bold">Interest Rate History & Accrued Interest</h2>
+          <div className="grid gap-6 xl:grid-cols-1">
+            {summary.accounts_by_type.loan.map(account => (
+              <InterestRateTable
+                key={account.id}
+                accountId={account.id}
+                accountName={account.account_name}
+                loanPrincipal={account.loan_principal || 0}
+                loanStartDate={account.loan_start_date || new Date().toISOString().split('T')[0]}
+                currency={account.currency}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+        </TabsContent>
+
+        <TabsContent value="accounts" className="space-y-6 mt-6">
       <div className="grid gap-6 lg:grid-cols-2 min-w-max lg:min-w-0">
         <Card className="shadow-card">
           <CardHeader className="flex flex-row items-center justify-between">
@@ -1018,7 +1070,10 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
+      </div>
+        </TabsContent>
 
+        <TabsContent value="transactions" className="space-y-6 mt-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Recent Transactions</CardTitle>
@@ -1052,44 +1107,8 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
-      </div>
-
-      {/* Interest Rate Charts for Floating Rate Loans */}
-      {summary?.accounts_by_type.loan.filter(account => account.interest_rate_type === 'floating').length > 0 && (
-        <div className="space-y-6">
-          <h2 className="text-2xl font-bold">Floating Interest Rate Trends</h2>
-          <div className="grid gap-6 xl:grid-cols-1">
-            {summary.accounts_by_type.loan
-              .filter(account => account.interest_rate_type === 'floating')
-              .map(account => (
-                <InterestRateChart
-                  key={account.id}
-                  accountId={account.id}
-                  accountName={account.account_name}
-                />
-              ))}
-          </div>
-        </div>
-      )}
-
-      {/* Interest Rate History Tables for All Loans */}
-      {summary?.accounts_by_type.loan.length > 0 && (
-        <div className="space-y-6">
-          <h2 className="text-2xl font-bold">Interest Rate History & Accrued Interest</h2>
-          <div className="grid gap-6 xl:grid-cols-1">
-            {summary.accounts_by_type.loan.map(account => (
-              <InterestRateTable
-                key={account.id}
-                accountId={account.id}
-                accountName={account.account_name}
-                loanPrincipal={account.loan_principal || 0}
-                loanStartDate={account.loan_start_date || new Date().toISOString().split('T')[0]}
-                currency={account.currency}
-              />
-            ))}
-          </div>
-        </div>
-      )}
+        </TabsContent>
+      </Tabs>
 
       {/* Account Statement Dialog */}
       <AccountStatementDialog
