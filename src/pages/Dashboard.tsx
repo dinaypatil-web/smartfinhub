@@ -436,12 +436,14 @@ export default function Dashboard() {
       </div>
 
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="accounts">Accounts</TabsTrigger>
-          <TabsTrigger value="charts">Charts & Analytics</TabsTrigger>
-          <TabsTrigger value="transactions">Transactions</TabsTrigger>
-        </TabsList>
+        <div className="w-full overflow-x-auto pb-2">
+          <TabsList className="inline-flex w-full min-w-max lg:w-auto">
+            <TabsTrigger value="overview" className="flex-1 lg:flex-none whitespace-nowrap">Overview</TabsTrigger>
+            <TabsTrigger value="accounts" className="flex-1 lg:flex-none whitespace-nowrap">Accounts</TabsTrigger>
+            <TabsTrigger value="charts" className="flex-1 lg:flex-none whitespace-nowrap">Charts & Analytics</TabsTrigger>
+            <TabsTrigger value="transactions" className="flex-1 lg:flex-none whitespace-nowrap">Transactions</TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="overview" className="space-y-6 mt-6">
 
