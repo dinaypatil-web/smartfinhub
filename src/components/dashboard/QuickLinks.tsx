@@ -14,7 +14,7 @@ interface QuickLinksProps {
 interface BankQuickLink {
   name: string;
   logo: string | null;
-  link: BankAppLink;
+  link: BankAppLink | null;
 }
 
 export default function QuickLinks({ countryCode, accounts = [] }: QuickLinksProps) {
@@ -27,11 +27,11 @@ export default function QuickLinks({ countryCode, accounts = [] }: QuickLinksPro
     
     accounts.forEach(account => {
       if (account.account_type !== 'cash' && account.institution_name) {
-        const bankLink = getBankAppLink(account.institution_name);
-        if (bankLink && !banksMap.has(account.institution_name)) {
+        if (!banksMap.has(account.institution_name)) {
+          const bankLink = getBankAppLink(account.institution_name);
           banksMap.set(account.institution_name, {
             name: account.institution_name,
-            logo: account.institution_logo || bankLink.logoUrl || null,
+            logo: account.institution_logo || bankLink?.logoUrl || null,
             link: bankLink,
           });
         }
@@ -73,6 +73,16 @@ export default function QuickLinks({ countryCode, accounts = [] }: QuickLinksPro
   };
 
   const handleOpenBank = (bank: BankQuickLink) => {
+    // If no link is configured, show a message
+    if (!bank.link || (!bank.link.webUrl && !bank.link.urlScheme)) {
+      toast({
+        title: 'No App Link Available',
+        description: `${bank.name} app link is not configured. Please visit your bank's website directly.`,
+        variant: 'default',
+      });
+      return;
+    }
+
     try {
       const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       
@@ -87,7 +97,7 @@ export default function QuickLinks({ countryCode, accounts = [] }: QuickLinksPro
             return;
           }
           // App didn't open, go to web URL
-          if (bank.link.webUrl) {
+          if (bank.link?.webUrl) {
             window.open(bank.link.webUrl, '_blank');
           }
         }, 1500);
@@ -126,31 +136,38 @@ export default function QuickLinks({ countryCode, accounts = [] }: QuickLinksPro
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-              {userBanks.map((bank) => (
-                <Button
-                  key={bank.name}
-                  variant="outline"
-                  className="h-auto flex-col items-start p-4 hover:bg-accent transition-smooth"
-                  onClick={() => handleOpenBank(bank)}
-                >
-                  <div className="flex items-center gap-2 w-full mb-2">
-                    {bank.logo ? (
-                      <img 
-                        src={bank.logo} 
-                        alt={`${bank.name} logo`}
-                        className="h-8 w-8 object-contain rounded"
-                      />
-                    ) : (
-                      <Building2 className="h-8 w-8 text-muted-foreground" />
-                    )}
-                    <span className="font-semibold text-sm break-words line-clamp-2 flex-1">{bank.name}</span>
-                    <ExternalLink className="h-3 w-3 ml-auto opacity-50 flex-shrink-0" />
-                  </div>
-                  <p className="text-xs text-muted-foreground text-left w-full break-words">
-                    Open banking app
-                  </p>
-                </Button>
-              ))}
+              {userBanks.map((bank) => {
+                const hasLink = bank.link && (bank.link.webUrl || bank.link.urlScheme);
+                return (
+                  <Button
+                    key={bank.name}
+                    variant="outline"
+                    className="h-auto flex-col items-start p-4 hover:bg-accent transition-smooth"
+                    onClick={() => handleOpenBank(bank)}
+                  >
+                    <div className="flex items-center gap-2 w-full mb-2">
+                      {bank.logo ? (
+                        <img 
+                          src={bank.logo} 
+                          alt={`${bank.name} logo`}
+                          className="h-8 w-8 object-contain rounded"
+                        />
+                      ) : (
+                        <Building2 className="h-8 w-8 text-muted-foreground" />
+                      )}
+                      <span className="font-semibold text-sm break-words line-clamp-2 flex-1">{bank.name}</span>
+                      {hasLink ? (
+                        <ExternalLink className="h-3 w-3 ml-auto opacity-50 flex-shrink-0" />
+                      ) : (
+                        <span className="text-xs text-muted-foreground ml-auto flex-shrink-0">ℹ️</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground text-left w-full break-words">
+                      {hasLink ? 'Open banking app' : 'App link not configured'}
+                    </p>
+                  </Button>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
