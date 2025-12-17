@@ -91,6 +91,17 @@ export interface ExpenseCategory {
   created_at: string;
 }
 
+export interface CustomBankLink {
+  id: string;
+  user_id: string;
+  account_id: string;
+  institution_name: string;
+  app_name: string;
+  app_url: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface AccountWithInterestHistory extends Account {
   interest_history?: InterestRateHistory[];
 }
