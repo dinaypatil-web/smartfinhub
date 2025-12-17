@@ -230,6 +230,53 @@ export default function TransactionForm() {
       return;
     }
 
+    // Validate account selections based on transaction type
+    if (formData.transaction_type === 'income' && !formData.to_account_id) {
+      toast({
+        title: 'Error',
+        description: 'Please select a destination account for income',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (formData.transaction_type === 'expense' && !formData.from_account_id) {
+      toast({
+        title: 'Error',
+        description: 'Please select a source account for expense',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if ((formData.transaction_type === 'transfer' || formData.transaction_type === 'withdrawal') && 
+        (!formData.from_account_id || !formData.to_account_id)) {
+      toast({
+        title: 'Error',
+        description: 'Please select both source and destination accounts',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (formData.transaction_type === 'loan_payment' && (!formData.from_account_id || !formData.to_account_id)) {
+      toast({
+        title: 'Error',
+        description: 'Please select both payment source and loan account',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (formData.transaction_type === 'credit_card_repayment' && (!formData.from_account_id || !formData.to_account_id)) {
+      toast({
+        title: 'Error',
+        description: 'Please select both payment source and credit card account',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     // Validate EMI fields if EMI is selected
     if (formData.is_emi) {
       if (!formData.emi_months || parseInt(formData.emi_months) <= 0) {
