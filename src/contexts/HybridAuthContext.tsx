@@ -57,6 +57,30 @@ export function HybridAuthProvider({ children }: { children: ReactNode }) {
   const [hasEncryptionKey, setHasEncryptionKey] = useState(false);
   const [authProvider, setAuthProvider] = useState<'auth0' | 'supabase' | null>(null);
 
+  // Initialize encryption for a user
+  const initializeUserEncryption = useCallback(async (userId: string, existingSalt: string | null) => {
+    try {
+      const { salt } = await initializeEncryption(userId, existingSalt || undefined);
+      
+      // If this is a new user without a salt, save it to the database
+      if (!existingSalt) {
+        await supabase
+          .from('profiles')
+          .update({ encryption_salt: salt })
+          .eq('id', userId);
+      }
+      
+      setHasEncryptionKey(true);
+    } catch (error) {
+      console.error('Error initializing encryption:', error);
+      toast({
+        title: 'Warning',
+        description: 'Failed to initialize encryption. Some features may not work correctly.',
+        variant: 'destructive',
+      });
+    }
+  }, [toast]);
+
   // Sync Auth0 user with Supabase
   const syncAuth0UserWithSupabase = useCallback(async (auth0User: any) => {
     try {
@@ -116,31 +140,7 @@ export function HybridAuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Error syncing Auth0 user:', error);
     }
-  }, [toast]);
-
-  // Initialize encryption for a user
-  const initializeUserEncryption = useCallback(async (userId: string, existingSalt: string | null) => {
-    try {
-      const { salt } = await initializeEncryption(userId, existingSalt || undefined);
-      
-      // If this is a new user without a salt, save it to the database
-      if (!existingSalt) {
-        await supabase
-          .from('profiles')
-          .update({ encryption_salt: salt })
-          .eq('id', userId);
-      }
-      
-      setHasEncryptionKey(true);
-    } catch (error) {
-      console.error('Error initializing encryption:', error);
-      toast({
-        title: 'Warning',
-        description: 'Failed to initialize encryption. Some features may not work correctly.',
-        variant: 'destructive',
-      });
-    }
-  }, [toast]);
+  }, [toast, initializeUserEncryption]);
 
   // Refresh profile from Supabase
   const refreshProfile = useCallback(async () => {
