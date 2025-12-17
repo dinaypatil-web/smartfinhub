@@ -36,6 +36,7 @@ import BankLogo from '@/components/BankLogo';
 import AccountStatementDialog from '@/components/AccountStatementDialog';
 import QuickLinks from '@/components/dashboard/QuickLinks';
 import { getBankAppLink } from '@/config/paymentApps';
+import { cache } from '@/utils/cache';
 
 export default function Dashboard() {
   const { user, profile } = useAuth();
@@ -72,12 +73,36 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (user) {
-      loadDashboardData();
+      // Add a small delay to allow the UI to render first
+      const timer = setTimeout(() => {
+        loadDashboardData();
+      }, 100);
+      
+      return () => clearTimeout(timer);
     }
   }, [user, location.key]);
 
   const loadDashboardData = async () => {
     if (!user) return;
+    
+    // Check cache first
+    const cacheKey = `dashboard-${user.id}`;
+    const cachedData = cache.get<{
+      summary: FinancialSummary;
+      transactions: Transaction[];
+      expenses: Transaction[];
+    }>(cacheKey);
+    
+    if (cachedData) {
+      setSummary(cachedData.summary);
+      setRecentTransactions(cachedData.transactions);
+      setAllExpenses(cachedData.expenses);
+      setLoading(false);
+      
+      // Load heavy calculations in background
+      loadHeavyCalculations(cachedData.summary);
+      return;
+    }
     
     setLoading(true);
     try {
@@ -98,6 +123,38 @@ export default function Dashboard() {
       // Filter only expense transactions for the chart
       const expenses = monthExpenses.filter(t => t.transaction_type === 'expense');
       setAllExpenses(expenses);
+      
+      // Cache the basic data
+      cache.set(cacheKey, {
+        summary: summaryData,
+        transactions,
+        expenses
+      }, 10000); // Cache for 10 seconds
+      
+      setLoading(false);
+      
+      // Load heavy calculations in background
+      loadHeavyCalculations(summaryData);
+    } catch (error) {
+      console.error('Error loading dashboard:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load dashboard data',
+        variant: 'destructive',
+      });
+      setLoading(false);
+    }
+  };
+  
+  const loadHeavyCalculations = async (summaryData: FinancialSummary) => {
+    if (!user) return;
+    
+    try {
+      // Get current month date range
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+      const monthExpenses = await transactionApi.getTransactionsByDateRange(user.id, startOfMonth, endOfMonth);
 
       // Parallel processing for loan accounts
       const loanPromises = (summaryData?.accounts_by_type.loan || []).map(async (account) => {
@@ -201,9 +258,7 @@ export default function Dashboard() {
       const creditCardDetails = getCreditCardDuesDetails(allAccounts);
       setCreditCardDuesDetails(creditCardDetails);
     } catch (error) {
-      console.error('Error loading dashboard:', error);
-    } finally {
-      setLoading(false);
+      console.error('Error loading heavy calculations:', error);
     }
   };
 

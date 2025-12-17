@@ -13,6 +13,7 @@ import type { Profile } from '@/types/types';
 import { profileApi } from '@/db/api';
 import { keyManager, initializeEncryption } from '@/utils/encryption';
 import { useToast } from '@/hooks/use-toast';
+import { isAuth0Configured } from '@/config/auth0';
 
 interface HybridAuthContextType {
   // User info
@@ -42,6 +43,18 @@ const HybridAuthContext = createContext<HybridAuthContextType | undefined>(undef
 
 export function HybridAuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
+  
+  // Only use Auth0 hooks if Auth0 is configured
+  const auth0Enabled = isAuth0Configured();
+  const auth0Context = auth0Enabled ? useAuth0() : {
+    user: null,
+    isAuthenticated: false,
+    isLoading: false,
+    loginWithRedirect: async () => {},
+    logout: async () => {},
+    getAccessTokenSilently: async () => '',
+  };
+  
   const {
     user: auth0User,
     isAuthenticated: isAuth0Authenticated,
@@ -49,7 +62,7 @@ export function HybridAuthProvider({ children }: { children: ReactNode }) {
     loginWithRedirect,
     logout: auth0Logout,
     getAccessTokenSilently,
-  } = useAuth0();
+  } = auth0Context;
 
   const [user, setUser] = useState<any | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -385,41 +398,48 @@ export function HybridAuthProvider({ children }: { children: ReactNode }) {
   // Initialize authentication state
   useEffect(() => {
     const initAuth = async () => {
-      setLoading(true);
-
-      // Check Auth0 first
-      if (isAuth0Authenticated && auth0User) {
-        setUser(auth0User);
-        setAuthProvider('auth0');
-        await syncAuth0UserWithSupabase(auth0User);
-        setHasEncryptionKey(keyManager.hasKey());
-        setLoading(false);
-        return;
-      }
-
-      // Check Supabase session
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUser(session.user);
-        setAuthProvider('supabase');
-        
-        // Initialize encryption for Supabase user
-        const userProfile = await profileApi.getProfile(session.user.id);
-        if (userProfile) {
-          setProfile(userProfile);
-          await initializeUserEncryption(session.user.id, userProfile.encryption_salt);
+      try {
+        // Check Auth0 first
+        if (isAuth0Authenticated && auth0User) {
+          setUser(auth0User);
+          setAuthProvider('auth0');
+          setLoading(false); // Set loading false immediately
+          
+          // Sync with Supabase in background (non-blocking)
+          syncAuth0UserWithSupabase(auth0User).then(() => {
+            setHasEncryptionKey(keyManager.hasKey());
+          });
+          return;
         }
-        
-        setHasEncryptionKey(keyManager.hasKey());
-      }
 
-      setLoading(false);
+        // Check Supabase session
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          setUser(session.user);
+          setAuthProvider('supabase');
+          setLoading(false); // Set loading false immediately
+          
+          // Load profile and initialize encryption in background (non-blocking)
+          profileApi.getProfile(session.user.id).then(async (userProfile) => {
+            if (userProfile) {
+              setProfile(userProfile);
+              await initializeUserEncryption(session.user.id, userProfile.encryption_salt);
+              setHasEncryptionKey(keyManager.hasKey());
+            }
+          });
+        } else {
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+        setLoading(false);
+      }
     };
 
     if (!isAuth0Loading) {
       initAuth();
     }
-  }, [isAuth0Authenticated, auth0User, isAuth0Loading, syncAuth0UserWithSupabase, initializeUserEncryption]);
+  }, [isAuth0Authenticated, auth0User, isAuth0Loading]);
 
   // Listen to Supabase auth changes
   useEffect(() => {
@@ -428,12 +448,14 @@ export function HybridAuthProvider({ children }: { children: ReactNode }) {
         setUser(session.user);
         setAuthProvider('supabase');
         
-        // Initialize encryption for Supabase user
-        const userProfile = await profileApi.getProfile(session.user.id);
-        if (userProfile) {
-          setProfile(userProfile);
-          await initializeUserEncryption(session.user.id, userProfile.encryption_salt);
-        }
+        // Initialize encryption for Supabase user in background (non-blocking)
+        profileApi.getProfile(session.user.id).then(async (userProfile) => {
+          if (userProfile) {
+            setProfile(userProfile);
+            await initializeUserEncryption(session.user.id, userProfile.encryption_salt);
+            setHasEncryptionKey(keyManager.hasKey());
+          }
+        });
       } else if (!session?.user && !isAuth0Authenticated) {
         setUser(null);
         setProfile(null);
@@ -446,14 +468,7 @@ export function HybridAuthProvider({ children }: { children: ReactNode }) {
     return () => {
       subscription.unsubscribe();
     };
-  }, [isAuth0Authenticated, initializeUserEncryption]);
-
-  // Fetch profile when user changes
-  useEffect(() => {
-    if (user && !profile) {
-      refreshProfile();
-    }
-  }, [user, profile, refreshProfile]);
+  }, [isAuth0Authenticated]);
 
   const value: HybridAuthContextType = {
     user,
