@@ -53,22 +53,27 @@ const EMI_ENCRYPTED_FIELDS = [
  * Encrypt an account object
  */
 export async function encryptAccount(account: Partial<Account>): Promise<Partial<Account>> {
-  const key = await getEncryptionKey();
-  const encrypted: any = { ...account };
+  try {
+    const key = await getEncryptionKey();
+    const encrypted: any = { ...account };
 
-  for (const field of ACCOUNT_ENCRYPTED_FIELDS) {
-    if (account[field as keyof Account] !== undefined && account[field as keyof Account] !== null) {
-      const value = account[field as keyof Account];
-      
-      if (typeof value === 'number') {
-        encrypted[field] = await encryptNumber(value, key);
-      } else if (typeof value === 'string') {
-        encrypted[field] = await encryptData(value, key);
+    for (const field of ACCOUNT_ENCRYPTED_FIELDS) {
+      if (account[field as keyof Account] !== undefined && account[field as keyof Account] !== null) {
+        const value = account[field as keyof Account];
+        
+        if (typeof value === 'number') {
+          encrypted[field] = await encryptNumber(value, key);
+        } else if (typeof value === 'string' && value !== '') {
+          encrypted[field] = await encryptData(value, key);
+        }
       }
     }
-  }
 
-  return encrypted;
+    return encrypted;
+  } catch (error) {
+    console.error('Error encrypting account:', error);
+    throw new Error('Failed to encrypt account data. Please try logging out and logging in again.');
+  }
 }
 
 /**
@@ -105,22 +110,27 @@ export async function decryptAccount(account: Account): Promise<Account> {
  * Encrypt a transaction object
  */
 export async function encryptTransaction(transaction: Partial<Transaction>): Promise<Partial<Transaction>> {
-  const key = await getEncryptionKey();
-  const encrypted: any = { ...transaction };
+  try {
+    const key = await getEncryptionKey();
+    const encrypted: any = { ...transaction };
 
-  for (const field of TRANSACTION_ENCRYPTED_FIELDS) {
-    if (transaction[field as keyof Transaction] !== undefined && transaction[field as keyof Transaction] !== null) {
-      const value = transaction[field as keyof Transaction];
-      
-      if (typeof value === 'number') {
-        encrypted[field] = await encryptNumber(value, key);
-      } else if (typeof value === 'string') {
-        encrypted[field] = await encryptData(value, key);
+    for (const field of TRANSACTION_ENCRYPTED_FIELDS) {
+      if (transaction[field as keyof Transaction] !== undefined && transaction[field as keyof Transaction] !== null) {
+        const value = transaction[field as keyof Transaction];
+        
+        if (typeof value === 'number') {
+          encrypted[field] = await encryptNumber(value, key);
+        } else if (typeof value === 'string' && value !== '') {
+          encrypted[field] = await encryptData(value, key);
+        }
       }
     }
-  }
 
-  return encrypted;
+    return encrypted;
+  } catch (error) {
+    console.error('Error encrypting transaction:', error);
+    throw new Error('Failed to encrypt transaction data. Please try logging out and logging in again.');
+  }
 }
 
 /**
@@ -157,22 +167,27 @@ export async function decryptTransaction(transaction: Transaction): Promise<Tran
  * Encrypt an EMI transaction object
  */
 export async function encryptEMI(emi: Partial<EMITransaction>): Promise<Partial<EMITransaction>> {
-  const key = await getEncryptionKey();
-  const encrypted: any = { ...emi };
+  try {
+    const key = await getEncryptionKey();
+    const encrypted: any = { ...emi };
 
-  for (const field of EMI_ENCRYPTED_FIELDS) {
-    if (emi[field as keyof EMITransaction] !== undefined && emi[field as keyof EMITransaction] !== null) {
-      const value = emi[field as keyof EMITransaction];
-      
-      if (typeof value === 'number') {
-        encrypted[field] = await encryptNumber(value, key);
-      } else if (typeof value === 'string') {
-        encrypted[field] = await encryptData(value, key);
+    for (const field of EMI_ENCRYPTED_FIELDS) {
+      if (emi[field as keyof EMITransaction] !== undefined && emi[field as keyof EMITransaction] !== null) {
+        const value = emi[field as keyof EMITransaction];
+        
+        if (typeof value === 'number') {
+          encrypted[field] = await encryptNumber(value, key);
+        } else if (typeof value === 'string' && value !== '') {
+          encrypted[field] = await encryptData(value, key);
+        }
       }
     }
-  }
 
-  return encrypted;
+    return encrypted;
+  } catch (error) {
+    console.error('Error encrypting EMI:', error);
+    throw new Error('Failed to encrypt EMI data. Please try logging out and logging in again.');
+  }
 }
 
 /**
