@@ -12,7 +12,8 @@ import type {
   AccountWithInterestHistory,
   TransactionWithAccounts,
   FinancialSummary,
-  BudgetAnalysis
+  BudgetAnalysis,
+  CustomBankLink
 } from '@/types/types';
 import {
   encryptAccount,
@@ -1053,5 +1054,72 @@ export const loanEMIPaymentApi = {
     
     if (error) throw error;
     return data || 1;
+  }
+};
+
+// Custom Bank Links API
+export const customBankLinkApi = {
+  async getCustomLink(userId: string, accountId: string) {
+    const { data, error } = await supabase
+      .from('custom_bank_links')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('account_id', accountId)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async getAllCustomLinks(userId: string) {
+    const { data, error } = await supabase
+      .from('custom_bank_links')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return Array.isArray(data) ? data : [];
+  },
+
+  async createCustomLink(customLink: {
+    user_id: string;
+    account_id: string;
+    institution_name: string;
+    app_name: string;
+    app_url: string;
+  }) {
+    const { data, error } = await supabase
+      .from('custom_bank_links')
+      .insert(customLink)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async updateCustomLink(id: string, updates: {
+    app_name?: string;
+    app_url?: string;
+  }) {
+    const { data, error } = await supabase
+      .from('custom_bank_links')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async deleteCustomLink(id: string) {
+    const { error } = await supabase
+      .from('custom_bank_links')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
   }
 };
