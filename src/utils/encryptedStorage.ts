@@ -42,11 +42,12 @@ const TRANSACTION_ENCRYPTED_FIELDS = [
  * Fields to encrypt in EMITransaction objects
  */
 const EMI_ENCRYPTED_FIELDS = [
-  'transaction_amount',
+  'purchase_amount',
+  'bank_charges',
+  'total_amount',
+  'emi_months',
   'monthly_emi',
-  'total_installments',
   'remaining_installments',
-  'interest_rate',
 ];
 
 /**
