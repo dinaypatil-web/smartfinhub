@@ -1,14 +1,19 @@
 import type { ReactNode } from 'react';
+import { lazy } from 'react';
 import { ProtectedRoute } from './components/ProtectedRoute';
-import Dashboard from './pages/Dashboard';
-import Accounts from './pages/Accounts';
-import AccountForm from './pages/AccountForm';
-import Transactions from './pages/Transactions';
-import TransactionForm from './pages/TransactionForm';
-import Budgets from './pages/Budgets';
-import Reports from './pages/Reports';
-import Settings from './pages/Settings';
-import QuickLinks from './pages/QuickLinks';
+
+// Lazy load pages for better performance
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Accounts = lazy(() => import('./pages/Accounts'));
+const AccountForm = lazy(() => import('./pages/AccountForm'));
+const Transactions = lazy(() => import('./pages/Transactions'));
+const TransactionForm = lazy(() => import('./pages/TransactionForm'));
+const Budgets = lazy(() => import('./pages/Budgets'));
+const Reports = lazy(() => import('./pages/Reports'));
+const Settings = lazy(() => import('./pages/Settings'));
+const QuickLinks = lazy(() => import('./pages/QuickLinks'));
+
+// Auth pages loaded immediately for faster initial access
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ResetPassword from './pages/ResetPassword';

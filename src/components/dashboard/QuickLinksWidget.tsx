@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { useHybridAuth } from '@/contexts/HybridAuthContext';
 import { quickLinksApi } from '@/db/api';
 import type { QuickLink } from '@/types/types';
@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { ExternalLink, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-export default function QuickLinksWidget() {
+function QuickLinksWidget() {
   const { user } = useHybridAuth();
   const [links, setLinks] = useState<QuickLink[]>([]);
   const [loading, setLoading] = useState(true);
@@ -119,3 +119,5 @@ export default function QuickLinksWidget() {
     </Card>
   );
 }
+
+export default memo(QuickLinksWidget);

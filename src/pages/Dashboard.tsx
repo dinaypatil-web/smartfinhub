@@ -100,75 +100,87 @@ export default function Dashboard() {
       const expenses = monthExpenses.filter(t => t.transaction_type === 'expense');
       setAllExpenses(expenses);
 
-      // Calculate loan metrics for all loan accounts
-      const calculations: Record<string, { emi: number; accruedInterest: number }> = {};
-      
-      if (summaryData?.accounts_by_type.loan) {
-        for (const account of summaryData.accounts_by_type.loan) {
-          if (account.loan_principal && account.current_interest_rate && account.loan_tenure_months) {
-            // Calculate EMI
-            const emi = calculateEMI(
-              Number(account.loan_principal),
-              Number(account.current_interest_rate),
-              Number(account.loan_tenure_months)
-            );
+      // Parallel processing for loan accounts
+      const loanPromises = (summaryData?.accounts_by_type.loan || []).map(async (account) => {
+        if (!account.loan_principal || !account.current_interest_rate || !account.loan_tenure_months) {
+          return { accountId: account.id, data: null };
+        }
 
-            // Calculate accrued interest
-            let accruedInterest = 0;
-            if (account.loan_start_date) {
-              try {
-                // Get the reference point considering both EMI payments and interest_charge transactions
-                const reference = await getAccruedInterestReference(account);
-                const history = await interestRateApi.getInterestRateHistory(account.id);
-                
-                if (reference) {
-                  accruedInterest = calculateAccruedInterest(
-                    reference.referenceDate,
-                    reference.referenceBalance,
-                    history,
-                    Number(account.current_interest_rate)
-                  );
-                }
-              } catch (error) {
-                console.error('Error calculating accrued interest:', error);
-              }
+        const emi = calculateEMI(
+          Number(account.loan_principal),
+          Number(account.current_interest_rate),
+          Number(account.loan_tenure_months)
+        );
+
+        let accruedInterest = 0;
+        if (account.loan_start_date) {
+          try {
+            const reference = await getAccruedInterestReference(account);
+            const history = await interestRateApi.getInterestRateHistory(account.id);
+            
+            if (reference) {
+              accruedInterest = calculateAccruedInterest(
+                reference.referenceDate,
+                reference.referenceBalance,
+                history,
+                Number(account.current_interest_rate)
+              );
             }
-
-            calculations[account.id] = { emi, accruedInterest };
+          } catch (error) {
+            console.error('Error calculating accrued interest:', error);
           }
         }
-      }
 
+        return { accountId: account.id, data: { emi, accruedInterest } };
+      });
+
+      const loanResults = await Promise.all(loanPromises);
+      const calculations: Record<string, { emi: number; accruedInterest: number }> = {};
+      loanResults.forEach(result => {
+        if (result.data) {
+          calculations[result.accountId] = result.data;
+        }
+      });
       setLoanCalculations(calculations);
 
-      // Load EMI data for credit card accounts
+      // Parallel processing for credit card accounts
+      const creditCardPromises = (summaryData?.accounts_by_type.credit_card || []).map(async (account) => {
+        try {
+          const [accountEMIs, txs] = await Promise.all([
+            emiApi.getActiveEMIsByAccount(account.id),
+            transactionApi.getTransactionsByAccount(user.id, account.id)
+          ]);
+          
+          return {
+            accountId: account.id,
+            emis: accountEMIs.length > 0 ? accountEMIs : null,
+            transactions: txs
+          };
+        } catch (error) {
+          console.error(`Error loading data for account ${account.id}:`, error);
+          return { accountId: account.id, emis: null, transactions: [] };
+        }
+      });
+
+      const creditCardResults = await Promise.all(creditCardPromises);
       const emis: Record<string, EMITransaction[]> = {};
       const accountTxs: Record<string, Transaction[]> = {};
-      if (summaryData?.accounts_by_type.credit_card) {
-        for (const account of summaryData.accounts_by_type.credit_card) {
-          try {
-            const accountEMIs = await emiApi.getActiveEMIsByAccount(account.id);
-            if (accountEMIs.length > 0) {
-              emis[account.id] = accountEMIs;
-            }
-            
-            // Load transactions for due amount calculation
-            const txs = await transactionApi.getTransactionsByAccount(user.id, account.id);
-            accountTxs[account.id] = txs;
-          } catch (error) {
-            console.error(`Error loading data for account ${account.id}:`, error);
-          }
+      
+      creditCardResults.forEach(result => {
+        if (result.emis) {
+          emis[result.accountId] = result.emis;
         }
-      }
+        accountTxs[result.accountId] = result.transactions;
+      });
+      
       setAccountEMIs(emis);
       setAccountTransactions(accountTxs);
 
-      // Calculate monthly cash flow
+      // Calculate monthly cash flow with limited transaction data
       const today = new Date();
       const currentMonth = today.getMonth() + 1;
       const currentYear = today.getFullYear();
       
-      // Get all accounts from summary
       const allAccounts = [
         ...(summaryData.accounts_by_type.cash || []),
         ...(summaryData.accounts_by_type.bank || []),
@@ -176,20 +188,17 @@ export default function Dashboard() {
         ...(summaryData.accounts_by_type.loan || [])
       ];
       
-      // Get all transactions for cash flow calculation
-      const allTransactions = await transactionApi.getTransactions(user.id);
-      
+      // Use month transactions instead of all transactions for better performance
       const budget = await budgetApi.getBudget(user.id, currentMonth, currentYear);
       const cashFlowData = calculateMonthlyCashFlow(
         allAccounts,
-        allTransactions,
+        monthExpenses, // Use already loaded month transactions
         budget,
         currentMonth,
         currentYear
       );
       setCashFlow(cashFlowData);
       
-      // Get credit card dues details with statement dates
       const creditCardDetails = getCreditCardDuesDetails(allAccounts);
       setCreditCardDuesDetails(creditCardDetails);
     } catch (error) {
