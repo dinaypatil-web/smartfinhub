@@ -25,8 +25,7 @@ A comprehensive financial management web application designed for tracking and m
 - User must enter current password before setting new password
 - Password change confirmation sent to registered email address
 \n## 2. Core Features
-
-### 2.1 User Preferences
+\n### 2.1 User Preferences
 - Select default country from dropdown list
 - Choose preferred currency for dashboard display
 - Country and currency settings saved to user profile
@@ -47,8 +46,7 @@ A comprehensive financial management web application designed for tracking and m
 - Fetched logos displayed on both account pages and dashboard
 - System caches fetched logos for future use
 - Optional account number entry (encrypted storage, only last 4 digits visible on dashboard)
-
-#### 2.2.3 Credit Card Configuration
+\n#### 2.2.3 Credit Card Configuration
 - **Statement Day of Month**: User inputs the day of month when credit card statement is generated (1-31)
 - **Due Day of Month**: User inputs the day of month when credit card payment is due (1-31)
 - **Credit Card Limit**: User inputs their own credit limit for the card
@@ -162,6 +160,9 @@ A comprehensive financial management web application designed for tracking and m
   - Repayment transaction clearly labeled in transaction history
 - During expense transaction entry, display remaining budget balance for the selected budget category for current month
 - Show budget balance information prominently before transaction confirmation to help user make informed spending decisions
+- **Available Balance Display**: When user selects from account during expense transaction, withdrawal transaction, or transfer transaction entry, system displays current available balance of the selected account
+- Available balance shown immediately after account selection and before transaction amount entry
+- Balance display helps user verify sufficient funds before completing transaction
 - Dashboard auto-updates after each transaction\n- Screen refreshes automatically after transaction entry
 - **Automatic Interest Transaction**: On EMI due day, system automatically creates interest transaction in loan account
 - Interest transaction increases loan balance (more negative)
@@ -200,8 +201,7 @@ A comprehensive financial management web application designed for tracking and m
 - Active tab highlighted with visual indicator
 - Each tab loads relevant content dynamically
 - Tab selection persists during user session
-
-#### 2.4.2 Financial Summary (Overview Tab)
+\n#### 2.4.2 Financial Summary (Overview Tab)
 - Current Assets: Sum of Cash and Bank Account balances
 - Current Liabilities: Sum of Credit Card balances only
 - Liquid Assets: Sum of Cash and Bank Account balances
@@ -309,3 +309,4 @@ A comprehensive financial management web application designed for tracking and m
 
 ## 4. Reference Images
 - IMG_7775.jpeg: Budget status display showing category selection, budgeted amount, spent amount, and remaining budget for Bills & Utilities category
+- IMG_7776.jpeg: Reports section showing transaction summary with total income, total expenses, and net position displays
