@@ -285,10 +285,59 @@ export function HybridAuthProvider({ children }: { children: ReactNode }) {
         throw new Error('Email already registered');
       }
 
-      toast({
-        title: 'Success',
-        description: 'Account created! Please check your email to verify your account.',
-      });
+      // If user is created and confirmed immediately (email verification disabled)
+      if (data.user && data.session) {
+        // Check if profile exists
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.user.id)
+          .maybeSingle();
+
+        // If profile doesn't exist, create it
+        if (!existingProfile) {
+          // Check if this is the first user (should be admin)
+          const { count } = await supabase
+            .from('profiles')
+            .select('*', { count: 'exact', head: true });
+
+          const role = count === 0 ? 'admin' : 'user';
+
+          await supabase
+            .from('profiles')
+            .insert({
+              id: data.user.id,
+              email: data.user.email,
+              phone: data.user.phone,
+              role: role,
+            });
+        }
+
+        // Initialize encryption for the new user
+        await initializeUserEncryption(data.user.id, existingProfile?.encryption_salt || null);
+
+        // Load profile
+        const profile = await profileApi.getProfile(data.user.id);
+        setProfile(profile);
+        setUser(data.user);
+        setAuthProvider('supabase');
+
+        toast({
+          title: 'Success',
+          description: 'Account created successfully! Redirecting to dashboard...',
+        });
+
+        // Navigate to dashboard
+        setTimeout(() => {
+          window.location.href = '/dashboard';
+        }, 1000);
+      } else {
+        // Email verification is required
+        toast({
+          title: 'Success',
+          description: 'Account created! Please check your email to verify your account.',
+        });
+      }
     } catch (error: any) {
       console.error('Email signup error:', error);
       toast({
@@ -298,7 +347,7 @@ export function HybridAuthProvider({ children }: { children: ReactNode }) {
       });
       throw error;
     }
-  }, [toast]);
+  }, [toast, initializeUserEncryption]);
 
   // Sign out
   const signOut = useCallback(async () => {
