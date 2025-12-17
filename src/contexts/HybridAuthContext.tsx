@@ -56,6 +56,7 @@ export function HybridAuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [hasEncryptionKey, setHasEncryptionKey] = useState(false);
   const [authProvider, setAuthProvider] = useState<'auth0' | 'supabase' | null>(null);
+  const [isProviderReady, setIsProviderReady] = useState(false);
 
   // Initialize encryption for a user
   const initializeUserEncryption = useCallback(async (userId: string, existingSalt: string | null) => {
@@ -379,6 +380,11 @@ export function HybridAuthProvider({ children }: { children: ReactNode }) {
     }
   }, [user, profile, refreshProfile]);
 
+  // Mark provider as ready after initial setup
+  useEffect(() => {
+    setIsProviderReady(true);
+  }, []);
+
   const value: HybridAuthContextType = {
     user,
     profile,
@@ -393,6 +399,11 @@ export function HybridAuthProvider({ children }: { children: ReactNode }) {
     updateEncryptionKeyStatus,
     authProvider,
   };
+
+  // Don't render children until provider is ready
+  if (!isProviderReady) {
+    return null;
+  }
 
   return (
     <HybridAuthContext.Provider value={value}>
