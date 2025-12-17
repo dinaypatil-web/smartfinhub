@@ -460,7 +460,7 @@ export default function TransactionForm() {
                             {account.account_name}
                           </SelectItem>
                         ))
-                      : accounts.map(account => (
+                      : accounts.filter(a => a.account_type !== 'loan').map(account => (
                           <SelectItem key={account.id} value={account.id}>
                             {account.account_name} ({account.account_type})
                           </SelectItem>
