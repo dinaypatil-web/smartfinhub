@@ -468,6 +468,41 @@ export default function TransactionForm() {
                     }
                   </SelectContent>
                 </Select>
+                
+                {/* Display available balance for selected account */}
+                {formData.from_account_id && (() => {
+                  const selectedAccount = accounts.find((a: Account) => a.id === formData.from_account_id);
+                  if (selectedAccount) {
+                    const isCreditCard = selectedAccount.account_type === 'credit_card';
+                    const availableBalance = isCreditCard 
+                      ? (selectedAccount.credit_limit || 0) + selectedAccount.balance // Credit card: limit + negative balance
+                      : selectedAccount.balance; // Other accounts: actual balance
+                    
+                    return (
+                      <div className="mt-2 p-3 rounded-lg bg-muted/50 border border-border">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">
+                            {isCreditCard ? 'Available Credit' : 'Available Balance'}
+                          </span>
+                          <span className={`text-sm font-semibold ${
+                            availableBalance < 0 ? 'text-destructive' : 'text-emerald-600 dark:text-emerald-400'
+                          }`}>
+                            {formatCurrency(availableBalance, selectedAccount.currency)}
+                          </span>
+                        </div>
+                        {isCreditCard && selectedAccount.credit_limit && (
+                          <div className="flex items-center justify-between mt-1">
+                            <span className="text-xs text-muted-foreground">Credit Limit</span>
+                            <span className="text-xs text-muted-foreground">
+                              {formatCurrency(selectedAccount.credit_limit, selectedAccount.currency)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
             )}
 
