@@ -200,3 +200,15 @@ export interface LoanAccountWithPayments extends LoanAccountWithCalculations {
   total_interest_paid?: number;
   remaining_principal?: number;
 }
+
+export interface QuickLink {
+  id: string;
+  user_id: string;
+  name: string;
+  url: string;
+  icon: string;
+  color: string;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+}

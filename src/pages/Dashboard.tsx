@@ -35,6 +35,7 @@ import InterestRateTable from '@/components/InterestRateTable';
 import BankLogo from '@/components/BankLogo';
 import AccountStatementDialog from '@/components/AccountStatementDialog';
 import QuickLinks from '@/components/dashboard/QuickLinks';
+import QuickLinksWidget from '@/components/dashboard/QuickLinksWidget';
 import { getBankAppLink } from '@/config/paymentApps';
 
 export default function Dashboard() {
@@ -526,6 +527,9 @@ export default function Dashboard() {
           ...summary.accounts_by_type.loan
         ] : []}
       />
+
+      {/* User-Defined Quick Links */}
+      <QuickLinksWidget />
 
       {cashFlow && (
         <Card className="border-l-4 border-l-indigo-500 bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-950/20 dark:to-blue-950/20 shadow-card">
