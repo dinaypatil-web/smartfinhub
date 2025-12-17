@@ -5,7 +5,7 @@ export interface BankingApp {
   logo: string;
   deepLink: string;
   webUrl: string;
-  category: 'upi' | 'wallet' | 'banking' | 'payment';
+  category: 'upi' | 'wallet' | 'banking' | 'payment' | 'finance';
 }
 
 export const bankingApps: BankingApp[] = [
@@ -177,6 +177,116 @@ export const bankingApps: BankingApp[] = [
     deepLink: 'freecharge://',
     webUrl: 'https://www.freecharge.in',
     category: 'wallet'
+  },
+  
+  // Finance & Investment Apps
+  {
+    id: 'mint',
+    name: 'Mint',
+    description: 'Budget tracking and financial management',
+    logo: 'https://upload.wikimedia.org/wikipedia/commons/4/4e/Mint.com_logo.svg',
+    deepLink: 'mint://',
+    webUrl: 'https://mint.intuit.com',
+    category: 'finance'
+  },
+  {
+    id: 'ynab',
+    name: 'YNAB',
+    description: 'You Need A Budget - budgeting app',
+    logo: 'https://www.youneedabudget.com/wp-content/themes/dupatta/dist/images/ynab-logo.svg',
+    deepLink: 'ynab://',
+    webUrl: 'https://www.youneedabudget.com',
+    category: 'finance'
+  },
+  {
+    id: 'personal-capital',
+    name: 'Personal Capital',
+    description: 'Wealth management and financial planning',
+    logo: 'https://upload.wikimedia.org/wikipedia/commons/8/8f/Empower_logo.svg',
+    deepLink: 'personalcapital://',
+    webUrl: 'https://www.personalcapital.com',
+    category: 'finance'
+  },
+  {
+    id: 'quicken',
+    name: 'Quicken',
+    description: 'Personal finance management software',
+    logo: 'https://upload.wikimedia.org/wikipedia/commons/3/3e/Quicken_logo.svg',
+    deepLink: 'quicken://',
+    webUrl: 'https://www.quicken.com',
+    category: 'finance'
+  },
+  {
+    id: 'robinhood',
+    name: 'Robinhood',
+    description: 'Stock trading and investing',
+    logo: 'https://upload.wikimedia.org/wikipedia/commons/9/9b/Robinhood_logo.svg',
+    deepLink: 'robinhood://',
+    webUrl: 'https://robinhood.com',
+    category: 'finance'
+  },
+  {
+    id: 'etrade',
+    name: 'E*TRADE',
+    description: 'Online brokerage and trading',
+    logo: 'https://upload.wikimedia.org/wikipedia/commons/7/7e/E-Trade_logo.svg',
+    deepLink: 'etrade://',
+    webUrl: 'https://www.etrade.com',
+    category: 'finance'
+  },
+  {
+    id: 'fidelity',
+    name: 'Fidelity',
+    description: 'Investment and retirement planning',
+    logo: 'https://upload.wikimedia.org/wikipedia/commons/6/6d/Fidelity_Investments_logo.svg',
+    deepLink: 'fidelity://',
+    webUrl: 'https://www.fidelity.com',
+    category: 'finance'
+  },
+  {
+    id: 'charles-schwab',
+    name: 'Charles Schwab',
+    description: 'Brokerage and financial services',
+    logo: 'https://upload.wikimedia.org/wikipedia/commons/9/9d/Charles_Schwab_Corporation_logo.svg',
+    deepLink: 'schwab://',
+    webUrl: 'https://www.schwab.com',
+    category: 'finance'
+  },
+  {
+    id: 'coinbase',
+    name: 'Coinbase',
+    description: 'Cryptocurrency exchange and wallet',
+    logo: 'https://upload.wikimedia.org/wikipedia/commons/1/1a/Coinbase.svg',
+    deepLink: 'coinbase://',
+    webUrl: 'https://www.coinbase.com',
+    category: 'finance'
+  },
+  {
+    id: 'acorns',
+    name: 'Acorns',
+    description: 'Micro-investing and savings',
+    logo: 'https://upload.wikimedia.org/wikipedia/commons/8/8f/Acorns_%28company%29_logo.svg',
+    deepLink: 'acorns://',
+    webUrl: 'https://www.acorns.com',
+    category: 'finance'
+  },
+  {
+    id: 'stash',
+    name: 'Stash',
+    description: 'Investing and banking app',
+    logo: 'https://www.stash.com/wp-content/themes/stash/assets/images/stash-logo.svg',
+    deepLink: 'stash://',
+    webUrl: 'https://www.stash.com',
+    category: 'finance'
+  },
+  {
+    id: 'wealthfront',
+    name: 'Wealthfront',
+    description: 'Automated investing and financial planning',
+    logo: 'https://www.wealthfront.com/next/images/wealthfront-logo.svg',
+    deepLink: 'wealthfront://',
+    webUrl: 'https://www.wealthfront.com',
+    category: 'finance'
   }
 ];
 
