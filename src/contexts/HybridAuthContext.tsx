@@ -11,7 +11,7 @@ import { useAuth0 } from '@auth0/auth0-react';
 import { supabase } from '@/db/supabase';
 import type { Profile } from '@/types/types';
 import { profileApi } from '@/db/api';
-import { keyManager } from '@/utils/encryption';
+import { keyManager, initializeEncryption } from '@/utils/encryption';
 import { useToast } from '@/hooks/use-toast';
 
 interface HybridAuthContextType {
@@ -97,6 +97,9 @@ export function HybridAuthProvider({ children }: { children: ReactNode }) {
         }
 
         setProfile(newProfile);
+        
+        // Initialize encryption for new user
+        await initializeUserEncryption(newProfile.id, null);
       } else {
         // Update auth0_sub if not set
         if (!existingProfile.auth0_sub) {
@@ -106,9 +109,36 @@ export function HybridAuthProvider({ children }: { children: ReactNode }) {
             .eq('id', existingProfile.id);
         }
         setProfile(existingProfile);
+        
+        // Initialize encryption for existing user
+        await initializeUserEncryption(existingProfile.id, existingProfile.encryption_salt);
       }
     } catch (error) {
       console.error('Error syncing Auth0 user:', error);
+    }
+  }, [toast]);
+
+  // Initialize encryption for a user
+  const initializeUserEncryption = useCallback(async (userId: string, existingSalt: string | null) => {
+    try {
+      const { salt } = await initializeEncryption(userId, existingSalt || undefined);
+      
+      // If this is a new user without a salt, save it to the database
+      if (!existingSalt) {
+        await supabase
+          .from('profiles')
+          .update({ encryption_salt: salt })
+          .eq('id', userId);
+      }
+      
+      setHasEncryptionKey(true);
+    } catch (error) {
+      console.error('Error initializing encryption:', error);
+      toast({
+        title: 'Warning',
+        description: 'Failed to initialize encryption. Some features may not work correctly.',
+        variant: 'destructive',
+      });
     }
   }, [toast]);
 
@@ -296,6 +326,14 @@ export function HybridAuthProvider({ children }: { children: ReactNode }) {
       if (session?.user) {
         setUser(session.user);
         setAuthProvider('supabase');
+        
+        // Initialize encryption for Supabase user
+        const userProfile = await profileApi.getProfile(session.user.id);
+        if (userProfile) {
+          setProfile(userProfile);
+          await initializeUserEncryption(session.user.id, userProfile.encryption_salt);
+        }
+        
         setHasEncryptionKey(keyManager.hasKey());
       }
 
@@ -305,14 +343,21 @@ export function HybridAuthProvider({ children }: { children: ReactNode }) {
     if (!isAuth0Loading) {
       initAuth();
     }
-  }, [isAuth0Authenticated, auth0User, isAuth0Loading, syncAuth0UserWithSupabase]);
+  }, [isAuth0Authenticated, auth0User, isAuth0Loading, syncAuth0UserWithSupabase, initializeUserEncryption]);
 
   // Listen to Supabase auth changes
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user && !isAuth0Authenticated) {
         setUser(session.user);
         setAuthProvider('supabase');
+        
+        // Initialize encryption for Supabase user
+        const userProfile = await profileApi.getProfile(session.user.id);
+        if (userProfile) {
+          setProfile(userProfile);
+          await initializeUserEncryption(session.user.id, userProfile.encryption_salt);
+        }
       } else if (!session?.user && !isAuth0Authenticated) {
         setUser(null);
         setProfile(null);
@@ -325,7 +370,7 @@ export function HybridAuthProvider({ children }: { children: ReactNode }) {
     return () => {
       subscription.unsubscribe();
     };
-  }, [isAuth0Authenticated]);
+  }, [isAuth0Authenticated, initializeUserEncryption]);
 
   // Fetch profile when user changes
   useEffect(() => {
