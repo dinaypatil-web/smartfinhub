@@ -16,7 +16,8 @@ A comprehensive financial management web application designed for tracking and m
 - **No Third-Party Dependency**: Email verification system built into application without relying on external authentication services
 - Application uses its own SMTP server configuration to send verification emails
 - Verified email address serves as username for secure login
-- **Forgot Password Option**: Forgot password link displayed on login page\n- Password reset via email verification code
+- **Forgot Password Option**: Forgot password link displayed on login page
+- Password reset via email verification code
 - User receives 6-digit verification code to registered email address
 - After entering valid verification code, user can set new password
 - Password reset verification code valid for 15 minutes
@@ -24,7 +25,8 @@ A comprehensive financial management web application designed for tracking and m
 - User must enter current password before setting new password
 - Password change confirmation sent to registered email address
 \n## 2. Core Features
-\n### 2.1 User Preferences
+
+### 2.1 User Preferences
 - Select default country from dropdown list
 - Choose preferred currency for dashboard display
 - Country and currency settings saved to user profile
@@ -76,7 +78,8 @@ A comprehensive financial management web application designed for tracking and m
 - System saves user-corrected values and uses them for all subsequent calculations
 - Corrected values reflected in loan account statement and accrued interest calculations
 - **Loan Account Statement Generation**: System generates detailed loan account statement showing:
-  - Each EMI payment with date and amount\n  - Principal and interest breakdown for each payment (including user corrections)
+  - Each EMI payment with date and amount
+  - Principal and interest breakdown for each payment (including user corrections)
   - Running balance of outstanding principal after each payment
   - Cumulative interest paid to date
   - Remaining loan balance
@@ -86,42 +89,56 @@ A comprehensive financial management web application designed for tracking and m
   - Current outstanding principal balance
   - Interest rate and payment schedule
 - Accrued interest displayed on dashboard and loan account detail page
-- **Edit EMI History**: User can add, edit, or delete historical EMI payment records at any time\n- User can modify principal and interest breakdown for any EMI payment record
+- **Edit EMI History**: User can add, edit, or delete historical EMI payment records at any time
+- User can modify principal and interest breakdown for any EMI payment record
 - System recalculates principal/interest breakdown and accrued interest automatically when EMI history is modified
-- **Automatic Monthly Interest Calculation and Addition**: On the EMI due day of each month, system automatically:
-  - Calculates interest for the month based on outstanding principal balance and all transactions in loan account during the month
+- **Automatic Monthly Interest Calculation and Addition**: On the EMI due day of each month, system automatically:\n  - Calculates interest for the month based on outstanding principal balance and all transactions in loan account during the month
   - Considers all payments, additional payments, and principal adjustments made during the month
-  - Adds calculated monthly interest amount to the loan account balance\n  - Records interest addition as a system-generated transaction in loan account statement
+  - Adds calculated monthly interest amount to the loan account balance
+  - Records interest addition as a system-generated transaction in loan account statement
   - Updates total accrued interest on dashboard and loan account detail page
 - Sends notification to user about monthly interest addition
 - Interest calculation uses daily balance method considering all intra-month transactions
-- System maintains complete audit trail of all automatic interest additions\n
+- System maintains complete audit trail of all automatic interest additions
+
 #### 2.2.5 Floating Interest Rate Management
 - Record all interest rate changes from loan inception to current date
-- User can update floating interest rate at any time\n- System maintains complete historical record of rate changes
+- User can update floating interest rate at any time
+- System maintains complete historical record of rate changes
 - Auto-calculate total accrued interest till date
 - Display accrued interest on dashboard and account detail page
 - Chart visualization showing floating interest rate history over time
 - **EMI Recalculation on Rate Change**: When floating interest rate is updated, system recalculates principal and interest components for all subsequent EMI payments
-- Updated interest breakdown reflected in loan account statement
-- Automatic monthly interest calculation uses current applicable interest rate
+- Updated interest breakdown reflected in loan account statement\n- Automatic monthly interest calculation uses current applicable interest rate
 \n#### 2.2.6 Data Security
-- **End-to-End Encryption**: All user data encrypted in database using industry-standard encryption algorithms
-- **Zero-Knowledge Architecture**: Application creator and administrators have no access to decrypted user data
-- **Client-Side Encryption**: User data encrypted on client side before transmission to server
-- **User-Specific Encryption Keys**: Each user's data encrypted with unique encryption key derived from user credentials
-- Encryption keys never stored on server in plain text
-- Bank account numbers encrypted in database
-- Credit card numbers encrypted in database
-- Loan account numbers encrypted in database
-- Transaction details encrypted in database
-- Personal information encrypted in database
-- Budget data encrypted in database
-- Account balances encrypted in database
-- All financial data encrypted at rest and in transit
-- Account data accessible only by authenticated account owner with valid decryption credentials
-- **Data Privacy Guarantee**: System architecture ensures that even database administrators and application developers cannot access or view user's financial information
-\n#### 2.2.7 Account Modification\n- Edit any account information at any time
+- **End-to-End Encryption**: All user data encrypted in database using industry-standard AES-256 encryption algorithm
+- **Zero-Knowledge Architecture**: Application creator, administrators, and database administrators have no access to decrypted user data
+- **Client-Side Encryption**: All user data encrypted on client side before transmission to server
+- **User-Specific Encryption Keys**: Each user's data encrypted with unique encryption key derived from user credentials using PBKDF2 key derivation function
+- Encryption keys never stored on server in plain text or recoverable form
+- **Comprehensive Data Encryption**: All user data stored in encrypted form including:
+  - User profile information (name, email, contact details, preferences)
+  - Bank account numbers and account details
+  - Credit card numbers and credit card details
+  - Loan account numbers and loan details
+  - All transaction records (income, expenses, transfers, payments)
+  - Transaction descriptions and notes
+  - Budget data and budget categories
+  - Account balances (current and historical)
+  - EMI payment history and breakdowns
+  - Interest rate history\n  - Financial reports and analytics data
+  - User settings and preferences
+  - Session data and activity logs
+- **Encryption at Rest**: All data encrypted in database storage\n- **Encryption in Transit**: All data transmission between client and server protected by TLS/SSL encryption
+- **Secure Key Management**: Encryption keys derived from user password and never stored on server
+- User password hashed using bcrypt before storage
+- **Data Privacy Guarantee**: System architecture ensures that even database administrators, application developers, and hosting providers cannot access or view user's financial information in decrypted form
+- **No Backdoor Access**: No master key or backdoor mechanism exists to decrypt user data without user credentials
+- **Secure Session Management**: User sessions encrypted and protected against hijacking
+- **Automatic Logout**: Sessions automatically expire after period of inactivity
+- **Data Isolation**: Each user's encrypted data completely isolated from other users\n- **Audit Trail Encryption**: All system logs and audit trails encrypted to protect user activity information
+
+#### 2.2.7 Account Modification\n- Edit any account information at any time
 - Delete accounts with user confirmation
 \n#### 2.2.8 External App Integration
 - **Bank App Quick Link**: Each bank account card on dashboard displays clickable link icon to open the associated bank's mobile app or web banking portal
@@ -135,13 +152,13 @@ A comprehensive financial management web application designed for tracking and m
 - For other countries: Links to country-specific popular payment apps (e.g., Venmo for USA, Alipay for China, PayPal for global)
 - **Automatic UPI App Logo Fetching**: When UPI/payment app logo is not available in system database, automatically fetch the official app logo from internet sources
 - Fetched UPI app logos displayed as icon buttons in dashboard header or dedicated quick access section
-- System caches fetched UPI app logos for future use
-- UPI app links displayed as icon buttons in dashboard header or dedicated quick access section
+- System caches fetched UPI app logos for future use\n- UPI app links displayed as icon buttons in dashboard header or dedicated quick access section
 - Clicking UPI app link opens the respective payment app (if installed) or redirects to app download page
 - System detects user's country from account settings to display relevant payment app options
 - User can customize which UPI/payment app links to display in dashboard settings
 
-### 2.3 Transaction Management\n\n#### 2.3.1 Transaction Types
+### 2.3 Transaction Management\n
+#### 2.3.1 Transaction Types
 - Income transactions
 - Expense transactions\n- Cash withdrawals (from bank account or credit card)
 - Bank-to-bank transfers
@@ -164,16 +181,13 @@ A comprehensive financial management web application designed for tracking and m
 - Show budget balance information prominently before transaction confirmation to help user make informed spending decisions
 - Dashboard auto-updates after each transaction\n- Screen refreshes automatically after transaction entry
 - **Automatic Interest Transaction**: On EMI due day, system automatically creates interest transaction in loan account
-- Interest transaction increases loan balance (more negative)
-- Interest transaction marked as system-generated and non-editable by user
+- Interest transaction increases loan balance (more negative)\n- Interest transaction marked as system-generated and non-editable by user
 - All loan account transactions considered in monthly interest calculation
 \n#### 2.3.3 Credit Card Transaction with EMI Option
-- **EMI Payment Option**: During credit card transaction entry, system prompts user to select payment method
-- Payment options: Full Payment or EMI (Equated Monthly Installment)\n- **EMI Configuration**: If EMI option selected, user provides:
+- **EMI Payment Option**: During credit card transaction entry, system prompts user to select payment method\n- Payment options: Full Payment or EMI (Equated Monthly Installment)\n- **EMI Configuration**: If EMI option selected, user provides:
   - EMI Duration: Number of months for installment plan
   - Bank EMI Charges: Processing fee or interest charges applied by bank
-- **EMI Calculation**: System automatically calculates monthly EMI amount based on transaction amount, duration, and bank charges
-- **Statement Amount Calculation**: System calculates EMI amount to be included in monthly credit card statement
+- **EMI Calculation**: System automatically calculates monthly EMI amount based on transaction amount, duration, and bank charges\n- **Statement Amount Calculation**: System calculates EMI amount to be included in monthly credit card statement
 - **Dashboard Display**: EMI details displayed on dashboard including:
   - Total EMI amount
   - Monthly installment amount
@@ -232,13 +246,13 @@ A comprehensive financial management web application designed for tracking and m
 - Bank or financial institution logo\n- Account type indicator\n- Last 4 digits of account number only\n- Real-time current balance\n- For loan accounts: Total accrued interest till date including automatic monthly interest additions
 - **For credit card accounts**:
   - Display next statement date and payment due date as reminders
-  - Show user-defined credit limit\n  - Display available credit remaining\n  - Show active EMI transactions count
+  - Show user-defined credit limit
+  - Display available credit remaining\n  - Show active EMI transactions count
   - Display total outstanding EMI balance
   - Show next EMI installment amount and due date
 - Visual indicators highlighting upcoming statement dates and due dates within7 days
 - **For loan accounts**: Visual indicator showing next EMI due date and automatic interest calculation date
-- **Bank App Quick Access Icon**: Clickable icon on each bank account card to open bank's mobile app or web banking portal
-\n#### 2.4.6 Account Quick View (Accounts Tab)
+- **Bank App Quick Access Icon**: Clickable icon on each bank account card to open bank's mobile app or web banking portal\n\n#### 2.4.6 Account Quick View (Accounts Tab)
 - **Click-to-View Statement**: When user clicks on any account card on dashboard, system displays popup window showing last 90 days statement for that account
 - Popup includes transaction history, balance changes, and account activity for the 90-day period
 - **For loan accounts**: Popup displays detailed EMI payment history with principal and interest breakdown for each payment within the 90-day period, including automatic monthly interest additions
@@ -294,7 +308,8 @@ A comprehensive financial management web application designed for tracking and m
 - Secondary color: Emerald green (#10B981) for positive balances and income indicators
 - Accent color: Amber (#F59E0B) for alerts and important notifications
 - Negative indicator: Coral red (#EF4444) for liabilities and overspending
-\n### 3.2 Visual Details
+
+### 3.2 Visual Details
 - Card-based layout with subtle drop shadows for depth
 - Rounded corners (8px radius) for modern, approachable aesthetic
 - Smooth hover transitions on interactive elements

@@ -87,6 +87,48 @@ export async function deriveKeyFromPassword(
 }
 
 /**
+ * Derive encryption key from user ID (for Auth0/OAuth scenarios)
+ * This provides application-level encryption when password is not available
+ */
+export async function deriveKeyFromUserId(
+  userId: string,
+  salt: Uint8Array
+): Promise<CryptoKey> {
+  // Use user ID as the key material
+  // Note: This is less secure than password-based encryption but provides
+  // an additional layer of protection beyond database-level encryption
+  const encoder = new TextEncoder();
+  const userIdBuffer = encoder.encode(userId);
+  
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    userIdBuffer.buffer,
+    'PBKDF2',
+    false,
+    ['deriveBits', 'deriveKey']
+  );
+
+  // Derive actual encryption key
+  const key = await crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: salt.buffer as ArrayBuffer,
+      iterations: ENCRYPTION_CONFIG.pbkdf2Iterations,
+      hash: 'SHA-256',
+    },
+    keyMaterial,
+    {
+      name: ENCRYPTION_CONFIG.algorithm,
+      length: ENCRYPTION_CONFIG.keyLength,
+    },
+    true, // extractable
+    ['encrypt', 'decrypt']
+  );
+
+  return key;
+}
+
+/**
  * Encrypt data using AES-GCM
  */
 export async function encryptData(
@@ -293,4 +335,34 @@ export async function getEncryptionKey(): Promise<CryptoKey> {
     throw new Error('Encryption key not available. Please log in again.');
   }
   return key;
+}
+
+/**
+ * Initialize encryption for a user (Auth0/OAuth scenario)
+ * Generates or retrieves salt and derives encryption key from user ID
+ */
+export async function initializeEncryption(
+  userId: string,
+  existingSalt?: string
+): Promise<{ key: CryptoKey; salt: string }> {
+  let salt: Uint8Array;
+  
+  if (existingSalt) {
+    // Use existing salt
+    salt = base64ToArrayBuffer(existingSalt);
+  } else {
+    // Generate new salt
+    salt = generateSalt();
+  }
+  
+  // Derive key from user ID
+  const key = await deriveKeyFromUserId(userId, salt);
+  
+  // Store key in session
+  await keyManager.setKey(key);
+  
+  return {
+    key,
+    salt: arrayBufferToBase64(salt),
+  };
 }

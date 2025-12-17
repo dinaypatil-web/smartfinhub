@@ -14,6 +14,14 @@ import type {
   FinancialSummary,
   BudgetAnalysis
 } from '@/types/types';
+import {
+  encryptAccount,
+  decryptAccount,
+  decryptAccounts,
+  encryptTransaction,
+  decryptTransaction,
+  decryptTransactions,
+} from '@/utils/encryptedStorage';
 
 export const profileApi = {
   async getProfile(userId: string): Promise<Profile | null> {
@@ -60,7 +68,16 @@ export const accountApi = {
       .order('created_at', { ascending: false });
     
     if (error) throw error;
-    return Array.isArray(data) ? data : [];
+    const accounts = Array.isArray(data) ? data : [];
+    
+    // Decrypt accounts before returning
+    try {
+      return await decryptAccounts(accounts);
+    } catch (encryptionError) {
+      console.error('Failed to decrypt accounts:', encryptionError);
+      // Return unencrypted data if decryption fails (for backward compatibility)
+      return accounts;
+    }
   },
 
   async getAccountById(accountId: string): Promise<Account | null> {
@@ -71,7 +88,16 @@ export const accountApi = {
       .maybeSingle();
     
     if (error) throw error;
-    return data;
+    if (!data) return null;
+    
+    // Decrypt account before returning
+    try {
+      return await decryptAccount(data);
+    } catch (encryptionError) {
+      console.error('Failed to decrypt account:', encryptionError);
+      // Return unencrypted data if decryption fails
+      return data;
+    }
   },
 
   async getAccountWithInterestHistory(accountId: string): Promise<AccountWithInterestHistory | null> {
@@ -92,39 +118,72 @@ export const accountApi = {
     
     if (historyError) throw historyError;
 
-    return {
-      ...account,
-      interest_history: Array.isArray(history) ? history : []
-    };
+    // Decrypt account before returning
+    try {
+      const decryptedAccount = await decryptAccount(account);
+      return {
+        ...decryptedAccount,
+        interest_history: Array.isArray(history) ? history : []
+      };
+    } catch (encryptionError) {
+      console.error('Failed to decrypt account:', encryptionError);
+      return {
+        ...account,
+        interest_history: Array.isArray(history) ? history : []
+      };
+    }
   },
 
   async createAccount(account: Omit<Account, 'id' | 'created_at' | 'updated_at'>): Promise<Account> {
+    // Encrypt account before storing
+    const encryptedAccount = await encryptAccount({
+      ...account,
+      balance: account.balance || 0,
+      currency: account.currency || 'INR'
+    });
+    
     const { data, error } = await supabase
       .from('accounts')
-      .insert({
-        ...account,
-        balance: account.balance || 0,
-        currency: account.currency || 'INR'
-      })
+      .insert(encryptedAccount)
       .select()
       .maybeSingle();
     
     if (error) throw error;
     if (!data) throw new Error('Failed to create account');
-    return data;
+    
+    // Decrypt before returning
+    try {
+      return await decryptAccount(data);
+    } catch (encryptionError) {
+      console.error('Failed to decrypt created account:', encryptionError);
+      return data;
+    }
   },
 
   async updateAccount(accountId: string, updates: Partial<Account>): Promise<Account> {
+    // Encrypt updates before storing
+    const encryptedUpdates = await encryptAccount({
+      ...updates,
+      updated_at: new Date().toISOString()
+    });
+    
     const { data, error } = await supabase
       .from('accounts')
-      .update({ ...updates, updated_at: new Date().toISOString() })
+      .update(encryptedUpdates)
       .eq('id', accountId)
       .select()
       .maybeSingle();
     
     if (error) throw error;
     if (!data) throw new Error('Account not found');
-    return data;
+    
+    // Decrypt before returning
+    try {
+      return await decryptAccount(data);
+    } catch (encryptionError) {
+      console.error('Failed to decrypt updated account:', encryptionError);
+      return data;
+    }
   },
 
   async deleteAccount(accountId: string): Promise<void> {
@@ -247,7 +306,15 @@ export const transactionApi = {
     const { data, error } = await query;
     
     if (error) throw error;
-    return Array.isArray(data) ? data : [];
+    const transactions = Array.isArray(data) ? data : [];
+    
+    // Decrypt transactions before returning
+    try {
+      return await decryptTransactions(transactions);
+    } catch (encryptionError) {
+      console.error('Failed to decrypt transactions:', encryptionError);
+      return transactions;
+    }
   },
 
   async getTransactionsByDateRange(userId: string, startDate: string, endDate: string): Promise<Transaction[]> {
@@ -260,7 +327,15 @@ export const transactionApi = {
       .order('transaction_date', { ascending: false });
     
     if (error) throw error;
-    return Array.isArray(data) ? data : [];
+    const transactions = Array.isArray(data) ? data : [];
+    
+    // Decrypt transactions before returning
+    try {
+      return await decryptTransactions(transactions);
+    } catch (encryptionError) {
+      console.error('Failed to decrypt transactions:', encryptionError);
+      return transactions;
+    }
   },
 
   async getTransactionsByCategory(userId: string, category: string): Promise<Transaction[]> {
@@ -272,7 +347,15 @@ export const transactionApi = {
       .order('transaction_date', { ascending: false });
     
     if (error) throw error;
-    return Array.isArray(data) ? data : [];
+    const transactions = Array.isArray(data) ? data : [];
+    
+    // Decrypt transactions before returning
+    try {
+      return await decryptTransactions(transactions);
+    } catch (encryptionError) {
+      console.error('Failed to decrypt transactions:', encryptionError);
+      return transactions;
+    }
   },
 
   async getTransactionsByAccount(userId: string, accountId: string): Promise<Transaction[]> {
@@ -284,16 +367,27 @@ export const transactionApi = {
       .order('transaction_date', { ascending: false });
     
     if (error) throw error;
-    return Array.isArray(data) ? data : [];
+    const transactions = Array.isArray(data) ? data : [];
+    
+    // Decrypt transactions before returning
+    try {
+      return await decryptTransactions(transactions);
+    } catch (encryptionError) {
+      console.error('Failed to decrypt transactions:', encryptionError);
+      return transactions;
+    }
   },
 
   async createTransaction(transaction: Omit<Transaction, 'id' | 'created_at' | 'updated_at'>): Promise<Transaction> {
+    // Encrypt transaction before storing
+    const encryptedTransaction = await encryptTransaction({
+      ...transaction,
+      currency: transaction.currency || 'INR'
+    });
+    
     const { data, error } = await supabase
       .from('transactions')
-      .insert({
-        ...transaction,
-        currency: transaction.currency || 'INR'
-      })
+      .insert(encryptedTransaction)
       .select()
       .maybeSingle();
     
@@ -302,7 +396,13 @@ export const transactionApi = {
 
     await this.updateAccountBalances(transaction);
     
-    return data;
+    // Decrypt before returning
+    try {
+      return await decryptTransaction(data);
+    } catch (encryptionError) {
+      console.error('Failed to decrypt created transaction:', encryptionError);
+      return data;
+    }
   },
 
   async updateTransaction(transactionId: string, updates: Partial<Transaction>): Promise<Transaction> {
@@ -312,9 +412,15 @@ export const transactionApi = {
       .eq('id', transactionId)
       .maybeSingle();
 
+    // Encrypt updates before storing
+    const encryptedUpdates = await encryptTransaction({
+      ...updates,
+      updated_at: new Date().toISOString()
+    });
+    
     const { data, error } = await supabase
       .from('transactions')
-      .update({ ...updates, updated_at: new Date().toISOString() })
+      .update(encryptedUpdates)
       .eq('id', transactionId)
       .select()
       .maybeSingle();
@@ -323,11 +429,22 @@ export const transactionApi = {
     if (!data) throw new Error('Transaction not found');
 
     if (oldTransaction) {
-      await this.reverseAccountBalances(oldTransaction);
-      await this.updateAccountBalances(data);
+      // Decrypt old transaction for balance reversal
+      const decryptedOld = await decryptTransaction(oldTransaction);
+      await this.reverseAccountBalances(decryptedOld);
+      
+      // Decrypt new transaction for balance update
+      const decryptedNew = await decryptTransaction(data);
+      await this.updateAccountBalances(decryptedNew);
     }
     
-    return data;
+    // Decrypt before returning
+    try {
+      return await decryptTransaction(data);
+    } catch (encryptionError) {
+      console.error('Failed to decrypt updated transaction:', encryptionError);
+      return data;
+    }
   },
 
   async deleteTransaction(transactionId: string): Promise<void> {
