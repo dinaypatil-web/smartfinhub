@@ -105,29 +105,37 @@ export default function Reports() {
 
   const calculateSummary = () => {
     const filtered = getFilteredTransactions();
+    
+    // Helper function to safely parse amount as number
+    const parseAmount = (amount: any): number => {
+      if (typeof amount === 'number') return amount;
+      if (typeof amount === 'string') return parseFloat(amount) || 0;
+      return 0;
+    };
+    
     const income = filtered
       .filter(t => t.transaction_type === 'income')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => sum + parseAmount(t.amount), 0);
     
     const expenses = filtered
       .filter(t => t.transaction_type === 'expense')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => sum + parseAmount(t.amount), 0);
 
     const withdrawals = filtered
       .filter(t => t.transaction_type === 'withdrawal')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => sum + parseAmount(t.amount), 0);
 
     const transfers = filtered
       .filter(t => t.transaction_type === 'transfer')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => sum + parseAmount(t.amount), 0);
 
     const loanPayments = filtered
       .filter(t => t.transaction_type === 'loan_payment')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => sum + parseAmount(t.amount), 0);
 
     const creditCardRepayments = filtered
       .filter(t => t.transaction_type === 'credit_card_repayment')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => sum + parseAmount(t.amount), 0);
 
     return {
       income,
