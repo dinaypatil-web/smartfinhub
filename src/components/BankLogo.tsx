@@ -59,14 +59,14 @@ const generateLogoUrls = (bankName: string): string[] => {
   
   // Use multiple reliable logo APIs
   domains.slice(0, 4).forEach(domain => {
+    // Google Favicon API with higher resolution - most reliable
+    urls.push(`https://www.google.com/s2/favicons?domain=${domain}&sz=128`);
+    
     // DuckDuckGo Icon API - reliable and fast
     urls.push(`https://icons.duckduckgo.com/ip3/${domain}.ico`);
     
     // Favicon Kit API - good quality
     urls.push(`https://api.faviconkit.com/${domain}/128`);
-    
-    // Google Favicon API - reliable fallback
-    urls.push(`https://www.google.com/s2/favicons?domain=${domain}&sz=128`);
   });
   
   return urls;
