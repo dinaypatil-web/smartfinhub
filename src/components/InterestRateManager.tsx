@@ -109,7 +109,7 @@ export default function InterestRateManager({ accountId, accountName, currentRat
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Current Interest Rate</p>
-                  <p className="text-2xl font-bold">{currentRate.toFixed(2)}%</p>
+                  <p className="text-2xl font-bold">{typeof currentRate === 'number' ? currentRate.toFixed(2) : '0.00'}%</p>
                 </div>
                 <TrendingUp className="h-8 w-8 text-primary" />
               </div>
