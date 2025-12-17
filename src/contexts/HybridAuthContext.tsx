@@ -217,10 +217,37 @@ export function HybridAuthProvider({ children }: { children: ReactNode }) {
         password,
       });
 
-      if (error) throw error;
+      if (error) {
+        // Check for specific error types
+        if (error.message.includes('Email not confirmed')) {
+          throw new Error('Please verify your email address before signing in. Check your inbox for the confirmation link.');
+        }
+        if (error.message.includes('Invalid login credentials')) {
+          throw new Error('Invalid email or password. Please check your credentials and try again.');
+        }
+        throw error;
+      }
+
+      if (!data.user) {
+        throw new Error('No user data returned');
+      }
+
+      // Check if email is confirmed
+      if (!data.user.email_confirmed_at && data.user.confirmed_at === null) {
+        throw new Error('Please verify your email address before signing in. Check your inbox for the confirmation link.');
+      }
 
       setUser(data.user);
       setAuthProvider('supabase');
+      
+      // Load profile and initialize encryption
+      const userProfile = await profileApi.getProfile(data.user.id);
+      if (userProfile) {
+        setProfile(userProfile);
+        await initializeUserEncryption(data.user.id, userProfile.encryption_salt);
+      } else {
+        throw new Error('Failed to load user profile');
+      }
       
       toast({
         title: 'Success',
@@ -235,7 +262,7 @@ export function HybridAuthProvider({ children }: { children: ReactNode }) {
       });
       throw error;
     }
-  }, [toast]);
+  }, [toast, initializeUserEncryption]);
 
   const signUpWithEmail = useCallback(async (email: string, password: string) => {
     try {
