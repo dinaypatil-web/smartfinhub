@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useHybridAuth as useAuth } from '@/contexts/HybridAuthContext';
-import { transactionApi, accountApi, emiApi, budgetApi } from '@/db/api';
+import { transactionApi, accountApi, emiApi } from '@/db/api';
 import type { Transaction, Account, EMITransaction } from '@/types/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,10 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Download, TrendingUp, TrendingDown, Calendar, CreditCard, DollarSign } from 'lucide-react';
+import { Loader2, Download, TrendingUp, TrendingDown, Calendar, CreditCard } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/utils/format';
 import { calculateTotalDueAmount, getBillingCycleInfo } from '@/utils/billingCycleCalculations';
-import { calculateMonthlyCashFlow, getCreditCardDuesDetails } from '@/utils/cashFlowCalculations';
 import BankLogo from '@/components/BankLogo';
 
 export default function Reports() {
@@ -34,10 +33,6 @@ export default function Reports() {
     `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
   );
   const [creditCardEMIs, setCreditCardEMIs] = useState<EMITransaction[]>([]);
-  
-  // Cash flow state
-  const [cashFlow, setCashFlow] = useState<any>(null);
-  const [creditCardDuesDetails, setCreditCardDuesDetails] = useState<any[]>([]);
 
   const currency = profile?.default_currency || 'INR';
 
@@ -84,50 +79,10 @@ export default function Reports() {
       ]);
       setTransactions(transactionsData);
       setAccounts(accountsData);
-      
-      // Load cash flow data
-      await loadCashFlowData(accountsData, transactionsData);
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
       setLoading(false);
-    }
-  };
-  
-  const loadCashFlowData = async (accountsData: Account[], transactionsData: Transaction[]) => {
-    if (!user) return;
-    
-    try {
-      const today = new Date();
-      const currentMonth = today.getMonth() + 1;
-      const currentYear = today.getFullYear();
-      const startOfMonth = new Date(currentYear, currentMonth - 1, 1).toISOString().split('T')[0];
-      const endOfMonth = new Date(currentYear, currentMonth, 0).toISOString().split('T')[0];
-      
-      // Get month transactions
-      const monthTransactions = transactionsData.filter(t => {
-        const txDate = new Date(t.transaction_date);
-        return txDate >= new Date(startOfMonth) && txDate <= new Date(endOfMonth);
-      });
-      
-      // Get budget
-      const budget = await budgetApi.getBudget(user.id, currentMonth, currentYear);
-      
-      // Calculate cash flow
-      const cashFlowData = calculateMonthlyCashFlow(
-        accountsData,
-        monthTransactions,
-        budget,
-        currentMonth,
-        currentYear
-      );
-      setCashFlow(cashFlowData);
-      
-      // Get credit card dues details
-      const creditCardDetails = getCreditCardDuesDetails(accountsData);
-      setCreditCardDuesDetails(creditCardDetails);
-    } catch (error) {
-      console.error('Error loading cash flow data:', error);
     }
   };
 
@@ -375,12 +330,11 @@ export default function Reports() {
 
       <Tabs defaultValue="summary" className="space-y-6">
         <div className="overflow-x-auto">
-          <TabsList className="inline-flex w-full min-w-max xl:grid xl:grid-cols-5">
+          <TabsList className="inline-flex w-full min-w-max xl:grid xl:grid-cols-4">
             <TabsTrigger value="summary" className="flex-1 xl:flex-none whitespace-nowrap">Summary</TabsTrigger>
             <TabsTrigger value="transactions" className="flex-1 xl:flex-none whitespace-nowrap">Transaction History</TabsTrigger>
             <TabsTrigger value="balances" className="flex-1 xl:flex-none whitespace-nowrap">Account Balances</TabsTrigger>
             <TabsTrigger value="credit-card" className="flex-1 xl:flex-none whitespace-nowrap">Credit Card Statement</TabsTrigger>
-            <TabsTrigger value="charts" className="flex-1 xl:flex-none whitespace-nowrap">Charts & Analytics</TabsTrigger>
           </TabsList>
         </div>
 
@@ -845,125 +799,6 @@ export default function Reports() {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
-        
-        <TabsContent value="charts" className="space-y-6">
-          {cashFlow && (
-            <Card className="border-l-4 border-l-indigo-500 bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-950/20 dark:to-blue-950/20 shadow-card">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-lg bg-indigo-500/20 flex items-center justify-center">
-                    <DollarSign className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-                  </div>
-                  Monthly Cash Flow Summary
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">Opening Balance</span>
-                        <span className="text-lg font-semibold text-blue-600 dark:text-blue-400">
-                          {formatCurrency(cashFlow.openingBalance, currency)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">Income Received</span>
-                        <span className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">
-                          + {formatCurrency(cashFlow.incomeReceived, currency)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">Expenses Incurred</span>
-                        <span className="text-lg font-semibold text-red-600 dark:text-red-400">
-                          - {formatCurrency(cashFlow.expensesIncurred, currency)}
-                        </span>
-                      </div>
-                      {cashFlow.creditCardRepayments > 0 && (
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-muted-foreground">Credit Card Repayments</span>
-                          <span className="text-lg font-semibold text-purple-600 dark:text-purple-400">
-                            - {formatCurrency(cashFlow.creditCardRepayments, currency)}
-                          </span>
-                        </div>
-                      )}
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">Remaining Budget</span>
-                        <span className="text-lg font-semibold text-amber-600 dark:text-amber-400">
-                          - {formatCurrency(cashFlow.remainingBudget, currency)}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2 border-l-2 border-muted pl-4">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium text-muted-foreground">Expected Balance</span>
-                        <span className="text-xl font-bold text-blue-600 dark:text-blue-400">
-                          {formatCurrency(cashFlow.expectedBalance, currency)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">Credit Card Dues</span>
-                        <span className="text-lg font-semibold text-purple-600 dark:text-purple-400">
-                          - {formatCurrency(cashFlow.creditCardDues, currency)}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="border-l-2 border-muted pl-4 flex items-center justify-between">
-                      <span className="text-base font-semibold text-muted-foreground">Net Available</span>
-                      <span className={`text-2xl font-bold ${cashFlow.netAvailable >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                        {formatCurrency(cashFlow.netAvailable, currency)}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="pt-2 border-t border-muted">
-                    <p className="text-xs text-muted-foreground">
-                      This summary shows your projected cash position for the current month based on opening balance, income received, expenses incurred, credit card repayments, remaining budget allocation, and credit card dues.
-                    </p>
-                  </div>
-
-                  {/* Credit Card Dues Breakdown */}
-                  {creditCardDuesDetails.length > 0 && (
-                    <div className="pt-3 border-t border-muted space-y-2">
-                      <h4 className="text-sm font-semibold text-muted-foreground">Upcoming Credit Card Dues</h4>
-                      {creditCardDuesDetails.map(({ account, dueAmount, nextDueDate }) => (
-                        <div key={account.id} className="flex items-center justify-between text-sm p-2 rounded bg-purple-50 dark:bg-purple-950/20">
-                          <div className="flex items-center gap-2">
-                            <CreditCard className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                            <div>
-                              <p className="font-medium">{account.account_name}</p>
-                              {nextDueDate && (
-                                <p className="text-xs text-muted-foreground">
-                                  Due: {nextDueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                          <span className="font-semibold text-purple-600 dark:text-purple-400">
-                            {formatCurrency(dueAmount, account.currency)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-          
-          {!cashFlow && (
-            <Card>
-              <CardContent className="py-8">
-                <div className="text-center text-muted-foreground">
-                  <DollarSign className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No cash flow data available. Add accounts and transactions to see your monthly cash flow summary.</p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
         </TabsContent>
       </Tabs>
     </div>
