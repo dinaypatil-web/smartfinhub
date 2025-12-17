@@ -13,8 +13,7 @@ import type {
   TransactionWithAccounts,
   FinancialSummary,
   BudgetAnalysis,
-  CustomBankLink,
-  QuickLink
+  CustomBankLink
 } from '@/types/types';
 import {
   encryptAccount,
@@ -1122,68 +1121,5 @@ export const customBankLinkApi = {
       .eq('id', id);
 
     if (error) throw error;
-  }
-};
-
-export const quickLinksApi = {
-  async getQuickLinks(userId: string): Promise<QuickLink[]> {
-    const { data, error } = await supabase
-      .from('quick_links')
-      .select('*')
-      .eq('user_id', userId)
-      .order('display_order', { ascending: true });
-
-    if (error) throw error;
-    return Array.isArray(data) ? data : [];
-  },
-
-  async createQuickLink(quickLink: Omit<QuickLink, 'id' | 'created_at' | 'updated_at'>): Promise<QuickLink> {
-    const { data, error } = await supabase
-      .from('quick_links')
-      .insert(quickLink)
-      .select()
-      .maybeSingle();
-
-    if (error) throw error;
-    if (!data) throw new Error('Failed to create quick link');
-    return data;
-  },
-
-  async updateQuickLink(id: string, updates: Partial<Omit<QuickLink, 'id' | 'user_id' | 'created_at' | 'updated_at'>>): Promise<QuickLink> {
-    const { data, error } = await supabase
-      .from('quick_links')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .maybeSingle();
-
-    if (error) throw error;
-    if (!data) throw new Error('Quick link not found');
-    return data;
-  },
-
-  async deleteQuickLink(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('quick_links')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
-  },
-
-  async reorderQuickLinks(userId: string, linkIds: string[]): Promise<void> {
-    // Update display_order for each link
-    const updates = linkIds.map((id, index) => ({
-      id,
-      display_order: index
-    }));
-
-    for (const update of updates) {
-      await supabase
-        .from('quick_links')
-        .update({ display_order: update.display_order })
-        .eq('id', update.id)
-        .eq('user_id', userId);
-    }
   }
 };
