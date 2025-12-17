@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, ArrowLeft } from 'lucide-react';
+import { Loader2, ArrowLeft, Smartphone } from 'lucide-react';
 import { countries } from '@/utils/countries';
 import { getBanksByCountry, getBankLogo } from '@/utils/banks';
 import { calculateEMI, formatLoanAmount } from '@/utils/loanCalculations';
@@ -394,6 +394,40 @@ export default function AccountForm() {
                     </div>
                   </div>
                 )}
+
+                {/* Mobile Banking App Link */}
+                {formData.institution_name && (() => {
+                  const selectedBank = availableBanks.find(b => b.name === formData.institution_name);
+                  if (selectedBank?.appLink) {
+                    return (
+                      <div className="p-3 bg-emerald-50 dark:bg-emerald-950/20 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <Smartphone className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                            <div>
+                              <p className="text-sm font-medium text-emerald-900 dark:text-emerald-100">
+                                Mobile Banking App Available
+                              </p>
+                              <p className="text-xs text-emerald-700 dark:text-emerald-300">
+                                Download the official banking app for easy access
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="border-emerald-300 dark:border-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/30"
+                            onClick={() => window.open(selectedBank.appLink, '_blank')}
+                          >
+                            Open App
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
 
                 {/* Custom Logo URL Input */}
                 {formData.institution_name && (
