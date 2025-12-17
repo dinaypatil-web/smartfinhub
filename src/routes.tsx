@@ -11,7 +11,6 @@ const TransactionForm = lazy(() => import('./pages/TransactionForm'));
 const Budgets = lazy(() => import('./pages/Budgets'));
 const Reports = lazy(() => import('./pages/Reports'));
 const Settings = lazy(() => import('./pages/Settings'));
-const QuickLinks = lazy(() => import('./pages/QuickLinks'));
 
 // Auth pages loaded immediately for faster initial access
 import Login from './pages/Login';
@@ -119,13 +118,6 @@ const routes: RouteConfig[] = [
     name: 'Reports',
     path: '/reports',
     element: <ProtectedRoute><Reports /></ProtectedRoute>,
-    visible: true,
-    protected: true,
-  },
-  {
-    name: 'Quick Links',
-    path: '/quick-links',
-    element: <ProtectedRoute><QuickLinks /></ProtectedRoute>,
     visible: true,
     protected: true,
   },

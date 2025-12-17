@@ -31,7 +31,8 @@ A comprehensive financial management web application designed for tracking and m
 - Choose preferred currency for dashboard display
 - Country and currency settings saved to user profile
 - Settings apply across all dashboard views and reports
-\n### 2.2 Account Management
+
+### 2.2 Account Management
 \n#### 2.2.1 Account Types
 - Cash accounts\n- Bank accounts
 - Credit card accounts
@@ -59,7 +60,8 @@ A comprehensive financial management web application designed for tracking and m
 - **Credit Limit Alert**: System triggers alert notification when user attempts transaction that would exceed their set credit limit
 - Alert displayed before transaction confirmation to prevent overspending
 - Current available credit displayed on credit card account page and dashboard
-\n#### 2.2.4 Loan Account Configuration
+
+#### 2.2.4 Loan Account Configuration
 - Select interest rate type: Fixed or Floating
 - Input total principal loan amount
 - **EMI Due Day of Month**: User inputs the day of month when EMI payment is due (1-31)
@@ -85,7 +87,8 @@ A comprehensive financial management web application designed for tracking and m
 - **Accurate Accrued Interest Calculation**: System calculates precise accrued interest based on:
   - Historical EMI payment records
   - Interest component extracted from each EMI (including user corrections)
-  - Current outstanding principal balance\n  - Interest rate and payment schedule
+  - Current outstanding principal balance
+  - Interest rate and payment schedule
 - Accrued interest displayed on dashboard and loan account detail page
 - **Edit EMI History**: User can add, edit, or delete historical EMI payment records at any time
 - User can modify principal and interest breakdown for any EMI payment record
@@ -137,49 +140,10 @@ A comprehensive financial management web application designed for tracking and m
 
 #### 2.2.7 Account Modification\n- Edit any account information at any time
 - Delete accounts with user confirmation
-\n#### 2.2.8 External App Integration
-- **Bank App Quick Link**: Each bank account card on dashboard displays clickable link icon to open the associated bank's mobile app or web banking portal
-- Link automatically configured based on selected bank during account creation
-- Clicking link redirects user to bank's official app (if installed) or web banking login page
-- **User Selection for Missing Bank App Links**: If quick link for any bank app is not available in system database, application prompts user to select from list of existing available apps
-- System displays dropdown or selection interface showing all available bank apps in database
-- User selects appropriate bank app link from the available options
-- **Store User-Selected App Link**: System saves user's selected bank app link association for the specific bank account
-- User-selected app link stored in user's account profile for future use
-- Next time user accesses the same bank account, system automatically uses the previously selected app link
-- **Edit Quick App Links with Installed Apps**: User can edit and correct quick app links at any time through account settings
-- **Installed Apps Selection Interface**: Application provides interface allowing user to select from apps installed on their phone
-- System detects and displays list of banking and payment apps currently installed on user's device
-- User can browse installed apps list and select correct app to associate with specific bank account or payment method
-- Selected installed app link replaces existing quick app link in user's account profile
-- **Manual App Link Update**: User can manually update app links for any account by:\n  - Accessing account settings or account detail page
-  - Clicking'Edit App Link' or similar option
-  - Selecting from list of installed apps on their phone
-  - Confirming selection to update the quick access link
-- Updated app link immediately reflected on dashboard and account cards
-- User can change app link associations multiple times as needed
-- **Automatic App Link Update from App Store**: When user installs or opens the appropriate banking or payment app from Google Play Store or Apple App Store:\n  - System detects the app installation or opening event
-  - System automatically retrieves the official app store link for the installed app
-  - System updates the stored app link in user's account profile with the new app store link
-  - Updated link saved for future use and displayed on dashboard
-  - System uses the updated link for all subsequent quick access attempts
-  - Automatic update applies to both bank apps and UPI/payment apps
-- **Automatic Bank App Logo Fetching**: When bank app logo is not available in system database, automatically fetch the official bank app logo from internet sources
-- Fetched bank app logos displayed on account cards and quick access sections
-- System caches fetched bank app logos for future use
-- **UPI App Integration**: Dashboard displays quick access links to popular UPI payment apps based on user's selected country\n- For India: Links to PhonePe, Google Pay, Paytm, BHIM UPI, and other major UPI apps
-- For other countries: Links to country-specific popular payment apps (e.g., Venmo for USA, Alipay for China, PayPal for global)
-- **Automatic UPI App Logo Fetching**: When UPI/payment app logo is not available in system database, automatically fetch the official app logo from internet sources
-- Fetched UPI app logos displayed as icon buttons in dashboard header or dedicated quick access section
-- System caches fetched UPI app logos for future use\n- UPI app links displayed as icon buttons in dashboard header or dedicated quick access section\n- Clicking UPI app link opens the respective payment app (if installed) or redirects to app download page
-- System detects user's country from account settings to display relevant payment app options
-- User can customize which UPI/payment app links to display in dashboard settings
-- **Edit UPI/Payment App Links**: User can edit UPI and payment app quick links by selecting from installed apps on their phone
-- Same installed apps selection interface available for UPI/payment apps as for bank apps
 \n### 2.3 Transaction Management\n
 #### 2.3.1 Transaction Types
-- Income transactions\n- Expense transactions
-- Cash withdrawals (from bank account or credit card)
+- Income transactions
+- Expense transactions\n- Cash withdrawals (from bank account or credit card)
 - Bank-to-bank transfers
 - Loan payments
 - **Credit card repayment transactions**
@@ -229,11 +193,13 @@ A comprehensive financial management web application designed for tracking and m
 
 #### 2.4.1 Tab-Based Dashboard Structure
 - **Dashboard organized into multiple tabs for better content organization and navigation**
-- **Tab 1 - Overview**: Financial summary, account cards, and quick access to payment apps\n- **Tab 2 - Analytics**: Visual charts including pie charts for balance distribution and expense breakdown, line charts for interest rate history\n- **Tab 3 - Cash Flow**: Monthly cash flow projection with opening balance, income, expenses, and credit card dues breakdown
+- **Tab 1 - Overview**: Financial summary and account cards
+- **Tab 2 - Analytics**: Visual charts including pie charts for balance distribution and expense breakdown, line charts for interest rate history\n- **Tab 3 - Cash Flow**: Monthly cash flow projection with opening balance, income, expenses, and credit card dues breakdown
 - **Tab 4 - Accounts**: Detailed view of all accounts with quick statement access
 - User can switch between tabs by clicking on tab headers
 - Active tab highlighted with visual indicator
-- Each tab loads relevant content dynamically\n- Tab selection persists during user session
+- Each tab loads relevant content dynamically
+- Tab selection persists during user session
 
 #### 2.4.2 Financial Summary (Overview Tab)
 - Current Assets: Sum of Cash and Bank Account balances
@@ -259,12 +225,10 @@ A comprehensive financial management web application designed for tracking and m
 - Breakdown view available showing each component of the calculation including individual credit card dues
 
 #### 2.4.4 Visual Analytics (Analytics Tab)
-- 3D pie chart showing Cash and Bank Account balance distribution
-- 3D pie chart showing Expenses breakdown by category
+- 3D pie chart showing Cash and Bank Account balance distribution\n- 3D pie chart showing Expenses breakdown by category
 - Line chart displaying Floating Interest Rate history for loan accounts
 \n#### 2.4.5 Account Display Cards (Overview Tab & Accounts Tab)
-- Bank or financial institution logo\n- Account type indicator\n- Last 4 digits of account number only
-- Real-time current balance\n- For loan accounts: Total accrued interest till date including automatic monthly interest additions
+- Bank or financial institution logo\n- Account type indicator\n- Last 4 digits of account number only\n- Real-time current balance\n- For loan accounts: Total accrued interest till date including automatic monthly interest additions
 - **For credit card accounts**:
   - Display next statement date and payment due date as reminders
   - Show user-defined credit limit
@@ -274,19 +238,15 @@ A comprehensive financial management web application designed for tracking and m
   - Show next EMI installment amount and due date
 - Visual indicators highlighting upcoming statement dates and due dates within7 days
 - **For loan accounts**: Visual indicator showing next EMI due date and automatic interest calculation date
-- **Bank App Quick Access Icon**: Clickable icon on each bank account card to open bank's mobile app or web banking portal\n\n#### 2.4.6 Account Quick View (Accounts Tab)
+\n#### 2.4.6 Account Quick View (Accounts Tab)
 - **Click-to-View Statement**: When user clicks on any account card on dashboard, system displays popup window showing last 90 days statement for that account
 - Popup includes transaction history, balance changes, and account activity for the 90-day period
 - **For loan accounts**: Popup displays detailed EMI payment history with principal and interest breakdown for each payment within the 90-day period, including automatic monthly interest additions
 - **For credit card accounts**: Popup displays all transactions including expenses, withdrawals, and repayment transactions for the 90-day period
 - Statement popup available for all account types: Cash, Bank, Credit Card, and Loan accounts
 - Close button to dismiss popup and return to dashboard
-\n#### 2.4.7 Quick Access to Payment Apps (Overview Tab)
-- **UPI/Payment App Links Section**: Dedicated section in dashboard header or sidebar displaying quick access icons for popular payment apps
-- Icons displayed based on user's country selection
-- Clicking icon opens respective payment app or redirects to download page
-- User can customize displayed payment apps in settings
-\n### 2.5 Budget Management
+
+### 2.5 Budget Management
 - Input monthly budgeted income amounts
 - Input monthly budgeted expense amounts by category
 - Compare actual expenses against budgeted amounts
@@ -348,5 +308,4 @@ A comprehensive financial management web application designed for tracking and m
 - Sticky header for easy navigation access
 
 ## 4. Reference Images
-- IMG_7739.jpeg: Credit card repayment transaction form showing source bank account, target credit card, repayment amount, date, and description fields
 - IMG_7775.jpeg: Budget status display showing category selection, budgeted amount, spent amount, and remaining budget for Bills & Utilities category
