@@ -182,36 +182,36 @@ export function SelectBankAppDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl h-[90vh] max-h-[600px] flex flex-col p-0 gap-0">
-        <DialogHeader className="px-6 pt-6 pb-4 border-b">
+      <DialogContent className="max-w-3xl w-[95vw] h-[95vh] max-h-[900px] flex flex-col p-0 gap-0">
+        <DialogHeader className="px-6 pt-6 pb-4 border-b flex-shrink-0">
           <DialogTitle>Select Banking App</DialogTitle>
           <DialogDescription>
             Choose which app to open when you click the quick link for <strong>{accountName}</strong>
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 flex flex-col overflow-hidden px-6 py-4">
-          <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search apps..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
-          </div>
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search apps..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
 
-          <Tabs defaultValue="all" className="flex-1 flex flex-col overflow-hidden">
-            <TabsList className="grid w-full grid-cols-5 mb-4">
-              <TabsTrigger value="all">All</TabsTrigger>
-              <TabsTrigger value="upi">UPI</TabsTrigger>
-              <TabsTrigger value="wallet">Wallet</TabsTrigger>
-              <TabsTrigger value="banking">Bank</TabsTrigger>
-              <TabsTrigger value="payment">Pay</TabsTrigger>
-            </TabsList>
+            <Tabs defaultValue="all" className="w-full">
+              <TabsList className="grid w-full grid-cols-5 mb-4">
+                <TabsTrigger value="all">All</TabsTrigger>
+                <TabsTrigger value="upi">UPI</TabsTrigger>
+                <TabsTrigger value="wallet">Wallet</TabsTrigger>
+                <TabsTrigger value="banking">Bank</TabsTrigger>
+                <TabsTrigger value="payment">Pay</TabsTrigger>
+              </TabsList>
 
-            <div className="flex-1 overflow-hidden">
-              <ScrollArea className="h-full pr-4">
+              <div className="min-h-[300px]">
                 <TabsContent value="all" className="space-y-2 mt-0">
                   {filteredApps.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
@@ -261,108 +261,108 @@ export function SelectBankAppDialog({
                     appsByCategory.payment.map(app => <AppCard key={app.id} app={app} />)
                   )}
                 </TabsContent>
-              </ScrollArea>
-            </div>
-          </Tabs>
-
-          <div className="mt-4 p-4 bg-muted/50 rounded-lg border border-border">
-            <div className="flex items-start gap-3">
-              <Smartphone className="w-5 h-5 text-muted-foreground mt-0.5 flex-shrink-0" />
-              <div className="flex-1">
-                <h4 className="text-sm font-medium mb-1">Can't find your app?</h4>
-                <p className="text-xs text-muted-foreground mb-3">
-                  Search for {institutionName} in your device's app store
-                </p>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={handleOpenAppStore}
-                  className="w-full"
-                >
-                  Open {platform === 'ios' ? 'App Store' : 'Play Store'}
-                </Button>
               </div>
-            </div>
-          </div>
+            </Tabs>
 
-          <div className="mt-4 p-4 bg-muted/50 rounded-lg border border-border">
-            <div className="flex items-start gap-3">
-              <Plus className="w-5 h-5 text-muted-foreground mt-0.5 flex-shrink-0" />
-              <div className="flex-1">
-                <h4 className="text-sm font-medium mb-1">Add Custom App Link</h4>
-                <p className="text-xs text-muted-foreground mb-3">
-                  After installing an app from the store, add its link here
-                </p>
-                
-                {!showCustomForm ? (
+            <div className="mt-4 p-4 bg-muted/50 rounded-lg border border-border">
+              <div className="flex items-start gap-3">
+                <Smartphone className="w-5 h-5 text-muted-foreground mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <h4 className="text-sm font-medium mb-1">Can't find your app?</h4>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Search for {institutionName} in your device's app store
+                  </p>
                   <Button 
                     variant="outline" 
                     size="sm" 
-                    onClick={() => setShowCustomForm(true)}
+                    onClick={handleOpenAppStore}
                     className="w-full"
                   >
-                    Add Custom App
+                    Open {platform === 'ios' ? 'App Store' : 'Play Store'}
                   </Button>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="custom-app-name" className="text-xs">App Name</Label>
-                      <Input
-                        id="custom-app-name"
-                        placeholder="e.g., Chase Mobile"
-                        value={customAppName}
-                        onChange={(e) => setCustomAppName(e.target.value)}
-                        disabled={loading}
-                        className="h-9"
-                      />
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 bg-muted/50 rounded-lg border border-border">
+              <div className="flex items-start gap-3">
+                <Plus className="w-5 h-5 text-muted-foreground mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <h4 className="text-sm font-medium mb-1">Add Custom App Link</h4>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    After installing an app from the store, add its link here
+                  </p>
+                  
+                  {!showCustomForm ? (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => setShowCustomForm(true)}
+                      className="w-full"
+                    >
+                      Add Custom App
+                    </Button>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="custom-app-name" className="text-xs">App Name</Label>
+                        <Input
+                          id="custom-app-name"
+                          placeholder="e.g., Chase Mobile"
+                          value={customAppName}
+                          onChange={(e) => setCustomAppName(e.target.value)}
+                          disabled={loading}
+                          className="h-9"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="custom-app-url" className="text-xs">
+                          App URL or Deep Link
+                        </Label>
+                        <Input
+                          id="custom-app-url"
+                          placeholder="e.g., chase:// or https://..."
+                          value={customAppUrl}
+                          onChange={(e) => setCustomAppUrl(e.target.value)}
+                          disabled={loading}
+                          className="h-9"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Enter the app's deep link (e.g., chase://) or web URL
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button 
+                          size="sm" 
+                          onClick={handleSaveCustomApp}
+                          disabled={loading}
+                          className="flex-1"
+                        >
+                          Save Link
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => {
+                            setShowCustomForm(false);
+                            setCustomAppName('');
+                            setCustomAppUrl('');
+                          }}
+                          disabled={loading}
+                          className="flex-1"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
                     </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="custom-app-url" className="text-xs">
-                        App URL or Deep Link
-                      </Label>
-                      <Input
-                        id="custom-app-url"
-                        placeholder="e.g., chase:// or https://..."
-                        value={customAppUrl}
-                        onChange={(e) => setCustomAppUrl(e.target.value)}
-                        disabled={loading}
-                        className="h-9"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Enter the app's deep link (e.g., chase://) or web URL
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button 
-                        size="sm" 
-                        onClick={handleSaveCustomApp}
-                        disabled={loading}
-                        className="flex-1"
-                      >
-                        Save Link
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => {
-                          setShowCustomForm(false);
-                          setCustomAppName('');
-                          setCustomAppUrl('');
-                        }}
-                        disabled={loading}
-                        className="flex-1"
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 px-6 py-4 border-t">
+        <div className="flex justify-end gap-2 px-6 py-4 border-t flex-shrink-0">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
             Cancel
           </Button>
