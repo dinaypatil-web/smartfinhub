@@ -74,7 +74,7 @@ export const banks: BankOption[] = [
   { name: 'Axis Bank', logo: 'https://www.google.com/s2/favicons?domain=axisbank.com&sz=128', country: 'IN' },
   { name: 'Kotak Mahindra Bank', logo: 'https://www.google.com/s2/favicons?domain=kotak.com&sz=128', country: 'IN' },
   { name: 'Punjab National Bank', logo: 'https://www.google.com/s2/favicons?domain=pnbindia.in&sz=128', country: 'IN' },
-  { name: 'Bank of Baroda', logo: 'https://www.google.com/s2/favicons?domain=bankofbaroda.in&sz=128', country: 'IN' },
+  { name: 'Bank of Baroda', logo: 'https://www.google.com/s2/favicons?domain=bankofbaroda.in&sz=128', country: 'IN', appLink: 'https://play.google.com/store/apps/details?id=com.bobibanking.bobworld' },
   { name: 'Canara Bank', logo: 'https://www.google.com/s2/favicons?domain=canarabank.com&sz=128', country: 'IN' },
   { name: 'Union Bank of India', logo: 'https://www.google.com/s2/favicons?domain=unionbankofindia.co.in&sz=128', country: 'IN' },
   { name: 'Bank of India', logo: 'https://www.google.com/s2/favicons?domain=bankofindia.co.in&sz=128', country: 'IN' },

@@ -25,7 +25,8 @@ A comprehensive financial management web application designed for tracking and m
 - User must enter current password before setting new password
 - Password change confirmation sent to registered email address
 \n## 2. Core Features
-\n### 2.1 User Preferences
+
+### 2.1 User Preferences
 - Select default country from dropdown list
 - Choose preferred currency for dashboard display
 - Country and currency settings saved to user profile
@@ -40,13 +41,15 @@ A comprehensive financial management web application designed for tracking and m
 - Bank or financial institution selection based on chosen country
 - **Complete bank name list available in dropdown for all supported countries**
 - Dropdown includes all major banks and financial institutions for selected country
+- **For India**: Bank selection page includes'BOB World: Banking & Experience' app link for Bank of Baroda customers
 - Display bank/financial institution logo on account pages and dashboard
 - Manual bank name entry option if institution not listed
 - **Automatic Logo Fetching**: When bank/loan/credit card account logo is not available in the system database during account creation or editing, automatically fetch the logo from internet sources
 - Fetched logos displayed on both account pages and dashboard
 - System caches fetched logos for future use
 - Optional account number entry (encrypted storage, only last 4 digits visible on dashboard)
-\n#### 2.2.3 Credit Card Configuration
+
+#### 2.2.3 Credit Card Configuration
 - **Statement Day of Month**: User inputs the day of month when credit card statement is generated (1-31)
 - **Due Day of Month**: User inputs the day of month when credit card payment is due (1-31)
 - **Credit Card Limit**: User inputs their own credit limit for the card
@@ -225,7 +228,8 @@ A comprehensive financial management web application designed for tracking and m
 - Breakdown view available showing each component of the calculation including individual credit card dues
 
 #### 2.4.4 Visual Analytics (Analytics Tab)
-- 3D pie chart showing Cash and Bank Account balance distribution\n- 3D pie chart showing Expenses breakdown by category
+- 3D pie chart showing Cash and Bank Account balance distribution
+- 3D pie chart showing Expenses breakdown by category
 - Line chart displaying Floating Interest Rate history for loan accounts
 \n#### 2.4.5 Account Display Cards (Overview Tab & Accounts Tab)
 - Bank or financial institution logo\n- Account type indicator\n- Last 4 digits of account number only\n- Real-time current balance\n- For loan accounts: Total accrued interest till date including automatic monthly interest additions
