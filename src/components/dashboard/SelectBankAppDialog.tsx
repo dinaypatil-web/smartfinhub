@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Search, ExternalLink } from 'lucide-react';
+import { Search, ExternalLink, Smartphone } from 'lucide-react';
 import { bankingApps, type BankingApp } from '@/data/bankingApps';
 import { customBankLinkApi } from '@/db/api';
 import { useToast } from '@/hooks/use-toast';
@@ -31,7 +31,17 @@ export function SelectBankAppDialog({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedApp, setSelectedApp] = useState<BankingApp | null>(null);
   const [loading, setLoading] = useState(false);
+  const [platform, setPlatform] = useState<'android' | 'ios' | 'unknown'>('unknown');
   const { toast } = useToast();
+
+  useEffect(() => {
+    const userAgent = navigator.userAgent || navigator.vendor;
+    if (/android/i.test(userAgent)) {
+      setPlatform('android');
+    } else if (/iPad|iPhone|iPod/.test(userAgent)) {
+      setPlatform('ios');
+    }
+  }, []);
 
   const filteredApps = searchQuery
     ? bankingApps.filter(app =>
@@ -44,8 +54,7 @@ export function SelectBankAppDialog({
     upi: filteredApps.filter(app => app.category === 'upi'),
     wallet: filteredApps.filter(app => app.category === 'wallet'),
     banking: filteredApps.filter(app => app.category === 'banking'),
-    payment: filteredApps.filter(app => app.category === 'payment'),
-    finance: filteredApps.filter(app => app.category === 'finance')
+    payment: filteredApps.filter(app => app.category === 'payment')
   };
 
   const handleSelectApp = async (app: BankingApp) => {
@@ -79,6 +88,26 @@ export function SelectBankAppDialog({
       setLoading(false);
       setSelectedApp(null);
     }
+  };
+
+  const handleOpenAppStore = () => {
+    const searchTerm = encodeURIComponent(institutionName + ' banking app');
+    let storeUrl = '';
+
+    if (platform === 'android') {
+      storeUrl = `https://play.google.com/store/search?q=${searchTerm}&c=apps`;
+    } else if (platform === 'ios') {
+      storeUrl = `https://apps.apple.com/search?term=${searchTerm}`;
+    } else {
+      storeUrl = `https://play.google.com/store/search?q=${searchTerm}&c=apps`;
+    }
+
+    window.open(storeUrl, '_blank');
+    
+    toast({
+      title: 'Opening App Store',
+      description: `Search for "${institutionName}" in the ${platform === 'ios' ? 'Apple App Store' : 'Google Play Store'}`
+    });
   };
 
   const AppCard = ({ app }: { app: BankingApp }) => (
@@ -127,13 +156,12 @@ export function SelectBankAppDialog({
           </div>
 
           <Tabs defaultValue="all" className="flex-1 flex flex-col overflow-hidden">
-            <TabsList className="grid w-full grid-cols-6 mb-4">
+            <TabsList className="grid w-full grid-cols-5 mb-4">
               <TabsTrigger value="all">All</TabsTrigger>
               <TabsTrigger value="upi">UPI</TabsTrigger>
               <TabsTrigger value="wallet">Wallet</TabsTrigger>
               <TabsTrigger value="banking">Bank</TabsTrigger>
               <TabsTrigger value="payment">Pay</TabsTrigger>
-              <TabsTrigger value="finance">Finance</TabsTrigger>
             </TabsList>
 
             <div className="flex-1 overflow-hidden">
@@ -187,19 +215,29 @@ export function SelectBankAppDialog({
                     appsByCategory.payment.map(app => <AppCard key={app.id} app={app} />)
                   )}
                 </TabsContent>
-
-                <TabsContent value="finance" className="space-y-2 mt-0">
-                  {appsByCategory.finance.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      No finance apps found
-                    </div>
-                  ) : (
-                    appsByCategory.finance.map(app => <AppCard key={app.id} app={app} />)
-                  )}
-                </TabsContent>
               </ScrollArea>
             </div>
           </Tabs>
+
+          <div className="mt-4 p-4 bg-muted/50 rounded-lg border border-border">
+            <div className="flex items-start gap-3">
+              <Smartphone className="w-5 h-5 text-muted-foreground mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <h4 className="text-sm font-medium mb-1">Can't find your app?</h4>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Search for {institutionName} in your device's app store
+                </p>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleOpenAppStore}
+                  className="w-full"
+                >
+                  Open {platform === 'ios' ? 'App Store' : 'Play Store'}
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="flex justify-end gap-2 px-6 py-4 border-t">
