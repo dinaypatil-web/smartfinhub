@@ -8,6 +8,7 @@ import TransactionForm from './pages/TransactionForm';
 import Budgets from './pages/Budgets';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
+import QuickLinks from './pages/QuickLinks';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ResetPassword from './pages/ResetPassword';
@@ -113,6 +114,13 @@ const routes: RouteConfig[] = [
     name: 'Reports',
     path: '/reports',
     element: <ProtectedRoute><Reports /></ProtectedRoute>,
+    visible: true,
+    protected: true,
+  },
+  {
+    name: 'Quick Links',
+    path: '/quick-links',
+    element: <ProtectedRoute><QuickLinks /></ProtectedRoute>,
     visible: true,
     protected: true,
   },
