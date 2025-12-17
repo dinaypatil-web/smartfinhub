@@ -4,10 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Search, ExternalLink, Smartphone } from 'lucide-react';
+import { Search, ExternalLink, Smartphone, Plus } from 'lucide-react';
 import { bankingApps, type BankingApp } from '@/data/bankingApps';
 import { customBankLinkApi } from '@/db/api';
 import { useToast } from '@/hooks/use-toast';
+import { Label } from '@/components/ui/label';
 
 interface SelectBankAppDialogProps {
   open: boolean;
@@ -32,6 +33,9 @@ export function SelectBankAppDialog({
   const [selectedApp, setSelectedApp] = useState<BankingApp | null>(null);
   const [loading, setLoading] = useState(false);
   const [platform, setPlatform] = useState<'android' | 'ios' | 'unknown'>('unknown');
+  const [showCustomForm, setShowCustomForm] = useState(false);
+  const [customAppName, setCustomAppName] = useState('');
+  const [customAppUrl, setCustomAppUrl] = useState('');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -106,8 +110,50 @@ export function SelectBankAppDialog({
     
     toast({
       title: 'Opening App Store',
-      description: `Search for "${institutionName}" in the ${platform === 'ios' ? 'Apple App Store' : 'Google Play Store'}`
+      description: `After installing the app, use "Add Custom App" below to save the link.`
     });
+  };
+
+  const handleSaveCustomApp = async () => {
+    if (!customAppName.trim() || !customAppUrl.trim()) {
+      toast({
+        title: 'Missing Information',
+        description: 'Please enter both app name and URL/deep link.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await customBankLinkApi.createCustomLink({
+        user_id: userId,
+        account_id: accountId,
+        institution_name: institutionName,
+        app_name: customAppName.trim(),
+        app_url: customAppUrl.trim()
+      });
+
+      toast({
+        title: 'Custom App Link Saved',
+        description: `${customAppName} will be used for ${accountName} quick link.`
+      });
+
+      setCustomAppName('');
+      setCustomAppUrl('');
+      setShowCustomForm(false);
+      onSuccess();
+      onOpenChange(false);
+    } catch (error) {
+      console.error('Error saving custom app link:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save custom app link. Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const AppCard = ({ app }: { app: BankingApp }) => (
@@ -235,6 +281,82 @@ export function SelectBankAppDialog({
                 >
                   Open {platform === 'ios' ? 'App Store' : 'Play Store'}
                 </Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 p-4 bg-muted/50 rounded-lg border border-border">
+            <div className="flex items-start gap-3">
+              <Plus className="w-5 h-5 text-muted-foreground mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <h4 className="text-sm font-medium mb-1">Add Custom App Link</h4>
+                <p className="text-xs text-muted-foreground mb-3">
+                  After installing an app from the store, add its link here
+                </p>
+                
+                {!showCustomForm ? (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setShowCustomForm(true)}
+                    className="w-full"
+                  >
+                    Add Custom App
+                  </Button>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="custom-app-name" className="text-xs">App Name</Label>
+                      <Input
+                        id="custom-app-name"
+                        placeholder="e.g., Chase Mobile"
+                        value={customAppName}
+                        onChange={(e) => setCustomAppName(e.target.value)}
+                        disabled={loading}
+                        className="h-9"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="custom-app-url" className="text-xs">
+                        App URL or Deep Link
+                      </Label>
+                      <Input
+                        id="custom-app-url"
+                        placeholder="e.g., chase:// or https://..."
+                        value={customAppUrl}
+                        onChange={(e) => setCustomAppUrl(e.target.value)}
+                        disabled={loading}
+                        className="h-9"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Enter the app's deep link (e.g., chase://) or web URL
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button 
+                        size="sm" 
+                        onClick={handleSaveCustomApp}
+                        disabled={loading}
+                        className="flex-1"
+                      >
+                        Save Link
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => {
+                          setShowCustomForm(false);
+                          setCustomAppName('');
+                          setCustomAppUrl('');
+                        }}
+                        disabled={loading}
+                        className="flex-1"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
