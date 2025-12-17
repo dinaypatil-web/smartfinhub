@@ -256,7 +256,7 @@ export default function QuickLinks() {
 
   if (loading) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto p-6 min-h-screen">
         <div className="flex items-center justify-center h-64">
           <p className="text-muted-foreground">Loading quick links...</p>
         </div>
@@ -265,8 +265,8 @@ export default function QuickLinks() {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl">
-      <div className="flex items-center justify-between mb-6">
+    <div className="container mx-auto p-6 max-w-4xl min-h-screen pb-20">
+      <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
         <div>
           <h1 className="text-3xl font-bold">Quick Links</h1>
           <p className="text-muted-foreground mt-1">
@@ -281,7 +281,7 @@ export default function QuickLinks() {
               Add Link
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
+          <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{editingLink ? 'Edit Quick Link' : 'Add Quick Link'}</DialogTitle>
               <DialogDescription>
