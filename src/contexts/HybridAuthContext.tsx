@@ -28,7 +28,9 @@ interface HybridAuthContextType {
   
   // Common methods
   signOut: () => Promise<void>;
-  refreshProfile: () => Promise<void>;  // Auth provider info
+  refreshProfile: () => Promise<void>;
+  
+  // Auth provider info
   authProvider: 'auth0' | 'supabase' | null;
 }
 
@@ -98,7 +100,8 @@ export function HybridAuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        setProfile(newProfile);      } else {
+        setProfile(newProfile);
+      } else {
         // Update auth0_sub if not set
         if (!existingProfile.auth0_sub) {
           await supabase
@@ -106,7 +109,8 @@ export function HybridAuthProvider({ children }: { children: ReactNode }) {
             .update({ auth0_sub: auth0User.sub })
             .eq('id', existingProfile.id);
         }
-        setProfile(existingProfile);      }
+        setProfile(existingProfile);
+      }
     } catch (error) {
       console.error('Error syncing Auth0 user:', error);
     }
@@ -136,7 +140,9 @@ export function HybridAuthProvider({ children }: { children: ReactNode }) {
         console.error('Error fetching profile:', error);
       }
     }
-  }, [user, authProvider]);  // Auth0 login methods
+  }, [user, authProvider]);
+
+  // Auth0 login methods
   const loginWithGoogle = useCallback(async () => {
     try {
       await loginWithRedirect({
