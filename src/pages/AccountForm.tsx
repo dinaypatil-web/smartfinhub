@@ -13,6 +13,7 @@ import { Loader2, ArrowLeft, Smartphone } from 'lucide-react';
 import { countries } from '@/utils/countries';
 import { getBanksByCountry, getBankLogo } from '@/utils/banks';
 import { calculateEMI, formatLoanAmount } from '@/utils/loanCalculations';
+import { detectDeviceType, getAppStoreName } from '@/utils/deviceDetection';
 import BankLogo from '@/components/BankLogo';
 import LoanEMIPaymentManager from '@/components/LoanEMIPaymentManager';
 
@@ -398,33 +399,52 @@ export default function AccountForm() {
                 {/* Mobile Banking App Link */}
                 {formData.institution_name && (() => {
                   const selectedBank = availableBanks.find(b => b.name === formData.institution_name);
-                  if (selectedBank?.appLink) {
-                    return (
-                      <div className="p-3 bg-emerald-50 dark:bg-emerald-950/20 rounded-lg border border-emerald-200 dark:border-emerald-800">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-2">
-                            <Smartphone className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                            <div>
-                              <p className="text-sm font-medium text-emerald-900 dark:text-emerald-100">
-                                Mobile Banking App Available
-                              </p>
-                              <p className="text-xs text-emerald-700 dark:text-emerald-300">
-                                Download the official banking app for easy access
-                              </p>
+                  if (selectedBank) {
+                    const deviceType = detectDeviceType();
+                    const appStoreName = getAppStoreName(deviceType);
+                    
+                    // Get the appropriate app link based on device
+                    let appLink = '';
+                    if (deviceType === 'ios' && selectedBank.iosAppLink) {
+                      appLink = selectedBank.iosAppLink;
+                    } else if (deviceType === 'android' && selectedBank.androidAppLink) {
+                      appLink = selectedBank.androidAppLink;
+                    } else if (selectedBank.androidAppLink) {
+                      // Fallback to Android link if device type is unknown
+                      appLink = selectedBank.androidAppLink;
+                    } else if (selectedBank.appLink) {
+                      // Legacy support for old appLink format
+                      appLink = selectedBank.appLink;
+                    }
+                    
+                    if (appLink) {
+                      return (
+                        <div className="p-3 bg-emerald-50 dark:bg-emerald-950/20 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2">
+                              <Smartphone className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                              <div>
+                                <p className="text-sm font-medium text-emerald-900 dark:text-emerald-100">
+                                  Mobile Banking App Available
+                                </p>
+                                <p className="text-xs text-emerald-700 dark:text-emerald-300">
+                                  Download from {appStoreName} for easy access
+                                </p>
+                              </div>
                             </div>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="border-emerald-300 dark:border-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/30"
+                              onClick={() => window.open(appLink, '_blank')}
+                            >
+                              Open App
+                            </Button>
                           </div>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="border-emerald-300 dark:border-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/30"
-                            onClick={() => window.open(selectedBank.appLink, '_blank')}
-                          >
-                            Open App
-                          </Button>
                         </div>
-                      </div>
-                    );
+                      );
+                    }
                   }
                   return null;
                 })()}

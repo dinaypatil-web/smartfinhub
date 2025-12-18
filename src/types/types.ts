@@ -146,7 +146,9 @@ export interface BankOption {
   name: string;
   logo: string;
   country: string;
-  appLink?: string; // Optional mobile banking app link
+  appLink?: string; // Optional mobile banking app link (deprecated - use androidAppLink/iosAppLink)
+  androidAppLink?: string; // Google Play Store link
+  iosAppLink?: string; // Apple App Store link
 }
 
 export type EMIStatus = 'active' | 'completed' | 'cancelled';

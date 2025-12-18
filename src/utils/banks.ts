@@ -68,19 +68,97 @@ export const banks: BankOption[] = [
   { name: 'Bunq', logo: 'https://www.google.com/s2/favicons?domain=bunq.com&sz=128', country: 'EU' },
 
   // India Banks
-  { name: 'State Bank of India', logo: 'https://www.google.com/s2/favicons?domain=sbi.co.in&sz=128', country: 'IN', appLink: 'https://play.google.com/store/apps/details?id=com.sbi.lotusintouch' },
-  { name: 'HDFC Bank', logo: 'https://www.google.com/s2/favicons?domain=hdfcbank.com&sz=128', country: 'IN', appLink: 'https://play.google.com/store/apps/details?id=com.snapwork.hdfc' },
-  { name: 'ICICI Bank', logo: 'https://www.google.com/s2/favicons?domain=icicibank.com&sz=128', country: 'IN', appLink: 'https://play.google.com/store/apps/details?id=com.csam.icici.bank.imobile' },
-  { name: 'Axis Bank', logo: 'https://www.google.com/s2/favicons?domain=axisbank.com&sz=128', country: 'IN', appLink: 'https://play.google.com/store/apps/details?id=com.axis.mobile' },
-  { name: 'Kotak Mahindra Bank', logo: 'https://www.google.com/s2/favicons?domain=kotak.com&sz=128', country: 'IN', appLink: 'https://play.google.com/store/apps/details?id=com.msf.kbank.mobile' },
-  { name: 'Punjab National Bank', logo: 'https://www.google.com/s2/favicons?domain=pnbindia.in&sz=128', country: 'IN', appLink: 'https://play.google.com/store/apps/details?id=com.fss.pnbone' },
-  { name: 'Bank of Baroda', logo: 'https://www.google.com/s2/favicons?domain=bankofbaroda.in&sz=128', country: 'IN', appLink: 'https://play.google.com/store/apps/details?id=com.bobibanking.bobworld' },
-  { name: 'Canara Bank', logo: 'https://www.google.com/s2/favicons?domain=canarabank.com&sz=128', country: 'IN', appLink: 'https://play.google.com/store/apps/details?id=com.canara.canaramobile' },
-  { name: 'Union Bank of India', logo: 'https://www.google.com/s2/favicons?domain=unionbankofindia.co.in&sz=128', country: 'IN', appLink: 'https://play.google.com/store/apps/details?id=com.unionbank.ecommerce.mobile.android' },
-  { name: 'Bank of India', logo: 'https://www.google.com/s2/favicons?domain=bankofindia.co.in&sz=128', country: 'IN', appLink: 'https://play.google.com/store/apps/details?id=com.boi.mobilebanking' },
-  { name: 'IndusInd Bank', logo: 'https://www.google.com/s2/favicons?domain=indusind.com&sz=128', country: 'IN', appLink: 'https://play.google.com/store/apps/details?id=com.indusind.mobile' },
-  { name: 'Yes Bank', logo: 'https://www.google.com/s2/favicons?domain=yesbank.in&sz=128', country: 'IN', appLink: 'https://play.google.com/store/apps/details?id=com.yesbank.yesbankapp' },
-  { name: 'IDFC First Bank', logo: 'https://www.google.com/s2/favicons?domain=idfcfirstbank.com&sz=128', country: 'IN', appLink: 'https://play.google.com/store/apps/details?id=com.idfcfirstbank.optimus' },
+  { 
+    name: 'State Bank of India', 
+    logo: 'https://www.google.com/s2/favicons?domain=sbi.co.in&sz=128', 
+    country: 'IN', 
+    androidAppLink: 'https://play.google.com/store/apps/details?id=com.sbi.lotusintouch',
+    iosAppLink: 'https://apps.apple.com/in/app/yono-sbi/id1206636728'
+  },
+  { 
+    name: 'HDFC Bank', 
+    logo: 'https://www.google.com/s2/favicons?domain=hdfcbank.com&sz=128', 
+    country: 'IN', 
+    androidAppLink: 'https://play.google.com/store/apps/details?id=com.snapwork.hdfc',
+    iosAppLink: 'https://apps.apple.com/in/app/hdfcbank-mobilebankingapp/id430033626'
+  },
+  { 
+    name: 'ICICI Bank', 
+    logo: 'https://www.google.com/s2/favicons?domain=icicibank.com&sz=128', 
+    country: 'IN', 
+    androidAppLink: 'https://play.google.com/store/apps/details?id=com.csam.icici.bank.imobile',
+    iosAppLink: 'https://apps.apple.com/in/app/imobile-pay-by-icici-bank/id1039140197'
+  },
+  { 
+    name: 'Axis Bank', 
+    logo: 'https://www.google.com/s2/favicons?domain=axisbank.com&sz=128', 
+    country: 'IN', 
+    androidAppLink: 'https://play.google.com/store/apps/details?id=com.axis.mobile',
+    iosAppLink: 'https://apps.apple.com/in/app/axis-mobile/id1462266800'
+  },
+  { 
+    name: 'Kotak Mahindra Bank', 
+    logo: 'https://www.google.com/s2/favicons?domain=kotak.com&sz=128', 
+    country: 'IN', 
+    androidAppLink: 'https://play.google.com/store/apps/details?id=com.msf.kbank.mobile',
+    iosAppLink: 'https://apps.apple.com/in/app/kotak-mobile-banking/id584518773'
+  },
+  { 
+    name: 'Punjab National Bank', 
+    logo: 'https://www.google.com/s2/favicons?domain=pnbindia.in&sz=128', 
+    country: 'IN', 
+    androidAppLink: 'https://play.google.com/store/apps/details?id=com.fss.pnbone',
+    iosAppLink: 'https://apps.apple.com/in/app/pnb-one/id1455678874'
+  },
+  { 
+    name: 'Bank of Baroda', 
+    logo: 'https://www.google.com/s2/favicons?domain=bankofbaroda.in&sz=128', 
+    country: 'IN', 
+    androidAppLink: 'https://play.google.com/store/apps/details?id=com.bobibanking.bobworld',
+    iosAppLink: 'https://apps.apple.com/in/app/bob-world/id1455440983'
+  },
+  { 
+    name: 'Canara Bank', 
+    logo: 'https://www.google.com/s2/favicons?domain=canarabank.com&sz=128', 
+    country: 'IN', 
+    androidAppLink: 'https://play.google.com/store/apps/details?id=com.canara.canaramobile',
+    iosAppLink: 'https://apps.apple.com/in/app/canara-ai1-mobile-banking/id1462483812'
+  },
+  { 
+    name: 'Union Bank of India', 
+    logo: 'https://www.google.com/s2/favicons?domain=unionbankofindia.co.in&sz=128', 
+    country: 'IN', 
+    androidAppLink: 'https://play.google.com/store/apps/details?id=com.unionbank.ecommerce.mobile.android',
+    iosAppLink: 'https://apps.apple.com/in/app/union-bank-mobile-banking/id1450073650'
+  },
+  { 
+    name: 'Bank of India', 
+    logo: 'https://www.google.com/s2/favicons?domain=bankofindia.co.in&sz=128', 
+    country: 'IN', 
+    androidAppLink: 'https://play.google.com/store/apps/details?id=com.boi.mobilebanking',
+    iosAppLink: 'https://apps.apple.com/in/app/boi-mobile/id1462268992'
+  },
+  { 
+    name: 'IndusInd Bank', 
+    logo: 'https://www.google.com/s2/favicons?domain=indusind.com&sz=128', 
+    country: 'IN', 
+    androidAppLink: 'https://play.google.com/store/apps/details?id=com.indusind.mobile',
+    iosAppLink: 'https://apps.apple.com/in/app/indusind-bank-mobile-banking/id1232225691'
+  },
+  { 
+    name: 'Yes Bank', 
+    logo: 'https://www.google.com/s2/favicons?domain=yesbank.in&sz=128', 
+    country: 'IN', 
+    androidAppLink: 'https://play.google.com/store/apps/details?id=com.yesbank.yesbankapp',
+    iosAppLink: 'https://apps.apple.com/in/app/yes-mobile/id1462268992'
+  },
+  { 
+    name: 'IDFC First Bank', 
+    logo: 'https://www.google.com/s2/favicons?domain=idfcfirstbank.com&sz=128', 
+    country: 'IN', 
+    androidAppLink: 'https://play.google.com/store/apps/details?id=com.idfcfirstbank.optimus',
+    iosAppLink: 'https://apps.apple.com/in/app/idfc-first-bank/id1448960242'
+  },
   { name: 'Federal Bank', logo: 'https://www.google.com/s2/favicons?domain=federalbank.co.in&sz=128', country: 'IN' },
   { name: 'South Indian Bank', logo: 'https://www.google.com/s2/favicons?domain=southindianbank.com&sz=128', country: 'IN' },
   { name: 'Karnataka Bank', logo: 'https://www.google.com/s2/favicons?domain=ktkbank.com&sz=128', country: 'IN' },
