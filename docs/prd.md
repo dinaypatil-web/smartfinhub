@@ -18,7 +18,7 @@ A comprehensive financial management web application designed for tracking and m
 - Verified email address serves as username for secure login
 - **Forgot Password Option**: Forgot password link displayed on login page
 - Password reset via email verification code
-- User receives6-digit verification code to registered email address
+- User receives 6-digit verification code to registered email address
 - After entering valid verification code, user can set new password
 - Password reset verification code valid for 15 minutes
 - **Change Password on Dashboard**: Password change option available in user account settings on dashboard
@@ -51,7 +51,7 @@ A comprehensive financial management web application designed for tracking and m
 - Manual bank name entry option if institution not listed\n- **Automatic Logo Fetching**: When bank/loan/credit card account logo is not available in the system database during account creation or editing, automatically fetch the logo from internet sources
 - Fetched logos displayed on both account pages and dashboard
 - System caches fetched logos for future use
-- Optional account number entry (encrypted storage, only last 4 digits visible on dashboard)
+- Optional account number entry (only last 4 digits visible on dashboard)
 
 #### 2.2.3 Credit Card Configuration
 - **Statement Day of Month**: User inputs the day of month when credit card statement is generated (1-31)
@@ -65,8 +65,7 @@ A comprehensive financial management web application designed for tracking and m
 - **Credit Limit Alert**: System triggers alert notification when user attempts transaction that would exceed their set credit limit
 - Alert displayed before transaction confirmation to prevent overspending
 - Current available credit displayed on credit card account page and dashboard
-
-#### 2.2.4 Loan Account Configuration
+\n#### 2.2.4 Loan Account Configuration
 - Select interest rate type: Fixed or Floating
 - Input total principal loan amount
 - **EMI Due Day of Month**: User inputs the day of month when EMI payment is due (1-31)
@@ -116,64 +115,12 @@ A comprehensive financial management web application designed for tracking and m
 - **EMI Recalculation on Rate Change**: When floating interest rate is updated, system recalculates principal and interest components for all subsequent EMI payments
 - Updated interest breakdown reflected in loan account statement
 - Automatic monthly interest calculation uses current applicable interest rate
-\n#### 2.2.6 Data Security\n- **End-to-End Encryption**: All user data encrypted in database using industry-standard AES-256 encryption algorithm
-- **Zero-Knowledge Architecture**: Application creator, administrators, and database administrators have no access to decrypted user data
-- **Client-Side Encryption**: All user data encrypted on client side before transmission to server
-- **User-Specific Encryption Keys**: Each user's data encrypted with unique encryption key derived from user credentials using PBKDF2 key derivation function
-- Encryption keys never stored on server in plain text or recoverable form
-- **Comprehensive Data Encryption**: All user data stored in encrypted form including:
-  - User profile information (name, email, contact details, preferences)
-  - Bank account numbers and account details
-  - Credit card numbers and credit card details
-  - Loan account numbers and loan details
-  - All transaction records (income, expenses, transfers, payments)
-  - Transaction descriptions and notes
-  - Budget data and budget categories
-  - Account balances (current and historical)
-  - EMI payment history and breakdowns
-  - Interest rate history\n  - Financial reports and analytics data
-  - User settings and preferences
-  - Session data and activity logs
-  - **All numerical data including**:
-    - Account balances (cash, bank, credit card, loan balances)
-    - Transaction amounts (income, expense, transfer, payment amounts)
-    - Credit card limits and available credit amounts
-    - Loan principal amounts and outstanding balances
-    - EMI amounts and payment values
-    - Interest rates (fixed and floating rates)
-    - Accrued interest amounts
-    - Budget amounts (budgeted income and expense values)
-    - Budget variance calculations
-    - Percentage values in reports and analytics
-    - All calculated financial metrics and projections
-- **Encryption at Rest**: All data encrypted in database storage\n- **Encryption in Transit**: All data transmission between client and server protected by TLS/SSL encryption
-- **Secure Key Management**: Encryption keys derived from user password and never stored on server
-- User password hashed using bcrypt before storage
-- **Data Privacy Guarantee**: System architecture ensures that even database administrators, application developers, and hosting providers cannot access or view user's financial information in decrypted form
-- **No Backdoor Access**: No master key or backdoor mechanism exists to decrypt user data without user credentials
-- **Secure Session Management**: User sessions encrypted and protected against hijacking
-- **Automatic Logout**: Sessions automatically expire after period of inactivity
-- **Data Isolation**: Each user's encrypted data completely isolated from other users\n- **Audit Trail Encryption**: All system logs and audit trails encrypted to protect user activity information
-- **Performance Optimization for Encryption**:
-  - **Client-Side Caching**: Decrypted data cached in secure browser memory during active session to minimize repeated decryption operations
-  - **Batch Encryption/Decryption**: Multiple data items encrypted or decrypted in single batch operation to reduce processing overhead
-  - **Optimized Encryption Libraries**: Use of hardware-accelerated AES encryption libraries (AES-NI instruction set support) for faster encryption/decryption\n  - **Selective Decryption**: Only decrypt data that needs to be displayed to user, keeping non-visible data encrypted in memory
-  - **Asynchronous Processing**: Encryption and decryption operations performed asynchronously to prevent UI blocking
-  - **Indexed Encrypted Data**: Database indexes maintained on encrypted data using deterministic encryption for frequently queried fields to enable fast lookups without decryption
-  - **Session Key Reuse**: Encryption keys cached securely in session memory to avoid repeated key derivation operations
-  - **Lazy Loading**: Financial data loaded and decrypted on-demand as user navigates through application sections
-  - **Web Workers**: Heavy encryption/decryption tasks offloaded to background web workers to maintain responsive user interface
-  - **Compression Before Encryption**: Data compressed before encryption to reduce encrypted payload size and improve transmission speed
-- **Performance Monitoring**: System continuously monitors encryption/decryption performance to ensure minimal impact on application responsiveness
-- Target performance: Encryption operations complete within 50milliseconds for typical user interactions
-- Dashboard load time with encrypted data maintained under 2 seconds
-
-#### 2.2.7 Account Modification\n- Edit any account information at any time
+\n#### 2.2.6 Account Modification\n- Edit any account information at any time
 - Delete accounts with user confirmation
-\n### 2.3 Transaction Management\n
-#### 2.3.1 Transaction Types
-- Income transactions\n- Expense transactions
-- Cash withdrawals (from bank account or credit card)
+\n### 2.3 Transaction Management
+
+#### 2.3.1 Transaction Types\n- Income transactions
+- Expense transactions\n- Cash withdrawals (from bank account or credit card)
 - Bank-to-bank transfers
 - Loan payments
 - **Credit card repayment transactions**
@@ -231,8 +178,10 @@ A comprehensive financial management web application designed for tracking and m
 - **Tab 4 - Accounts**: Detailed view of all accounts with quick statement access
 - User can switch between tabs by clicking on tab headers
 - Active tab highlighted with visual indicator
-- Each tab loads relevant content dynamically\n- Tab selection persists during user session
-\n#### 2.4.2 Financial Summary (Overview Tab)
+- Each tab loads relevant content dynamically
+- Tab selection persists during user session
+
+#### 2.4.2 Financial Summary (Overview Tab)
 - Current Assets: Sum of Cash and Bank Account balances
 - Current Liabilities: Sum of Credit Card balances only
 - Liquid Assets: Sum of Cash and Bank Account balances
@@ -288,7 +237,8 @@ A comprehensive financial management web application designed for tracking and m
 - Real-time recalculation of budget variance when budget values are modified
 - Updated Budget vs. Actual analysis immediately reflected on dashboard and reports
 - System recalculates remaining budget for each category after budget modification
-\n### 2.6 Reporting\n- Transaction history reports with date range filters
+\n### 2.6 Reporting
+- Transaction history reports with date range filters
 - Income and expense summary reports
 - Account balance reports across all accounts
 - Budget vs. actual analysis reports
@@ -338,6 +288,6 @@ A comprehensive financial management web application designed for tracking and m
 - Responsive design adapting seamlessly to desktop, tablet, and mobile screens
 - Clear visual hierarchy with prominent balance displays and chart visualizations
 - Sticky header for easy navigation access
-\n## 4. Reference Images
-- IMG_7776.jpeg: Reports section showing transaction summary with total income, total expenses, and net position displays
+
+## 4. Reference Images
 - IMG_7777.jpeg: Banking app selection interface showing system's ability to detect and redirect to appropriate app store based on device type
