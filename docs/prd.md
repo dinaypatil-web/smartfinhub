@@ -25,14 +25,12 @@ A comprehensive financial management web application designed for tracking and m
 - User must enter current password before setting new password
 - Password change confirmation sent to registered email address
 \n## 2. Core Features
-
-### 2.1 User Preferences
+\n### 2.1 User Preferences
 - Select default country from dropdown list
 - Choose preferred currency for dashboard display
 - Country and currency settings saved to user profile
 - Settings apply across all dashboard views and reports
-
-### 2.2 Account Management
+\n### 2.2 Account Management
 \n#### 2.2.1 Account Types
 - Cash accounts\n- Bank accounts
 - Credit card accounts
@@ -117,10 +115,10 @@ A comprehensive financial management web application designed for tracking and m
 - Automatic monthly interest calculation uses current applicable interest rate
 \n#### 2.2.6 Account Modification\n- Edit any account information at any time
 - Delete accounts with user confirmation
-\n### 2.3 Transaction Management
-
-#### 2.3.1 Transaction Types\n- Income transactions
-- Expense transactions\n- Cash withdrawals (from bank account or credit card)
+\n### 2.3 Transaction Management\n
+#### 2.3.1 Transaction Types
+- Income transactions\n- Expense transactions
+- Cash withdrawals (from bank account or credit card)
 - Bank-to-bank transfers
 - Loan payments
 - **Credit card repayment transactions**
@@ -266,7 +264,7 @@ A comprehensive financial management web application designed for tracking and m
   - Total accrued interest\n  - Remaining loan tenure
   - Complete amortization schedule showing full loan lifecycle
 - Date range filter for loan statement reports
-- Export reports functionality\n\n## 3. Design Style\n
+- Export reports functionality\n\n##3. Design Style\n
 ### 3.1 Color Scheme
 - Primary color: Deep blue (#1E3A8A) conveying trust and financial stability
 - Secondary color: Emerald green (#10B981) for positive balances and income indicators
