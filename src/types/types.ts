@@ -10,7 +10,6 @@ export interface Profile {
   default_country: string;
   default_currency: string;
   role: UserRole;
-  encryption_salt: string | null;
   created_at: string;
 }
 

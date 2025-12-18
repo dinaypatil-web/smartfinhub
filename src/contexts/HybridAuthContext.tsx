@@ -11,7 +11,6 @@ import { useAuth0 } from '@auth0/auth0-react';
 import { supabase } from '@/db/supabase';
 import type { Profile } from '@/types/types';
 import { profileApi } from '@/db/api';
-import { keyManager, initializeEncryption } from '@/utils/encryption';
 import { useToast } from '@/hooks/use-toast';
 import { isAuth0Configured } from '@/config/auth0';
 
@@ -29,13 +28,7 @@ interface HybridAuthContextType {
   
   // Common methods
   signOut: () => Promise<void>;
-  refreshProfile: () => Promise<void>;
-  
-  // Encryption
-  hasEncryptionKey: boolean;
-  updateEncryptionKeyStatus: () => void;
-  
-  // Auth provider info
+  refreshProfile: () => Promise<void>;  // Auth provider info
   authProvider: 'auth0' | 'supabase' | null;
 }
 
@@ -66,35 +59,7 @@ export function HybridAuthProvider({ children }: { children: ReactNode }) {
 
   const [user, setUser] = useState<any | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [hasEncryptionKey, setHasEncryptionKey] = useState(false);
-  const [authProvider, setAuthProvider] = useState<'auth0' | 'supabase' | null>(null);
-
-  // Initialize encryption for a user
-  const initializeUserEncryption = useCallback(async (userId: string, existingSalt: string | null) => {
-    try {
-      const { salt } = await initializeEncryption(userId, existingSalt || undefined);
-      
-      // If this is a new user without a salt, save it to the database
-      if (!existingSalt) {
-        await supabase
-          .from('profiles')
-          .update({ encryption_salt: salt })
-          .eq('id', userId);
-      }
-      
-      setHasEncryptionKey(true);
-    } catch (error) {
-      console.error('Error initializing encryption:', error);
-      toast({
-        title: 'Warning',
-        description: 'Failed to initialize encryption. Some features may not work correctly.',
-        variant: 'destructive',
-      });
-    }
-  }, [toast]);
-
-  // Sync Auth0 user with Supabase
+  const [loading, setLoading] = useState(true);  const [authProvider, setAuthProvider] = useState<'auth0' | 'supabase' | null>(null);  // Sync Auth0 user with Supabase
   const syncAuth0UserWithSupabase = useCallback(async (auth0User: any) => {
     try {
       // Check if profile exists in Supabase
@@ -133,11 +98,7 @@ export function HybridAuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        setProfile(newProfile);
-        
-        // Initialize encryption for new user
-        await initializeUserEncryption(newProfile.id, null);
-      } else {
+        setProfile(newProfile);      } else {
         // Update auth0_sub if not set
         if (!existingProfile.auth0_sub) {
           await supabase
@@ -145,15 +106,11 @@ export function HybridAuthProvider({ children }: { children: ReactNode }) {
             .update({ auth0_sub: auth0User.sub })
             .eq('id', existingProfile.id);
         }
-        setProfile(existingProfile);
-        
-        // Initialize encryption for existing user
-        await initializeUserEncryption(existingProfile.id, existingProfile.encryption_salt);
-      }
+        setProfile(existingProfile);      }
     } catch (error) {
       console.error('Error syncing Auth0 user:', error);
     }
-  }, [toast, initializeUserEncryption]);
+  }, [toast]);
 
   // Refresh profile from Supabase
   const refreshProfile = useCallback(async () => {
@@ -179,13 +136,7 @@ export function HybridAuthProvider({ children }: { children: ReactNode }) {
         console.error('Error fetching profile:', error);
       }
     }
-  }, [user, authProvider]);
-
-  const updateEncryptionKeyStatus = useCallback(() => {
-    setHasEncryptionKey(keyManager.hasKey());
-  }, []);
-
-  // Auth0 login methods
+  }, [user, authProvider]);  // Auth0 login methods
   const loginWithGoogle = useCallback(async () => {
     try {
       await loginWithRedirect({
@@ -255,9 +206,7 @@ export function HybridAuthProvider({ children }: { children: ReactNode }) {
       // Load profile and initialize encryption
       const userProfile = await profileApi.getProfile(data.user.id);
       if (userProfile) {
-        setProfile(userProfile);
-        await initializeUserEncryption(data.user.id, userProfile.encryption_salt);
-      } else {
+        setProfile(userProfile);      } else {
         throw new Error('Failed to load user profile');
       }
       
@@ -274,7 +223,7 @@ export function HybridAuthProvider({ children }: { children: ReactNode }) {
       });
       throw error;
     }
-  }, [toast, initializeUserEncryption]);
+  }, [toast]);
 
   const signUpWithEmail = useCallback(async (email: string, password: string) => {
     try {
@@ -324,12 +273,7 @@ export function HybridAuthProvider({ children }: { children: ReactNode }) {
               phone: data.user.phone,
               role: role,
             });
-        }
-
-        // Initialize encryption for the new user
-        await initializeUserEncryption(data.user.id, existingProfile?.encryption_salt || null);
-
-        // Load profile
+        }        // Load profile
         const profile = await profileApi.getProfile(data.user.id);
         setProfile(profile);
         setUser(data.user);
@@ -360,7 +304,7 @@ export function HybridAuthProvider({ children }: { children: ReactNode }) {
       });
       throw error;
     }
-  }, [toast, initializeUserEncryption]);
+  }, [toast]);
 
   // Sign out
   const signOut = useCallback(async () => {
@@ -377,11 +321,7 @@ export function HybridAuthProvider({ children }: { children: ReactNode }) {
 
       setUser(null);
       setProfile(null);
-      setAuthProvider(null);
-      keyManager.clearKey();
-      setHasEncryptionKey(false);
-
-      toast({
+      setAuthProvider(null);      toast({
         title: 'Signed out',
         description: 'You have been signed out successfully',
       });
@@ -406,9 +346,7 @@ export function HybridAuthProvider({ children }: { children: ReactNode }) {
           setLoading(false); // Set loading false immediately
           
           // Sync with Supabase in background (non-blocking)
-          syncAuth0UserWithSupabase(auth0User).then(() => {
-            setHasEncryptionKey(keyManager.hasKey());
-          });
+          syncAuth0UserWithSupabase(auth0User).then(() => {          });
           return;
         }
 
@@ -422,10 +360,7 @@ export function HybridAuthProvider({ children }: { children: ReactNode }) {
           // Load profile and initialize encryption in background (non-blocking)
           profileApi.getProfile(session.user.id).then(async (userProfile) => {
             if (userProfile) {
-              setProfile(userProfile);
-              await initializeUserEncryption(session.user.id, userProfile.encryption_salt);
-              setHasEncryptionKey(keyManager.hasKey());
-            }
+              setProfile(userProfile);            }
           });
         } else {
           setLoading(false);
@@ -451,18 +386,12 @@ export function HybridAuthProvider({ children }: { children: ReactNode }) {
         // Initialize encryption for Supabase user in background (non-blocking)
         profileApi.getProfile(session.user.id).then(async (userProfile) => {
           if (userProfile) {
-            setProfile(userProfile);
-            await initializeUserEncryption(session.user.id, userProfile.encryption_salt);
-            setHasEncryptionKey(keyManager.hasKey());
-          }
+            setProfile(userProfile);          }
         });
       } else if (!session?.user && !isAuth0Authenticated) {
         setUser(null);
         setProfile(null);
-        setAuthProvider(null);
-        keyManager.clearKey();
-        setHasEncryptionKey(false);
-      }
+        setAuthProvider(null);      }
     });
 
     return () => {
@@ -480,8 +409,6 @@ export function HybridAuthProvider({ children }: { children: ReactNode }) {
     signUpWithEmail,
     signOut,
     refreshProfile,
-    hasEncryptionKey,
-    updateEncryptionKeyStatus,
     authProvider,
   };
 
