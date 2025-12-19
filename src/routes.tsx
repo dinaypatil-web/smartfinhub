@@ -11,6 +11,7 @@ const TransactionForm = lazy(() => import('./pages/TransactionForm'));
 const Budgets = lazy(() => import('./pages/Budgets'));
 const Reports = lazy(() => import('./pages/Reports'));
 const Settings = lazy(() => import('./pages/Settings'));
+const BackupRestore = lazy(() => import('./pages/BackupRestore'));
 
 // Auth pages loaded immediately for faster initial access
 import Login from './pages/Login';
@@ -125,6 +126,13 @@ const routes: RouteConfig[] = [
     name: 'Settings',
     path: '/settings',
     element: <ProtectedRoute><Settings /></ProtectedRoute>,
+    visible: true,
+    protected: true,
+  },
+  {
+    name: 'Backup & Restore',
+    path: '/backup-restore',
+    element: <ProtectedRoute><BackupRestore /></ProtectedRoute>,
     visible: true,
     protected: true,
   },

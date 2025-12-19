@@ -25,12 +25,14 @@ A comprehensive financial management web application designed for tracking and m
 - User must enter current password before setting new password
 - Password change confirmation sent to registered email address
 \n## 2. Core Features
-\n### 2.1 User Preferences
+
+### 2.1 User Preferences
 - Select default country from dropdown list
 - Choose preferred currency for dashboard display
 - Country and currency settings saved to user profile
 - Settings apply across all dashboard views and reports
-\n### 2.2 Account Management
+
+### 2.2 Account Management
 \n#### 2.2.1 Account Types
 - Cash accounts\n- Bank accounts
 - Credit card accounts
@@ -103,7 +105,8 @@ A comprehensive financial management web application designed for tracking and m
 - Sends notification to user about monthly interest addition
 - Interest calculation uses daily balance method considering all intra-month transactions
 - System maintains complete audit trail of all automatic interest additions
-\n#### 2.2.5 Floating Interest Rate Management
+
+#### 2.2.5 Floating Interest Rate Management
 - Record all interest rate changes from loan inception to current date
 - User can update floating interest rate at any time
 - System maintains complete historical record of rate changes
@@ -264,7 +267,32 @@ A comprehensive financial management web application designed for tracking and m
   - Total accrued interest\n  - Remaining loan tenure
   - Complete amortization schedule showing full loan lifecycle
 - Date range filter for loan statement reports
-- Export reports functionality\n\n##3. Design Style\n
+- Export reports functionality\n\n### 2.7 Data Backup and Restore
+- **Backup Functionality**: User can create complete backup of all application data at any time
+- Backup includes:
+  - All account information (Cash, Bank, Credit Card, Loan accounts)
+  - Complete transaction history for all accounts
+  - Budget settings and historical budget data
+  - User preferences and settings
+  - EMI payment history and configurations
+  - Interest rate history for loan accounts
+  - Credit card statement history and EMI details
+- **Backup File Format**: System generates backup file in secure, encrypted format\n- Backup file includes timestamp and user identification
+- User can download backup file to local device storage
+- **Automatic Backup Option**: User can enable automatic scheduled backups (daily, weekly, or monthly)
+- System sends notification when automatic backup is completed
+- **Restore Functionality**: User can restore data from previously created backup file
+- Restore process accessible from Settings section
+- User uploads backup file from local device\n- System validates backup file integrity and compatibility before restoration
+- **Restore Options**:
+  - Complete Restore: Replaces all current data with backup data
+  - Selective Restore: User can choose specific accounts or data categories to restore
+- System displays preview of backup contents before confirming restoration
+- Confirmation prompt shown before executing restore operation to prevent accidental data loss
+- **Backup Management**: User can view list of all backup files with creation dates and sizes
+- Option to delete old backup files to manage storage\n- System maintains backup history log showing all backup and restore operations
+
+## 3. Design Style\n
 ### 3.1 Color Scheme
 - Primary color: Deep blue (#1E3A8A) conveying trust and financial stability
 - Secondary color: Emerald green (#10B981) for positive balances and income indicators
@@ -286,6 +314,5 @@ A comprehensive financial management web application designed for tracking and m
 - Responsive design adapting seamlessly to desktop, tablet, and mobile screens
 - Clear visual hierarchy with prominent balance displays and chart visualizations
 - Sticky header for easy navigation access
-
-## 4. Reference Images
+\n## 4. Reference Images
 - IMG_7777.jpeg: Banking app selection interface showing system's ability to detect and redirect to appropriate app store based on device type
