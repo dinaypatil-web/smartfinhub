@@ -42,13 +42,14 @@ export default function BackupRestore() {
 
     setLoading(true);
     try {
-      // Fetch all user data
+      // Fetch all user data - SECURITY: All API calls filter by user.id to ensure
+      // only the current user's data is included in the backup
       const [accounts, transactions, budgets, interestRates, loanEMIPayments] = await Promise.all([
         accountApi.getAccounts(user.id),
         transactionApi.getTransactions(user.id),
         budgetApi.getBudgets(user.id),
-        interestRateApi.getInterestRates(),
-        loanEMIPaymentApi.getLoanEMIPayments(),
+        interestRateApi.getInterestRates(user.id),
+        loanEMIPaymentApi.getLoanEMIPayments(user.id),
       ]);
 
       // Create backup object
@@ -95,7 +96,7 @@ export default function BackupRestore() {
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file || !user) return;
 
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -110,6 +111,16 @@ export default function BackupRestore() {
 
         if (!backup.data.accounts || !backup.data.transactions) {
           throw new Error('Backup file is missing required data');
+        }
+
+        // Validate that backup belongs to current user
+        if (backup.userId && backup.userId !== user.id) {
+          toast({
+            title: 'Unauthorized Backup File',
+            description: 'This backup file belongs to a different user. You can only restore your own backups.',
+            variant: 'destructive',
+          });
+          return;
         }
 
         setBackupFile(backup);
@@ -322,6 +333,16 @@ export default function BackupRestore() {
                   <p className="font-medium text-destructive">Warning:</p>
                   <p className="text-muted-foreground mt-1">
                     Restoring will replace all your current data with the backup. This action cannot be undone.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2 text-sm">
+                <Shield className="h-4 w-4 text-muted-foreground mt-0.5" />
+                <div>
+                  <p className="font-medium">Security:</p>
+                  <p className="text-muted-foreground mt-1">
+                    You can only restore backups that belong to your account. Backups from other users will be rejected.
                   </p>
                 </div>
               </div>
