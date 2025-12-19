@@ -208,6 +208,16 @@ export const accountApi = {
 };
 
 export const interestRateApi = {
+  async getInterestRates(): Promise<InterestRateHistory[]> {
+    const { data, error } = await supabase
+      .from('interest_rate_history')
+      .select('*')
+      .order('effective_date', { ascending: false });
+    
+    if (error) throw error;
+    return Array.isArray(data) ? data : [];
+  },
+
   async getInterestRateHistory(accountId: string): Promise<InterestRateHistory[]> {
     const { data, error } = await supabase
       .from('interest_rate_history')
@@ -229,6 +239,10 @@ export const interestRateApi = {
     if (error) throw error;
     if (!data) throw new Error('Failed to add interest rate');
     return data;
+  },
+
+  async createInterestRate(rate: Omit<InterestRateHistory, 'id' | 'created_at'>): Promise<InterestRateHistory> {
+    return interestRateApi.addInterestRate(rate);
   },
 
   async deleteInterestRate(rateId: string): Promise<void> {
@@ -854,6 +868,16 @@ export const emiApi = {
 };
 
 export const loanEMIPaymentApi = {
+  async getLoanEMIPayments(): Promise<LoanEMIPayment[]> {
+    const { data, error } = await supabase
+      .from('loan_emi_payments')
+      .select('*')
+      .order('payment_date', { ascending: false });
+    
+    if (error) throw error;
+    return Array.isArray(data) ? data : [];
+  },
+
   async getPaymentsByAccount(accountId: string): Promise<LoanEMIPayment[]> {
     const { data, error } = await supabase
       .from('loan_emi_payments')
@@ -886,6 +910,10 @@ export const loanEMIPaymentApi = {
     if (error) throw error;
     if (!data) throw new Error('Failed to create loan EMI payment');
     return data;
+  },
+
+  async createLoanEMIPayment(payment: Omit<LoanEMIPayment, 'id' | 'created_at' | 'updated_at'>): Promise<LoanEMIPayment> {
+    return loanEMIPaymentApi.createPayment(payment);
   },
 
   async createBulkPayments(payments: Omit<LoanEMIPayment, 'id' | 'created_at' | 'updated_at'>[]): Promise<LoanEMIPayment[]> {
