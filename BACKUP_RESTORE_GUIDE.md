@@ -39,6 +39,16 @@ Restoring data will permanently delete all your current data and replace it with
 - Test your backups periodically
 
 ## Security
+
+### User Data Isolation
+- **Your backups contain ONLY your data**: The system ensures that backups include only data belonging to your account
+- **User verification**: When restoring, the system validates that the backup file belongs to your account
+- **Rejection of unauthorized backups**: Backup files from other users will be automatically rejected
+- **No cross-user data access**: You cannot backup or restore another user's data
+
+### Data Protection
 - Backup files contain sensitive financial information
 - Store them securely and never share with others
 - Use encrypted cloud storage or password-protected folders
+- Each backup file includes your user ID for verification
+- The restore process validates the user ID before proceeding

@@ -208,11 +208,17 @@ export const accountApi = {
 };
 
 export const interestRateApi = {
-  async getInterestRates(): Promise<InterestRateHistory[]> {
-    const { data, error } = await supabase
+  async getInterestRates(userId?: string): Promise<InterestRateHistory[]> {
+    let query = supabase
       .from('interest_rate_history')
-      .select('*')
+      .select('*, accounts!inner(user_id)')
       .order('effective_date', { ascending: false });
+    
+    if (userId) {
+      query = query.eq('accounts.user_id', userId);
+    }
+    
+    const { data, error } = await query;
     
     if (error) throw error;
     return Array.isArray(data) ? data : [];
@@ -868,11 +874,17 @@ export const emiApi = {
 };
 
 export const loanEMIPaymentApi = {
-  async getLoanEMIPayments(): Promise<LoanEMIPayment[]> {
-    const { data, error } = await supabase
+  async getLoanEMIPayments(userId?: string): Promise<LoanEMIPayment[]> {
+    let query = supabase
       .from('loan_emi_payments')
       .select('*')
       .order('payment_date', { ascending: false });
+    
+    if (userId) {
+      query = query.eq('user_id', userId);
+    }
+    
+    const { data, error } = await query;
     
     if (error) throw error;
     return Array.isArray(data) ? data : [];
