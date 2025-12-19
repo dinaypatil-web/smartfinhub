@@ -5,7 +5,7 @@
 ### 1.1 Application Name
 SmartFinHub\n
 ### 1.2 Application Description
-A comprehensive financial management web application designed for tracking and managing multiple financial accounts including cash, bank accounts, credit cards, and loans. The platform provides real-time balance updates, transaction recording, budget analysis, and detailed financial reporting.
+A comprehensive financial management web application designed for tracking and managing multiple financial accounts including cash, bank accounts, credit cards, and loans. The platform provides real-time balance updates, transaction recording, budget analysis, and detailed financial reporting with enterprise-grade data protection.
 
 ### 1.3 Authentication System
 - **Email Registration and Login**: Users register and login using email address only
@@ -42,7 +42,7 @@ A comprehensive financial management web application designed for tracking and m
 - **Complete bank name list available in dropdown for all supported countries**
 - Dropdown includes all major banks and financial institutions for selected country
 - **For India**: Bank selection page includes'BOB World: Banking & Experience' app link for Bank of Baroda customers
-- **Smart App Store Redirection**: When user clicks 'Open App' button for bank/financial institution mobile app:\n  - System automatically detects user's mobile device operating system
+- **Smart App Store Redirection**: When user clicks'Open App' button for bank/financial institution mobile app:\n  - System automatically detects user's mobile device operating system
   - For Android devices: Redirects to Google Play Store app page
   - For iOS devices: Redirects to Apple App Store app page
   - Seamless redirection without manual app store selection
@@ -61,11 +61,11 @@ A comprehensive financial management web application designed for tracking and m
 - Statement day and due day saved to credit card account profile
 - System displays statement date and due date reminders on dashboard
 - Payment reminders shown on credit card account detail page
-- Visual indicators for upcoming statement dates and due dates
-- **Credit Limit Alert**: System triggers alert notification when user attempts transaction that would exceed their set credit limit
+- Visual indicators for upcoming statement dates and due dates\n- **Credit Limit Alert**: System triggers alert notification when user attempts transaction that would exceed their set credit limit
 - Alert displayed before transaction confirmation to prevent overspending
 - Current available credit displayed on credit card account page and dashboard
-\n#### 2.2.4 Loan Account Configuration
+
+#### 2.2.4 Loan Account Configuration
 - Select interest rate type: Fixed or Floating
 - Input total principal loan amount
 - **EMI Due Day of Month**: User inputs the day of month when EMI payment is due (1-31)
@@ -89,22 +89,21 @@ A comprehensive financial management web application designed for tracking and m
   - Cumulative interest paid to date
   - Remaining loan balance
 - **Accurate Accrued Interest Calculation**: System calculates precise accrued interest based on:
-  - Historical EMI payment records
-  - Interest component extracted from each EMI (including user corrections)
+  - Historical EMI payment records\n  - Interest component extracted from each EMI (including user corrections)
   - Current outstanding principal balance
   - Interest rate and payment schedule
 - Accrued interest displayed on dashboard and loan account detail page
 - **Edit EMI History**: User can add, edit, or delete historical EMI payment records at any time
 - User can modify principal and interest breakdown for any EMI payment record
 - System recalculates principal/interest breakdown and accrued interest automatically when EMI history is modified
-- **Automatic Monthly Interest Calculation and Addition**: On the EMI due day of each month, system automatically:\n  - Calculates interest for the month based on outstanding principal balance and all transactions in loan account during the month
+- **Automatic Monthly Interest Calculation and Addition**: On the EMI due day of each month, system automatically:
+  - Calculates interest for the month based on outstanding principal balance and all transactions in loan account during the month
   - Considers all payments, additional payments, and principal adjustments made during the month
   - Adds calculated monthly interest amount to the loan account balance
   - Records interest addition as a system-generated transaction in loan account statement
   - Updates total accrued interest on dashboard and loan account detail page
 - Sends notification to user about monthly interest addition
-- Interest calculation uses daily balance method considering all intra-month transactions
-- System maintains complete audit trail of all automatic interest additions
+- Interest calculation uses daily balance method considering all intra-month transactions\n- System maintains complete audit trail of all automatic interest additions
 
 #### 2.2.5 Floating Interest Rate Management
 - Record all interest rate changes from loan inception to current date
@@ -116,12 +115,13 @@ A comprehensive financial management web application designed for tracking and m
 - **EMI Recalculation on Rate Change**: When floating interest rate is updated, system recalculates principal and interest components for all subsequent EMI payments
 - Updated interest breakdown reflected in loan account statement
 - Automatic monthly interest calculation uses current applicable interest rate
-\n#### 2.2.6 Account Modification\n- Edit any account information at any time
+\n#### 2.2.6 Account Modification
+- Edit any account information at any time
 - Delete accounts with user confirmation
 \n### 2.3 Transaction Management\n
 #### 2.3.1 Transaction Types
-- Income transactions\n- Expense transactions
-- Cash withdrawals (from bank account or credit card)
+- Income transactions
+- Expense transactions\n- Cash withdrawals (from bank account or credit card)
 - Bank-to-bank transfers
 - Loan payments
 - **Credit card repayment transactions**
@@ -171,18 +171,17 @@ A comprehensive financial management web application designed for tracking and m
 - System-generated interest transactions cannot be edited or deleted by user
 - Credit card repayment transactions can be edited or deleted with automatic recalculation of both bank and credit card balances
 \n### 2.4 Dashboard Display
-
-#### 2.4.1 Tab-Based Dashboard Structure
+\n#### 2.4.1 Tab-Based Dashboard Structure
 - **Dashboard organized into multiple tabs for better content organization and navigation**
 - **Tab 1 - Overview**: Financial summary and account cards
-- **Tab 2 - Analytics**: Visual charts including pie charts for balance distribution and expense breakdown, line charts for interest rate history\n- **Tab 3 - Cash Flow**: Monthly cash flow projection with opening balance, income, expenses, and credit card dues breakdown
+- **Tab 2 - Analytics**: Visual charts including pie charts for balance distribution and expense breakdown, line charts for interest rate history
+- **Tab 3 - Cash Flow**: Monthly cash flow projection with opening balance, income, expenses, and credit card dues breakdown
 - **Tab 4 - Accounts**: Detailed view of all accounts with quick statement access
 - User can switch between tabs by clicking on tab headers
 - Active tab highlighted with visual indicator
 - Each tab loads relevant content dynamically
 - Tab selection persists during user session
-
-#### 2.4.2 Financial Summary (Overview Tab)
+\n#### 2.4.2 Financial Summary (Overview Tab)
 - Current Assets: Sum of Cash and Bank Account balances
 - Current Liabilities: Sum of Credit Card balances only
 - Liquid Assets: Sum of Cash and Bank Account balances
@@ -214,8 +213,7 @@ A comprehensive financial management web application designed for tracking and m
 - **For credit card accounts**:
   - Display next statement date and payment due date as reminders
   - Show user-defined credit limit
-  - Display available credit remaining
-  - Show active EMI transactions count
+  - Display available credit remaining\n  - Show active EMI transactions count
   - Display total outstanding EMI balance
   - Show next EMI installment amount and due date
 - Visual indicators highlighting upcoming statement dates and due dates within7 days
@@ -292,7 +290,66 @@ A comprehensive financial management web application designed for tracking and m
 - **Backup Management**: User can view list of all backup files with creation dates and sizes
 - Option to delete old backup files to manage storage\n- System maintains backup history log showing all backup and restore operations
 
-## 3. Design Style\n
+### 2.8 Data Security and Privacy Protection
+\n#### 2.8.1 End-to-End Encryption
+- **User-Specific Encryption Key**: System generates unique encryption key for each user during registration
+- Encryption key derived from user's password using secure key derivation function (PBKDF2 with SHA-256)
+- Encryption key never stored on server in plain text
+- All user financial data encrypted using AES-256 encryption standard before storage
+- Encrypted data can only be decrypted using user's unique encryption key
+\n#### 2.8.2 Local Data Encryption
+- **Client-Side Encryption**: All sensitive data encrypted on user's device before transmission to server
+- Encryption performed in browser using Web Crypto API
+- Server stores only encrypted data and cannot decrypt user information
+- Account numbers, transaction details, balances, and personal information encrypted at rest
+\n#### 2.8.3Secure Data Transmission
+- **HTTPS Protocol**: All data transmission between client and server uses HTTPS with TLS 1.3encryption
+- SSL/TLS certificates ensure secure communication channel
+- Man-in-the-middle attacks prevented through certificate validation
+\n#### 2.8.4 Zero-Knowledge Architecture
+- **Server Cannot Access User Data**: Application designed with zero-knowledge architecture\n- Server has no access to user's encryption keys or decrypted data
+- Only authenticated user through application interface can decrypt and view their own data
+- System administrators and database administrators cannot view user's financial information
+
+#### 2.8.5 Session Security
+- **Secure Session Management**: User sessions protected with secure, httpOnly cookies
+- Session tokens encrypted and time-limited
+- Automatic session timeout after 30 minutes of inactivity\n- User must re-authenticate after session expiration
+- Single active session per user account (optional multi-device support with separate session management)
+
+#### 2.8.6 Password Security
+- **Strong Password Requirements**: Minimum 8 characters with combination of uppercase, lowercase, numbers, and special characters
+- Password hashed using bcrypt algorithm with salt before storage
+- Original password never stored in database
+- Password reset requires email verification code authentication
+\n#### 2.8.7 Data Access Logging
+- **Audit Trail**: System maintains encrypted audit log of all data access attempts
+- Log records user authentication events, data access timestamps, and IP addresses
+- Audit logs accessible only to authenticated user for their own account
+- Failed login attempts logged and trigger account lockout after 5 consecutive failures
+
+#### 2.8.8 Backup File Encryption
+- **Encrypted Backup Files**: All backup files encrypted using user's encryption key
+- Backup files protected with additional password set by user during backup creation
+- Encrypted backups cannot be accessed without both user's account credentials and backup password
+\n#### 2.8.9 Data Isolation
+- **Multi-Tenant Data Isolation**: Each user's data stored in isolated, encrypted database partitions
+- Database-level access controls prevent cross-user data access
+- Application logic enforces strict user data boundary checks
+\n#### 2.8.10 Compliance and Standards
+- Data protection implementation follows industry best practices
+- Encryption standards compliant with financial data security requirements
+- Regular security audits and vulnerability assessments
+- Data retention policies configurable by user
+\n#### 2.8.11 User Control and Transparency
+- **Data Privacy Dashboard**: User can view all data security settings and encryption status
+- Option to export all personal data in encrypted format
+- Option to permanently delete account and all associated data
+- Clear privacy policy explaining data handling and protection measures
+- No third-party data sharing without explicit user consent
+
+##3. Design Style
+
 ### 3.1 Color Scheme
 - Primary color: Deep blue (#1E3A8A) conveying trust and financial stability
 - Secondary color: Emerald green (#10B981) for positive balances and income indicators
@@ -306,10 +363,11 @@ A comprehensive financial management web application designed for tracking and m
 - Consistent spacing and padding throughout interface
 - Tab headers with clear labels and active state indicators
 - Smooth tab switching animations for better user experience
+- Security indicators (lock icons) displayed prominently to reinforce data protection
 
 ### 3.3 Layout Structure
 - Grid-based dashboard for account cards with responsive columns
-- Side navigation panel for main sections: Accounts, Transactions, Reports, Budget, Settings
+- Side navigation panel for main sections: Accounts, Transactions, Reports, Budget, Settings, Security
 - **Horizontal tab navigation within dashboard for switching between Overview, Analytics, Cash Flow, and Accounts tabs**
 - Responsive design adapting seamlessly to desktop, tablet, and mobile screens
 - Clear visual hierarchy with prominent balance displays and chart visualizations
