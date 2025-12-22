@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useHybridAuth as useAuth } from '@/contexts/HybridAuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { profileApi } from '@/db/api';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Phone, Mail, Shield } from 'lucide-react';
+import { Loader2, Phone, Mail, Shield, Sun, Moon, Monitor, Palette } from 'lucide-react';
 import { countries } from '@/utils/countries';
 import {
   Dialog,
@@ -22,6 +23,7 @@ import ChangePassword from '@/components/ChangePassword';
 
 export default function Settings() {
   const { user, profile, refreshProfile } = useAuth();
+  const { theme, setTheme } = useTheme();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -144,13 +146,85 @@ export default function Settings() {
   };
 
   return (
-    <div className="container mx-auto p-6 max-w-2xl space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Settings</h1>
+    <div className="container mx-auto p-6 max-w-2xl space-y-6 animate-fade-in">
+      <div className="animate-slide-down">
+        <h1 className="text-3xl font-bold gradient-text">Settings</h1>
         <p className="text-muted-foreground">Manage your account preferences</p>
       </div>
 
-      <Card>
+      <Card className="animate-slide-up">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Palette className="h-5 w-5" />
+            Appearance
+          </CardTitle>
+          <CardDescription>
+            Customize the look and feel of the application
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Theme</Label>
+              <p className="text-sm text-muted-foreground mb-3">
+                Choose your preferred theme or sync with your system settings
+              </p>
+              <div className="grid grid-cols-3 gap-3">
+                <button
+                  onClick={() => setTheme('light')}
+                  className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all hover:shadow-md ${
+                    theme === 'light'
+                      ? 'border-primary bg-primary/5 shadow-md'
+                      : 'border-border hover:border-primary/50'
+                  }`}
+                >
+                  <Sun className={`h-6 w-6 ${theme === 'light' ? 'text-primary' : 'text-muted-foreground'}`} />
+                  <span className={`text-sm font-medium ${theme === 'light' ? 'text-primary' : 'text-foreground'}`}>
+                    Light
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setTheme('dark')}
+                  className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all hover:shadow-md ${
+                    theme === 'dark'
+                      ? 'border-primary bg-primary/5 shadow-md'
+                      : 'border-border hover:border-primary/50'
+                  }`}
+                >
+                  <Moon className={`h-6 w-6 ${theme === 'dark' ? 'text-primary' : 'text-muted-foreground'}`} />
+                  <span className={`text-sm font-medium ${theme === 'dark' ? 'text-primary' : 'text-foreground'}`}>
+                    Dark
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setTheme('system')}
+                  className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all hover:shadow-md ${
+                    theme === 'system'
+                      ? 'border-primary bg-primary/5 shadow-md'
+                      : 'border-border hover:border-primary/50'
+                  }`}
+                >
+                  <Monitor className={`h-6 w-6 ${theme === 'system' ? 'text-primary' : 'text-muted-foreground'}`} />
+                  <span className={`text-sm font-medium ${theme === 'system' ? 'text-primary' : 'text-foreground'}`}>
+                    System
+                  </span>
+                </button>
+              </div>
+              {theme === 'system' && (
+                <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <p className="text-xs text-blue-800 dark:text-blue-200">
+                    <strong>System mode:</strong> The theme will automatically switch based on your device's system preferences.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="animate-slide-up animate-stagger-1">
         <CardHeader>
           <CardTitle>Regional Settings</CardTitle>
           <CardDescription>
@@ -211,7 +285,7 @@ export default function Settings() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="animate-slide-up animate-stagger-2">
         <CardHeader>
           <CardTitle>Account Information</CardTitle>
           <CardDescription>Your account details</CardDescription>
@@ -250,7 +324,7 @@ export default function Settings() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="animate-slide-up animate-stagger-3">
         <CardHeader>
           <CardTitle>Security</CardTitle>
           <CardDescription>Manage your account security settings</CardDescription>

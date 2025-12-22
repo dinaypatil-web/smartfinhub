@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Suspense } from 'react';
 import { Auth0Provider } from '@auth0/auth0-react';
 import { HybridAuthProvider } from './contexts/HybridAuthContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { Toaster } from './components/ui/toaster';
 import { Skeleton } from './components/ui/skeleton';
 import Header from '@/components/common/Header';
@@ -25,26 +26,28 @@ const PageLoader = () => (
 const App = () => {
   // If Auth0 is not configured, skip Auth0Provider wrapper
   const AppContent = (
-    <HybridAuthProvider>
-      <Toaster />
-      <div className="flex flex-col min-h-screen">
-        <Header />
-        <main className="flex-grow">
-          <Suspense fallback={<PageLoader />}>
-            <Routes>
-              {routes.map((route, index) => (
-                <Route
-                  key={index}
-                  path={route.path}
-                  element={route.element}
-                />
-              ))}
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </Suspense>
-        </main>
-      </div>
-    </HybridAuthProvider>
+    <ThemeProvider>
+      <HybridAuthProvider>
+        <Toaster />
+        <div className="flex flex-col min-h-screen">
+          <Header />
+          <main className="flex-grow">
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
+                {routes.map((route, index) => (
+                  <Route
+                    key={index}
+                    path={route.path}
+                    element={route.element}
+                  />
+                ))}
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </Suspense>
+          </main>
+        </div>
+      </HybridAuthProvider>
+    </ThemeProvider>
   );
 
   // If Auth0 is not configured, return app without Auth0Provider
