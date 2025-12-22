@@ -274,6 +274,7 @@ export async function postMonthlyInterest(account: Account, userId: string): Pro
       amount: interestAmount,
       currency: account.currency,
       category: 'Interest',
+      income_category: null,
       description: `Monthly interest charge for ${account.account_name}`,
       transaction_date: today.toISOString().split('T')[0]
     };

@@ -61,6 +61,7 @@ export interface Transaction {
   amount: number;
   currency: string;
   category: string | null;
+  income_category: IncomeCategoryKey | null;
   description: string | null;
   transaction_date: string;
   created_at: string;

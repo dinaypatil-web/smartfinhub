@@ -690,19 +690,39 @@ export const budgetApi = {
       others: { budgeted: 0, actual: 0, variance: 0 }
     };
 
+    // Calculate actual income by category from transactions
+    const incomeTransactions = transactions.filter(t => t.transaction_type === 'income');
+    const actualIncomeByCategory: Record<string, number> = {};
+    
+    for (const transaction of incomeTransactions) {
+      if (transaction.income_category) {
+        actualIncomeByCategory[transaction.income_category] = 
+          (actualIncomeByCategory[transaction.income_category] || 0) + Number(transaction.amount);
+      }
+    }
+
+    // Calculate uncategorized income (for proportional distribution)
+    const categorizedIncome = Object.values(actualIncomeByCategory).reduce((sum, val) => sum + val, 0);
+    const uncategorizedIncome = actual_income - categorizedIncome;
+
     // Process income category budgets
     if (budget.income_category_budgets) {
       const incomeBudgets = budget.income_category_budgets as Record<IncomeCategoryKey, number>;
+      const totalBudgetedIncome = Object.values(incomeBudgets).reduce((sum: number, val) => sum + Number(val), 0);
+      
       for (const [categoryKey, budgeted] of Object.entries(incomeBudgets)) {
         if (categoryKey in income_category_analysis) {
           const key = categoryKey as IncomeCategoryKey;
           const budgetedAmount = Number(budgeted);
           
-          // For now, we'll distribute actual income proportionally based on budgeted amounts
-          // In a real scenario, you might want to track income categories in transactions
-          const totalBudgetedIncome = Object.values(incomeBudgets).reduce((sum: number, val) => sum + Number(val), 0);
-          const proportion = totalBudgetedIncome > 0 ? budgetedAmount / totalBudgetedIncome : 0;
-          const actual = actual_income * proportion;
+          // Use actual categorized income if available
+          let actual = actualIncomeByCategory[key] || 0;
+          
+          // Distribute uncategorized income proportionally if there's any
+          if (uncategorizedIncome > 0 && totalBudgetedIncome > 0) {
+            const proportion = budgetedAmount / totalBudgetedIncome;
+            actual += uncategorizedIncome * proportion;
+          }
           
           income_category_analysis[key] = {
             budgeted: budgetedAmount,

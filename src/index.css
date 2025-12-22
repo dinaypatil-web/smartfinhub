@@ -10,91 +10,103 @@ All colors MUST be HSL.
 @layer base {
   :root {
     --radius: 0.75rem;
-    --background: 210 40% 98%;
-    --foreground: 222 47% 11%;
+    --background: 240 100% 99%;
+    --foreground: 240 10% 15%;
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 240 10% 15%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    --primary: 221 83% 28%;
-    --primary-foreground: 210 40% 98%;
-    --primary-light: 221 83% 45%;
-    --primary-glow: 221 83% 65%;
-    --secondary: 158 64% 52%;
+    --popover-foreground: 240 10% 15%;
+    --primary: 262 83% 58%;
+    --primary-foreground: 0 0% 100%;
+    --primary-light: 262 83% 68%;
+    --primary-glow: 262 90% 75%;
+    --secondary: 168 76% 42%;
     --secondary-foreground: 0 0% 100%;
-    --secondary-light: 158 64% 62%;
-    --success: 158 64% 52%;
+    --secondary-light: 168 76% 52%;
+    --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
-    --danger: 0 72% 51%;
+    --danger: 0 84% 60%;
     --danger-foreground: 0 0% 100%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
-    --accent: 38 92% 50%;
+    --muted: 240 20% 96%;
+    --muted-foreground: 240 5% 45%;
+    --accent: 280 85% 60%;
     --accent-foreground: 0 0% 100%;
-    --destructive: 0 72% 51%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 221 83% 28%;
-    --chart-1: 158 64% 52%;
-    --chart-2: 221 83% 45%;
+    --border: 240 15% 90%;
+    --input: 240 15% 92%;
+    --ring: 262 83% 58%;
+    --chart-1: 262 83% 58%;
+    --chart-2: 168 76% 42%;
     --chart-3: 38 92% 50%;
-    --chart-4: 0 72% 51%;
-    --chart-5: 271 81% 56%;
+    --chart-4: 0 84% 60%;
+    --chart-5: 280 85% 60%;
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 222 47% 11%;
-    --sidebar-primary: 221 83% 28%;
-    --sidebar-primary-foreground: 210 40% 98%;
-    --sidebar-accent: 210 40% 96%;
-    --sidebar-accent-foreground: 222 47% 11%;
-    --sidebar-border: 214 32% 91%;
-    --sidebar-ring: 221 83% 28%;
+    --sidebar-foreground: 240 10% 15%;
+    --sidebar-primary: 262 83% 58%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 20% 96%;
+    --sidebar-accent-foreground: 240 10% 15%;
+    --sidebar-border: 240 15% 90%;
+    --sidebar-ring: 262 83% 58%;
+    --gradient-primary: linear-gradient(135deg, hsl(262 83% 58%), hsl(220 90% 56%));
+    --gradient-secondary: linear-gradient(135deg, hsl(168 76% 42%), hsl(142 71% 45%));
+    --gradient-accent: linear-gradient(135deg, hsl(280 85% 60%), hsl(320 85% 60%));
+    --shadow-primary: 0 10px 40px -10px hsl(262 83% 58% / 0.4);
+    --shadow-glow: 0 0 30px hsl(262 90% 75% / 0.3);
+    --shadow-card: 0 4px 20px -2px hsl(240 15% 20% / 0.08);
   }
 
   .dark {
-    --background: 222 47% 11%;
-    --foreground: 210 40% 98%;
-    --card: 222 47% 15%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 47% 15%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 221 83% 58%;
+    --background: 240 10% 8%;
+    --foreground: 240 10% 95%;
+    --card: 240 10% 12%;
+    --card-foreground: 240 10% 95%;
+    --popover: 240 10% 12%;
+    --popover-foreground: 240 10% 95%;
+    --primary: 262 83% 65%;
     --primary-foreground: 0 0% 100%;
-    --primary-light: 221 83% 68%;
-    --primary-glow: 221 83% 78%;
-    --secondary: 158 64% 52%;
+    --primary-light: 262 83% 75%;
+    --primary-glow: 262 90% 80%;
+    --secondary: 168 76% 48%;
     --secondary-foreground: 0 0% 100%;
-    --secondary-light: 158 64% 62%;
-    --success: 158 64% 52%;
+    --secondary-light: 168 76% 58%;
+    --success: 142 71% 50%;
     --success-foreground: 0 0% 100%;
-    --warning: 38 92% 50%;
+    --warning: 38 92% 55%;
     --warning-foreground: 0 0% 100%;
-    --danger: 0 72% 51%;
+    --danger: 0 84% 65%;
     --danger-foreground: 0 0% 100%;
-    --muted: 217 33% 18%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 38 92% 50%;
+    --muted: 240 10% 16%;
+    --muted-foreground: 240 5% 60%;
+    --accent: 280 85% 65%;
     --accent-foreground: 0 0% 100%;
-    --destructive: 0 72% 51%;
+    --destructive: 0 84% 65%;
     --destructive-foreground: 0 0% 100%;
-    --border: 217 33% 18%;
-    --input: 217 33% 18%;
-    --ring: 221 83% 58%;
-    --chart-1: 158 64% 52%;
-    --chart-2: 221 83% 58%;
-    --chart-3: 38 92% 50%;
-    --chart-4: 0 72% 51%;
-    --chart-5: 271 81% 56%;
-    --sidebar-background: 222 47% 15%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 221 83% 58%;
+    --border: 240 10% 20%;
+    --input: 240 10% 18%;
+    --ring: 262 83% 65%;
+    --chart-1: 262 83% 65%;
+    --chart-2: 168 76% 48%;
+    --chart-3: 38 92% 55%;
+    --chart-4: 0 84% 65%;
+    --chart-5: 280 85% 65%;
+    --sidebar-background: 240 10% 10%;
+    --sidebar-foreground: 240 10% 95%;
+    --sidebar-primary: 262 83% 65%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 217 33% 18%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 217 33% 18%;
-    --sidebar-ring: 221 83% 58%;
+    --sidebar-accent: 240 10% 16%;
+    --sidebar-accent-foreground: 240 10% 95%;
+    --sidebar-border: 240 10% 20%;
+    --sidebar-ring: 262 83% 65%;
+    --gradient-primary: linear-gradient(135deg, hsl(262 83% 65%), hsl(220 90% 60%));
+    --gradient-secondary: linear-gradient(135deg, hsl(168 76% 48%), hsl(142 71% 50%));
+    --gradient-accent: linear-gradient(135deg, hsl(280 85% 65%), hsl(320 85% 65%));
+    --shadow-primary: 0 10px 40px -10px hsl(262 83% 65% / 0.5);
+    --shadow-glow: 0 0 40px hsl(262 90% 80% / 0.4);
+    --shadow-card: 0 4px 20px -2px hsl(0 0% 0% / 0.3);
   }
 }
 
@@ -110,31 +122,35 @@ All colors MUST be HSL.
 
 @layer utilities {
   .gradient-primary {
-    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-light)));
+    background: var(--gradient-primary);
   }
 
   .gradient-secondary {
-    background: linear-gradient(135deg, hsl(var(--secondary)), hsl(var(--secondary-light)));
+    background: var(--gradient-secondary);
   }
 
-  .gradient-success {
-    background: linear-gradient(135deg, hsl(var(--success)) 0%, hsl(var(--secondary-light)) 100%);
+  .gradient-accent {
+    background: var(--gradient-accent);
   }
 
-  .gradient-card {
-    background: linear-gradient(135deg, hsl(var(--card)) 0%, hsl(var(--muted)) 100%);
-  }
-
-  .shadow-elegant {
-    box-shadow: 0 10px 30px -10px hsl(var(--primary) / 0.2);
+  .shadow-primary {
+    box-shadow: var(--shadow-primary);
   }
 
   .shadow-glow {
-    box-shadow: 0 0 40px hsl(var(--primary-glow) / 0.3);
+    box-shadow: var(--shadow-glow);
   }
 
   .shadow-card {
-    box-shadow: 0 4px 20px -4px hsl(var(--foreground) / 0.1);
+    box-shadow: var(--shadow-card);
+  }
+
+  .gradient-text {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
   }
 
   .transition-smooth {
@@ -148,14 +164,6 @@ All colors MUST be HSL.
   .hover-lift:hover {
     transform: translateY(-4px);
     box-shadow: 0 12px 40px -8px hsl(var(--foreground) / 0.15);
-  }
-
-  .gradient-text {
-    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    color: transparent;
   }
 
   .glass-effect {

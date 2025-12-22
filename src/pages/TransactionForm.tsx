@@ -21,6 +21,7 @@ import {
   getCreditLimitWarningMessage 
 } from '@/utils/emiCalculations';
 import { getTransactionStatementInfo } from '@/utils/statementCalculations';
+import { INCOME_CATEGORIES } from '@/constants/incomeCategories';
 
 // Transaction form for creating and editing transactions
 export default function TransactionForm() {
@@ -42,6 +43,7 @@ export default function TransactionForm() {
     amount: '',
     currency: profile?.default_currency || 'INR',
     category: '',
+    income_category: '',
     description: '',
     transaction_date: new Date().toISOString().split('T')[0],
     is_emi: false,
@@ -186,6 +188,7 @@ export default function TransactionForm() {
             amount: transaction.amount.toString(),
             currency: transaction.currency,
             category: transaction.category || '',
+            income_category: transaction.income_category || '',
             description: transaction.description || '',
             transaction_date: transaction.transaction_date,
             is_emi: false,
@@ -328,6 +331,7 @@ export default function TransactionForm() {
         amount: parseFloat(formData.amount),
         currency: formData.currency,
         category: formData.category || null,
+        income_category: formData.income_category || null,
         description: formData.description || null,
         transaction_date: formData.transaction_date,
       };
@@ -574,22 +578,42 @@ export default function TransactionForm() {
 
             {(formData.transaction_type === 'income' || formData.transaction_type === 'expense') && (
               <div className="space-y-2">
-                <Label htmlFor="category">Category</Label>
-                <Select
-                  value={formData.category}
-                  onValueChange={(value) => setFormData({ ...formData, category: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map(category => (
-                      <SelectItem key={category.id} value={category.name}>
-                        {category.icon} {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="category">
+                  {formData.transaction_type === 'income' ? 'Income Category' : 'Expense Category'}
+                </Label>
+                {formData.transaction_type === 'income' ? (
+                  <Select
+                    value={formData.income_category}
+                    onValueChange={(value) => setFormData({ ...formData, income_category: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select income category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {INCOME_CATEGORIES.map(category => (
+                        <SelectItem key={category.key} value={category.key}>
+                          {category.icon} {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Select
+                    value={formData.category}
+                    onValueChange={(value) => setFormData({ ...formData, category: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select expense category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map(category => (
+                        <SelectItem key={category.id} value={category.name}>
+                          {category.icon} {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
 
                 {/* Budget Information Display for Expense Transactions */}
                 {formData.transaction_type === 'expense' && formData.category && (
