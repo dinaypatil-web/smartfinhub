@@ -465,8 +465,8 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="container mx-auto p-4 md:p-6 space-y-4 md:space-y-6 max-w-full overflow-x-auto">
-      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+    <div className="container mx-auto p-4 md:p-6 space-y-4 md:space-y-6 max-w-full overflow-x-auto animate-fade-in">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 animate-slide-down">
         <div className="space-y-1">
           <h1 className="text-3xl md:text-4xl font-bold gradient-text">Dashboard</h1>
           <p className="text-sm md:text-base text-muted-foreground">Welcome back, {profile?.email || 'User'}</p>
@@ -512,7 +512,7 @@ export default function Dashboard() {
         <TabsContent value="overview" className="space-y-6 mt-6">
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 min-w-max md:min-w-0">
-        <Card className="border-l-4 border-l-emerald-500 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20 hover-lift shadow-card">
+        <Card className="border-l-4 border-l-emerald-500 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20 hover-lift shadow-card animate-slide-up">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Current Assets</CardTitle>
             <div className="h-10 w-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
@@ -529,7 +529,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-red-500 bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-950/20 dark:to-orange-950/20 hover-lift shadow-card">
+        <Card className="border-l-4 border-l-red-500 bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-950/20 dark:to-orange-950/20 hover-lift shadow-card animate-slide-up animate-stagger-1">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Current Liabilities</CardTitle>
             <div className="h-10 w-10 rounded-full bg-red-500/20 flex items-center justify-center">
@@ -546,7 +546,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 hover-lift shadow-card">
+        <Card className="border-l-4 border-l-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 hover-lift shadow-card animate-slide-up animate-stagger-2">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Liquid Assets</CardTitle>
             <div className="h-10 w-10 rounded-full bg-blue-500/20 flex items-center justify-center">
@@ -563,7 +563,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className={`border-l-4 hover-lift shadow-card ${(summary?.working_capital || 0) >= 0 ? 'border-l-purple-500 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/20 dark:to-pink-950/20' : 'border-l-amber-500 bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20'}`}>
+        <Card className={`border-l-4 hover-lift shadow-card animate-slide-up animate-stagger-3 ${(summary?.working_capital || 0) >= 0 ? 'border-l-purple-500 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/20 dark:to-pink-950/20' : 'border-l-amber-500 bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20'}`}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Working Capital</CardTitle>
             <div className={`h-10 w-10 rounded-full ${(summary?.working_capital || 0) >= 0 ? 'bg-purple-500/20' : 'bg-amber-500/20'} flex items-center justify-center`}>
@@ -595,7 +595,7 @@ export default function Dashboard() {
         <TabsContent value="charts" className="space-y-6 mt-6">
       {/* Monthly Cash Flow Summary */}
       {cashFlow && (
-        <Card className="border-l-4 border-l-indigo-500 bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-950/20 dark:to-blue-950/20 shadow-card">
+        <Card className="border-l-4 border-l-indigo-500 bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-950/20 dark:to-blue-950/20 shadow-card animate-slide-up">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <div className="h-8 w-8 rounded-lg bg-indigo-500/20 flex items-center justify-center">
@@ -701,7 +701,7 @@ export default function Dashboard() {
       )}
 
       <div className="grid gap-6 md:grid-cols-2 min-w-max md:min-w-0">
-        <Card className="shadow-card hover-lift">
+        <Card className="shadow-card hover-lift animate-scale-in">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -740,7 +740,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-card hover-lift">
+        <Card className="shadow-card hover-lift animate-scale-in animate-stagger-1">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <div className="h-8 w-8 rounded-lg bg-secondary/10 flex items-center justify-center">
@@ -834,10 +834,10 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {summary?.accounts_by_type.cash.map(account => (
+              {summary?.accounts_by_type.cash.map((account, index) => (
                 <div 
                   key={account.id} 
-                  className="flex items-center justify-between p-4 border-l-4 border-l-emerald-500 rounded-lg bg-gradient-to-r from-emerald-50/50 to-transparent dark:from-emerald-950/20 hover-lift shadow-card cursor-pointer"
+                  className={`flex items-center justify-between p-4 border-l-4 border-l-emerald-500 rounded-lg bg-gradient-to-r from-emerald-50/50 to-transparent dark:from-emerald-950/20 hover-lift shadow-card cursor-pointer animate-slide-right animate-stagger-${Math.min(index + 1, 4)}`}
                   onClick={() => handleAccountClick(account)}
                 >
                   <div className="flex items-center gap-3">
@@ -856,12 +856,12 @@ export default function Dashboard() {
                   </div>
                 </div>
               ))}
-              {summary?.accounts_by_type.bank.map(account => {
+              {summary?.accounts_by_type.bank.map((account, index) => {
                 const bankLink = getBankAppLink(account.institution_name || '');
                 return (
                   <div 
                     key={account.id} 
-                    className="flex items-center justify-between p-4 border-l-4 border-l-blue-500 rounded-lg bg-gradient-to-r from-blue-50/50 to-transparent dark:from-blue-950/20 hover-lift shadow-card cursor-pointer"
+                    className={`flex items-center justify-between p-4 border-l-4 border-l-blue-500 rounded-lg bg-gradient-to-r from-blue-50/50 to-transparent dark:from-blue-950/20 hover-lift shadow-card cursor-pointer animate-slide-right animate-stagger-${Math.min(index + 1, 4)}`}
                     onClick={() => handleAccountClick(account)}
                   >
                     <div className="flex items-center gap-3">
@@ -894,7 +894,7 @@ export default function Dashboard() {
                   </div>
                 );
               })}
-              {summary?.accounts_by_type.credit_card.map(account => {
+              {summary?.accounts_by_type.credit_card.map((account, index) => {
                 const emis = accountEMIs[account.id] || [];
                 const transactions = accountTransactions[account.id] || [];
                 const bankLink = getBankAppLink(account.institution_name || '');
@@ -941,7 +941,7 @@ export default function Dashboard() {
                 return (
                   <div 
                     key={account.id} 
-                    className="p-4 border-l-4 border-l-purple-500 rounded-lg bg-gradient-to-r from-purple-50/50 to-transparent dark:from-purple-950/20 hover:shadow-md transition-shadow space-y-3 cursor-pointer"
+                    className={`p-4 border-l-4 border-l-purple-500 rounded-lg bg-gradient-to-r from-purple-50/50 to-transparent dark:from-purple-950/20 hover:shadow-md transition-shadow space-y-3 cursor-pointer animate-slide-right animate-stagger-${Math.min(index + 1, 4)}`}
                     onClick={() => handleAccountClick(account)}
                   >
                     <div className="flex items-center justify-between">
@@ -1079,12 +1079,12 @@ export default function Dashboard() {
                   </div>
                 );
               })}
-              {summary?.accounts_by_type.loan.map(account => {
+              {summary?.accounts_by_type.loan.map((account, index) => {
                 const bankLink = getBankAppLink(account.institution_name || '');
                 return (
                   <div 
                     key={account.id} 
-                    className="flex items-center justify-between p-4 border-l-4 border-l-orange-500 rounded-lg bg-gradient-to-r from-orange-50/50 to-transparent dark:from-orange-950/20 hover:shadow-md transition-shadow cursor-pointer"
+                    className={`flex items-center justify-between p-4 border-l-4 border-l-orange-500 rounded-lg bg-gradient-to-r from-orange-50/50 to-transparent dark:from-orange-950/20 hover:shadow-md transition-shadow cursor-pointer animate-slide-right animate-stagger-${Math.min(index + 1, 4)}`}
                     onClick={() => handleAccountClick(account)}
                   >
                     <div className="flex items-center gap-3">
