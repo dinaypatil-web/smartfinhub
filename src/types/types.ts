@@ -67,6 +67,15 @@ export interface Transaction {
   updated_at: string;
 }
 
+export type IncomeCategoryKey = 'salaries' | 'allowances' | 'family_income' | 'others';
+
+export interface IncomeCategory {
+  key: IncomeCategoryKey;
+  name: string;
+  icon: string;
+  color: string;
+}
+
 export interface Budget {
   id: string;
   user_id: string;
@@ -75,6 +84,7 @@ export interface Budget {
   budgeted_income: number;
   budgeted_expenses: number;
   category_budgets: Record<string, number>;
+  income_category_budgets: Record<IncomeCategoryKey, number>;
   currency: string;
   created_at: string;
   updated_at: string;
@@ -117,6 +127,11 @@ export interface BudgetAnalysis {
   income_variance: number;
   expense_variance: number;
   category_analysis: Record<string, {
+    budgeted: number;
+    actual: number;
+    variance: number;
+  }>;
+  income_category_analysis: Record<IncomeCategoryKey, {
     budgeted: number;
     actual: number;
     variance: number;
