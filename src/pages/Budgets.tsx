@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useHybridAuth as useAuth } from '@/contexts/HybridAuthContext';
 import { budgetApi, categoryApi } from '@/db/api';
-import type { BudgetAnalysis, ExpenseCategory } from '@/types/types';
+import type { BudgetAnalysis, ExpenseCategory, IncomeCategoryKey } from '@/types/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, TrendingUp, TrendingDown, Plus, Trash2 } from 'lucide-react';
 import { formatCurrency, getMonthName, getCurrentMonthYear } from '@/utils/format';
 import { Progress } from '@/components/ui/progress';
+import { INCOME_CATEGORIES } from '@/constants/incomeCategories';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function Budgets() {
   const { user, profile } = useAuth();
@@ -25,6 +27,12 @@ export default function Budgets() {
     budgeted_expenses: '',
   });
   const [categoryBudgets, setCategoryBudgets] = useState<Record<string, string>>({});
+  const [incomeCategoryBudgets, setIncomeCategoryBudgets] = useState<Record<IncomeCategoryKey, string>>({
+    salaries: '',
+    allowances: '',
+    family_income: '',
+    others: ''
+  });
 
   const currency = profile?.default_currency || 'INR';
 
@@ -59,12 +67,26 @@ export default function Budgets() {
           budgeted_expenses: data.budget.budgeted_expenses.toString(),
         });
         
-        // Convert category budgets to string format for form
+        // Convert expense category budgets to string format for form
         const categoryBudgetsStr: Record<string, string> = {};
         Object.entries(data.budget.category_budgets || {}).forEach(([key, value]) => {
           categoryBudgetsStr[key] = value.toString();
         });
         setCategoryBudgets(categoryBudgetsStr);
+
+        // Convert income category budgets to string format for form
+        const incomeCategoryBudgetsStr: Record<IncomeCategoryKey, string> = {
+          salaries: '',
+          allowances: '',
+          family_income: '',
+          others: ''
+        };
+        Object.entries(data.budget.income_category_budgets || {}).forEach(([key, value]) => {
+          if (key in incomeCategoryBudgetsStr) {
+            incomeCategoryBudgetsStr[key as IncomeCategoryKey] = value.toString();
+          }
+        });
+        setIncomeCategoryBudgets(incomeCategoryBudgetsStr);
       }
     } catch (error) {
       console.error('Error loading budget analysis:', error);
@@ -80,7 +102,7 @@ export default function Budgets() {
     setLoading(true);
 
     try {
-      // Convert category budgets to numbers
+      // Convert expense category budgets to numbers
       const categoryBudgetsNum: Record<string, number> = {};
       Object.entries(categoryBudgets).forEach(([key, value]) => {
         const numValue = parseFloat(value);
@@ -89,16 +111,29 @@ export default function Budgets() {
         }
       });
 
+      // Convert income category budgets to numbers
+      const incomeCategoryBudgetsNum: Record<IncomeCategoryKey, number> = {} as Record<IncomeCategoryKey, number>;
+      Object.entries(incomeCategoryBudgets).forEach(([key, value]) => {
+        const numValue = parseFloat(value);
+        if (!isNaN(numValue) && numValue > 0) {
+          incomeCategoryBudgetsNum[key as IncomeCategoryKey] = numValue;
+        }
+      });
+
       // Calculate total budgeted expenses from categories
       const totalCategoryBudgets = Object.values(categoryBudgetsNum).reduce((sum, val) => sum + val, 0);
+
+      // Calculate total budgeted income from categories
+      const totalIncomeCategoryBudgets = Object.values(incomeCategoryBudgetsNum).reduce((sum, val) => sum + val, 0);
 
       await budgetApi.createOrUpdateBudget({
         user_id: user.id,
         month: selectedMonth,
         year: selectedYear,
-        budgeted_income: parseFloat(budgetForm.budgeted_income) || 0,
+        budgeted_income: totalIncomeCategoryBudgets || parseFloat(budgetForm.budgeted_income) || 0,
         budgeted_expenses: totalCategoryBudgets || parseFloat(budgetForm.budgeted_expenses) || 0,
         category_budgets: categoryBudgetsNum,
+        income_category_budgets: incomeCategoryBudgetsNum,
         currency,
       });
 
@@ -127,6 +162,13 @@ export default function Budgets() {
     }));
   };
 
+  const handleIncomeCategoryBudgetChange = (categoryKey: IncomeCategoryKey, value: string) => {
+    setIncomeCategoryBudgets(prev => ({
+      ...prev,
+      [categoryKey]: value
+    }));
+  };
+
   const removeCategoryBudget = (categoryId: string) => {
     setCategoryBudgets(prev => {
       const newBudgets = { ...prev };
@@ -137,6 +179,13 @@ export default function Budgets() {
 
   const getTotalCategoryBudgets = () => {
     return Object.values(categoryBudgets).reduce((sum, val) => {
+      const num = parseFloat(val);
+      return sum + (isNaN(num) ? 0 : num);
+    }, 0);
+  };
+
+  const getTotalIncomeCategoryBudgets = () => {
+    return Object.values(incomeCategoryBudgets).reduce((sum, val) => {
       const num = parseFloat(val);
       return sum + (isNaN(num) ? 0 : num);
     }, 0);
@@ -193,59 +242,86 @@ export default function Budgets() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="budgeted_income">Budgeted Income</Label>
-                <Input
-                  id="budgeted_income"
-                  type="number"
-                  step="0.01"
-                  value={budgetForm.budgeted_income}
-                  onChange={(e) => setBudgetForm({ ...budgetForm, budgeted_income: e.target.value })}
-                  placeholder="0.00"
-                />
-              </div>
+              <Tabs defaultValue="income" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="income">Income Budget</TabsTrigger>
+                  <TabsTrigger value="expenses">Expense Budget</TabsTrigger>
+                </TabsList>
 
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <Label>Category Budgets</Label>
-                  <span className="text-sm text-muted-foreground">
-                    Total: {formatCurrency(getTotalCategoryBudgets(), currency)}
-                  </span>
-                </div>
+                <TabsContent value="income" className="space-y-4 mt-4">
+                  <div className="flex justify-between items-center">
+                    <Label>Income Categories</Label>
+                    <span className="text-sm text-muted-foreground">
+                      Total: {formatCurrency(getTotalIncomeCategoryBudgets(), currency)}
+                    </span>
+                  </div>
 
-                <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-                  {categories.map(category => (
-                    <div key={category.id} className="flex items-center gap-2">
-                      <span className="text-2xl">{category.icon}</span>
-                      <div className="flex-1">
-                        <Label htmlFor={`category-${category.id}`} className="text-sm">
-                          {category.name}
-                        </Label>
+                  <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                    {INCOME_CATEGORIES.map(category => (
+                      <div key={category.key} className="flex items-center gap-2">
+                        <span className="text-2xl">{category.icon}</span>
+                        <div className="flex-1">
+                          <Label htmlFor={`income-${category.key}`} className="text-sm">
+                            {category.name}
+                          </Label>
+                        </div>
+                        <Input
+                          id={`income-${category.key}`}
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={incomeCategoryBudgets[category.key] || ''}
+                          onChange={(e) => handleIncomeCategoryBudgetChange(category.key, e.target.value)}
+                          placeholder="0.00"
+                          className="w-32"
+                        />
                       </div>
-                      <Input
-                        id={`category-${category.id}`}
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={categoryBudgets[category.id] || ''}
-                        onChange={(e) => handleCategoryBudgetChange(category.id, e.target.value)}
-                        placeholder="0.00"
-                        className="w-32"
-                      />
-                      {categoryBudgets[category.id] && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeCategoryBudget(category.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
+                    ))}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="expenses" className="space-y-4 mt-4">
+                  <div className="flex justify-between items-center">
+                    <Label>Expense Categories</Label>
+                    <span className="text-sm text-muted-foreground">
+                      Total: {formatCurrency(getTotalCategoryBudgets(), currency)}
+                    </span>
+                  </div>
+
+                  <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                    {categories.map(category => (
+                      <div key={category.id} className="flex items-center gap-2">
+                        <span className="text-2xl">{category.icon}</span>
+                        <div className="flex-1">
+                          <Label htmlFor={`category-${category.id}`} className="text-sm">
+                            {category.name}
+                          </Label>
+                        </div>
+                        <Input
+                          id={`category-${category.id}`}
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={categoryBudgets[category.id] || ''}
+                          onChange={(e) => handleCategoryBudgetChange(category.id, e.target.value)}
+                          placeholder="0.00"
+                          className="w-32"
+                        />
+                        {categoryBudgets[category.id] && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeCategoryBudget(category.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </TabsContent>
+              </Tabs>
 
               <Button type="submit" disabled={loading} className="w-full">
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -310,10 +386,57 @@ export default function Budgets() {
         )}
       </div>
 
+      {analysis && analysis.income_category_analysis && Object.keys(analysis.income_category_analysis).filter(key => analysis.income_category_analysis[key as keyof typeof analysis.income_category_analysis].budgeted > 0).length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Income Category Analysis</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {Object.entries(analysis.income_category_analysis).map(([categoryKey, data]) => {
+                const category = INCOME_CATEGORIES.find(c => c.key === categoryKey);
+                if (!category || data.budgeted === 0) return null;
+
+                const percentAchieved = data.budgeted > 0 ? (data.actual / data.budgeted) * 100 : 0;
+                const isUnderBudget = data.variance < 0;
+
+                return (
+                  <div key={categoryKey} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">{category.icon}</span>
+                        <span className="font-medium">{category.name}</span>
+                      </div>
+                      <div className="text-right">
+                        <div className={`text-sm font-semibold ${isUnderBudget ? 'text-danger' : 'text-success'}`}>
+                          {isUnderBudget ? <TrendingDown className="inline h-3 w-3" /> : <TrendingUp className="inline h-3 w-3" />}
+                          {formatCurrency(Math.abs(data.variance), currency)}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {percentAchieved.toFixed(0)}% achieved
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex justify-between text-sm text-muted-foreground">
+                      <span>Budgeted: {formatCurrency(data.budgeted, currency)}</span>
+                      <span>Actual: {formatCurrency(data.actual, currency)}</span>
+                    </div>
+                    <Progress 
+                      value={Math.min(percentAchieved, 100)} 
+                      className={`h-2 ${isUnderBudget ? '[&>div]:bg-danger' : ''}`}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {analysis && Object.keys(analysis.category_analysis).length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Category-wise Analysis</CardTitle>
+            <CardTitle>Expense Category Analysis</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">

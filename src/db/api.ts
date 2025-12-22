@@ -13,7 +13,8 @@ import type {
   TransactionWithAccounts,
   FinancialSummary,
   BudgetAnalysis,
-  CustomBankLink
+  CustomBankLink,
+  IncomeCategoryKey
 } from '@/types/types';
 
 export const profileApi = {
@@ -621,7 +622,8 @@ export const budgetApi = {
           currency: budget.currency || 'INR',
           budgeted_income: budget.budgeted_income || 0,
           budgeted_expenses: budget.budgeted_expenses || 0,
-          category_budgets: budget.category_budgets || {}
+          category_budgets: budget.category_budgets || {},
+          income_category_budgets: budget.income_category_budgets || {}
         })
         .select()
         .maybeSingle();
@@ -680,13 +682,45 @@ export const budgetApi = {
       };
     }
 
+    // Income category analysis
+    const income_category_analysis: Record<IncomeCategoryKey, { budgeted: number; actual: number; variance: number }> = {
+      salaries: { budgeted: 0, actual: 0, variance: 0 },
+      allowances: { budgeted: 0, actual: 0, variance: 0 },
+      family_income: { budgeted: 0, actual: 0, variance: 0 },
+      others: { budgeted: 0, actual: 0, variance: 0 }
+    };
+
+    // Process income category budgets
+    if (budget.income_category_budgets) {
+      const incomeBudgets = budget.income_category_budgets as Record<IncomeCategoryKey, number>;
+      for (const [categoryKey, budgeted] of Object.entries(incomeBudgets)) {
+        if (categoryKey in income_category_analysis) {
+          const key = categoryKey as IncomeCategoryKey;
+          const budgetedAmount = Number(budgeted);
+          
+          // For now, we'll distribute actual income proportionally based on budgeted amounts
+          // In a real scenario, you might want to track income categories in transactions
+          const totalBudgetedIncome = Object.values(incomeBudgets).reduce((sum: number, val) => sum + Number(val), 0);
+          const proportion = totalBudgetedIncome > 0 ? budgetedAmount / totalBudgetedIncome : 0;
+          const actual = actual_income * proportion;
+          
+          income_category_analysis[key] = {
+            budgeted: budgetedAmount,
+            actual,
+            variance: actual - budgetedAmount
+          };
+        }
+      }
+    }
+
     return {
       budget,
       actual_income,
       actual_expenses,
       income_variance: actual_income - Number(budget.budgeted_income),
       expense_variance: Number(budget.budgeted_expenses) - actual_expenses,
-      category_analysis
+      category_analysis,
+      income_category_analysis
     };
   },
 
