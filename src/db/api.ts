@@ -42,6 +42,17 @@ export const profileApi = {
     return data;
   },
 
+  async getProfileByPhone(phoneNumber: string): Promise<Profile | null> {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('phone', phoneNumber)
+      .maybeSingle();
+    
+    if (error) throw error;
+    return data;
+  },
+
   async getAllProfiles(): Promise<Profile[]> {
     const { data, error } = await supabase
       .from('profiles')
