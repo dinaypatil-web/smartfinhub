@@ -118,7 +118,7 @@ export default function AIAnalysisPage() {
       budgetedExpenses,
       transactions: monthlyTransactions.map(t => ({
         type: t.transaction_type,
-        category: t.category,
+        category: t.transaction_type === 'income' ? (t.income_category || 'others') : (t.category || 'uncategorized'),
         amount: t.amount,
         date: t.transaction_date,
         description: t.description,
