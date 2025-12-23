@@ -35,6 +35,7 @@ import InterestRateTable from '@/components/InterestRateTable';
 import BankLogo from '@/components/BankLogo';
 import AccountStatementDialog from '@/components/AccountStatementDialog';
 import QuickLinks from '@/components/dashboard/QuickLinks';
+import AIInsights from '@/components/dashboard/AIInsights';
 import BankQuickLinks from '@/components/BankQuickLinks';
 import { getBankAppLink } from '@/config/paymentApps';
 import { cache } from '@/utils/cache';
@@ -593,6 +594,9 @@ export default function Dashboard() {
           ...summary.accounts_by_type.loan
         ] : []}
       />
+
+      {/* AI Financial Insights */}
+      <AIInsights />
         </TabsContent>
 
         <TabsContent value="charts" className="space-y-6 mt-6">
