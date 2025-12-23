@@ -17,7 +17,7 @@ export const paymentAppsByCountry: Record<string, PaymentApp[]> = {
     {
       name: 'Google Pay',
       icon: '💳',
-      logoUrl: 'https://miaoda-conversation-file.s3cdn.medo.dev/user-7wr8a0fraxog/conv-7wraacwkpclc/20251223/file-8fddhmdyfi80.jpg',
+      logoUrl: 'https://miaoda-conversation-file.s3cdn.medo.dev/user-7wr8a0fraxog/conv-7wraacwkpclc/20251223/file-8fdi9xr4k0lc.jpg',
       deepLink: 'gpay://',
       webUrl: 'https://pay.google.com',
       androidPackage: 'com.google.android.apps.nbu.paisa.user',
@@ -27,7 +27,7 @@ export const paymentAppsByCountry: Record<string, PaymentApp[]> = {
     {
       name: 'PhonePe',
       icon: '📱',
-      logoUrl: 'https://miaoda-conversation-file.s3cdn.medo.dev/user-7wr8a0fraxog/conv-7wraacwkpclc/20251223/file-8fddhmdyfi80.jpg',
+      logoUrl: 'https://miaoda-conversation-file.s3cdn.medo.dev/user-7wr8a0fraxog/conv-7wraacwkpclc/20251223/file-8fdidvtcnytc.jpg',
       deepLink: 'phonepe://',
       webUrl: 'https://www.phonepe.com',
       androidPackage: 'com.phonepe.app',
@@ -37,7 +37,7 @@ export const paymentAppsByCountry: Record<string, PaymentApp[]> = {
     {
       name: 'Paytm',
       icon: '💰',
-      logoUrl: 'https://miaoda-conversation-file.s3cdn.medo.dev/user-7wr8a0fraxog/conv-7wraacwkpclc/20251223/file-8fddhmdyfi80.jpg',
+      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/7305d8c4-78b4-4156-bf1c-73344565fe19.jpg',
       deepLink: 'paytmmp://',
       webUrl: 'https://paytm.com',
       androidPackage: 'net.one97.paytm',
@@ -47,7 +47,7 @@ export const paymentAppsByCountry: Record<string, PaymentApp[]> = {
     {
       name: 'BHIM',
       icon: '🏦',
-      logoUrl: 'https://miaoda-conversation-file.s3cdn.medo.dev/user-7wr8a0fraxog/conv-7wraacwkpclc/20251223/file-8fddhmdyez9c.jpg',
+      logoUrl: 'https://miaoda-conversation-file.s3cdn.medo.dev/user-7wr8a0fraxog/conv-7wraacwkpclc/20251223/file-8fdijl0kd5a8.jpg',
       deepLink: 'bhim://',
       webUrl: 'https://www.npci.org.in/what-we-do/bhim/product-overview',
       androidPackage: 'in.org.npci.upiapp',
