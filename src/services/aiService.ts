@@ -23,6 +23,20 @@ export interface AIAnalysisData {
     balance: number;
     type: string;
   }>;
+  historicalData?: {
+    monthlyAverages: {
+      income: number;
+      expenses: number;
+      savings: number;
+    };
+    categoryTrends: Record<string, number[]>;
+    lastThreeMonths: Array<{
+      month: string;
+      income: number;
+      expenses: number;
+      savings: number;
+    }>;
+  };
 }
 
 export async function generateFinancialAnalysis(
@@ -125,9 +139,25 @@ function buildFinancialAnalysisPrompt(data: AIAnalysisData): string {
     .map(([cat, amt]) => `${cat}: ₹${amt.toFixed(2)}`)
     .join(', ');
 
-  return `You are a professional financial advisor. Analyze the following financial data and provide actionable insights and recommendations.
+  let historicalSection = '';
+  if (data.historicalData) {
+    const { monthlyAverages, lastThreeMonths } = data.historicalData;
+    historicalSection = `
 
-**Financial Summary:**
+**Historical Trends (Last 3 Months):**
+${lastThreeMonths.map(m => 
+  `- ${m.month}: Income ₹${m.income.toFixed(2)}, Expenses ₹${m.expenses.toFixed(2)}, Savings ₹${m.savings.toFixed(2)}`
+).join('\n')}
+
+**Monthly Averages:**
+- Average Income: ₹${monthlyAverages.income.toFixed(2)}
+- Average Expenses: ₹${monthlyAverages.expenses.toFixed(2)}
+- Average Savings: ₹${monthlyAverages.savings.toFixed(2)}`;
+  }
+
+  return `You are a professional financial advisor with expertise in personal finance management. Analyze the following financial data and provide comprehensive insights, current month advice, and future budget recommendations.
+
+**Current Month Financial Summary:**
 - Total Income: ₹${data.totalIncome.toFixed(2)}
 - Total Expenses: ₹${data.totalExpenses.toFixed(2)}
 - Budgeted Expenses: ₹${data.budgetedExpenses.toFixed(2)}
@@ -139,21 +169,54 @@ ${topCategories || 'No expenses recorded'}
 
 **Account Balances:**
 ${data.accountBalances.map(acc => `- ${acc.name} (${acc.type}): ₹${acc.balance.toFixed(2)}`).join('\n')}
+${historicalSection}
 
 **Recent Transactions (last 10):**
 ${data.transactions.slice(-10).map(t => 
   `- ${t.date}: ${t.type} - ${t.category} - ₹${t.amount.toFixed(2)}`
 ).join('\n')}
 
-Please provide:
-1. **Financial Health Assessment**: Overall evaluation of the current financial situation
-2. **Budget Analysis**: How well expenses align with the budget, areas of concern
-3. **Expense Reduction Suggestions**: Specific, actionable recommendations to reduce expenses
-4. **Savings Opportunities**: Ways to increase savings based on spending patterns
-5. **Category-wise Recommendations**: Detailed suggestions for top spending categories
-6. **Action Plan**: Prioritized steps to improve financial health
+Please provide a comprehensive analysis with the following sections:
 
-Format your response in clear sections with bullet points. Be specific, practical, and encouraging.`;
+## 1. Current Month Analysis & Advice
+- Evaluate spending patterns for the current month
+- Identify any unusual or concerning transactions
+- Provide specific recommendations for the remaining days of this month
+- Highlight areas where the user is doing well
+
+## 2. Financial Health Assessment
+- Overall evaluation of current financial situation
+- Comparison with historical trends (if available)
+- Strengths and areas for improvement
+
+## 3. Budget Analysis
+- How well expenses align with the budget
+- Categories that are over/under budget
+- Areas of concern and opportunities
+
+## 4. Future Budget Recommendations
+Based on historical data and current trends, suggest:
+- Recommended budget for next month (category-wise breakdown)
+- Realistic savings targets
+- Adjustments to current spending patterns
+- Expected outcomes if recommendations are followed
+
+## 5. Expense Optimization Strategies
+- Specific, actionable recommendations to reduce expenses
+- Category-wise suggestions for the top spending categories
+- Quick wins vs. long-term changes
+
+## 6. Savings & Investment Opportunities
+- Ways to increase savings based on spending patterns
+- Suggestions for emergency fund building
+- Investment recommendations based on savings capacity
+
+## 7. Action Plan
+- Prioritized steps to improve financial health
+- Timeline for implementing changes
+- Metrics to track progress
+
+Format your response in clear sections with bullet points and specific numbers. Be practical, encouraging, and data-driven. Use emojis sparingly for visual appeal.`;
 }
 
 export async function generateBudgetOptimization(
