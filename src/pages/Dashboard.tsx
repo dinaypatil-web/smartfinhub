@@ -250,13 +250,15 @@ export default function Dashboard() {
       const cashFlowData = calculateMonthlyCashFlow(
         allAccounts,
         monthExpenses, // Use already loaded month transactions
+        accountTxs,    // Pass account transactions for statement calculations
+        emis,          // Pass EMIs for statement calculations
         budget,
         currentMonth,
         currentYear
       );
       setCashFlow(cashFlowData);
       
-      const creditCardDetails = getCreditCardDuesDetails(allAccounts);
+      const creditCardDetails = getCreditCardDuesDetails(allAccounts, accountTxs, emis);
       setCreditCardDuesDetails(creditCardDetails);
     } catch (error) {
       console.error('Error loading heavy calculations:', error);

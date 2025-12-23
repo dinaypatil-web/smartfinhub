@@ -3,7 +3,8 @@
  * Functions for calculating monthly cash flow projections
  */
 
-import type { Account, Transaction, Budget } from '@/types/types';
+import type { Account, Transaction, Budget, EMITransaction } from '@/types/types';
+import { calculateCreditCardStatementAmount, shouldDisplayDueAmount } from './statementCalculations';
 
 /**
  * Calculate opening balance for cash and bank accounts at start of month
@@ -206,9 +207,12 @@ export function getNextDueDate(
 
 /**
  * Calculate expected credit card dues for the month
+ * Uses statement amount calculation to exclude transactions after statement date
  */
 export function calculateCreditCardDues(
   accounts: Account[],
+  accountTransactions: Record<string, Transaction[]>,
+  accountEMIs: Record<string, EMITransaction[]>,
   month?: number,
   year?: number
 ): number {
@@ -225,19 +229,43 @@ export function calculateCreditCardDues(
       return statementDate.getMonth() === month - 1;
     });
     
-    const totalDues = filteredAccounts.reduce(
-      (sum, acc) => sum + Math.abs(Number(acc.balance)),
-      0
-    );
+    const totalDues = filteredAccounts.reduce((sum, acc) => {
+      // Use statement amount calculation if statement day is configured
+      if (acc.statement_day && shouldDisplayDueAmount(acc.statement_day)) {
+        const transactions = accountTransactions[acc.id] || [];
+        const emis = accountEMIs[acc.id] || [];
+        const statementCalc = calculateCreditCardStatementAmount(
+          acc.id,
+          acc.statement_day,
+          transactions,
+          emis
+        );
+        return sum + Math.abs(statementCalc.statementAmount);
+      }
+      // Fallback to balance for cards without statement day
+      return sum + Math.abs(Number(acc.balance));
+    }, 0);
     
     return Math.round(totalDues * 100) / 100;
   }
 
-  // For credit cards, the balance represents the amount due
-  const totalDues = creditCardAccounts.reduce(
-    (sum, acc) => sum + Math.abs(Number(acc.balance)),
-    0
-  );
+  // For credit cards, calculate statement amount or use balance
+  const totalDues = creditCardAccounts.reduce((sum, acc) => {
+    // Use statement amount calculation if statement day is configured
+    if (acc.statement_day && shouldDisplayDueAmount(acc.statement_day)) {
+      const transactions = accountTransactions[acc.id] || [];
+      const emis = accountEMIs[acc.id] || [];
+      const statementCalc = calculateCreditCardStatementAmount(
+        acc.id,
+        acc.statement_day,
+        transactions,
+        emis
+      );
+      return sum + Math.abs(statementCalc.statementAmount);
+    }
+    // Fallback to balance for cards without statement day
+    return sum + Math.abs(Number(acc.balance));
+  }, 0);
 
   return Math.round(totalDues * 100) / 100;
 }
@@ -245,9 +273,12 @@ export function calculateCreditCardDues(
 /**
  * Get detailed credit card dues with statement dates
  * Returns all credit cards with their respective upcoming due dates
+ * Uses statement amount calculation to exclude transactions after statement date
  */
 export function getCreditCardDuesDetails(
-  accounts: Account[]
+  accounts: Account[],
+  accountTransactions: Record<string, Transaction[]>,
+  accountEMIs: Record<string, EMITransaction[]>
 ): Array<{
   account: Account;
   dueAmount: number;
@@ -263,12 +294,29 @@ export function getCreditCardDuesDetails(
   }
 
   // Calculate due dates for all credit cards and return them
-  const cardsWithDueDates = creditCardAccounts.map(acc => ({
-    account: acc,
-    dueAmount: Math.abs(Number(acc.balance)),
-    nextStatementDate: getNextStatementDate(acc.statement_day),
-    nextDueDate: getNextDueDate(acc.statement_day, acc.due_day)
-  }));
+  const cardsWithDueDates = creditCardAccounts.map(acc => {
+    let dueAmount = Math.abs(Number(acc.balance));
+    
+    // Use statement amount calculation if statement day is configured
+    if (acc.statement_day && shouldDisplayDueAmount(acc.statement_day)) {
+      const transactions = accountTransactions[acc.id] || [];
+      const emis = accountEMIs[acc.id] || [];
+      const statementCalc = calculateCreditCardStatementAmount(
+        acc.id,
+        acc.statement_day,
+        transactions,
+        emis
+      );
+      dueAmount = Math.abs(statementCalc.statementAmount);
+    }
+    
+    return {
+      account: acc,
+      dueAmount,
+      nextStatementDate: getNextStatementDate(acc.statement_day),
+      nextDueDate: getNextDueDate(acc.statement_day, acc.due_day)
+    };
+  });
 
   // Sort by due date (nearest first)
   return cardsWithDueDates.sort((a, b) => {
@@ -313,6 +361,8 @@ export function calculateCreditCardRepayments(
 export function calculateMonthlyCashFlow(
   accounts: Account[],
   transactions: Transaction[],
+  accountTransactions: Record<string, Transaction[]>,
+  accountEMIs: Record<string, EMITransaction[]>,
   budget: Budget | null,
   month: number,
   year: number
@@ -332,7 +382,7 @@ export function calculateMonthlyCashFlow(
   const creditCardRepayments = calculateCreditCardRepayments(transactions, month, year);
   const remainingBudget = calculateRemainingBudget(budget, expensesIncurred);
   const expectedBalance = openingBalance + incomeReceived - expensesIncurred - creditCardRepayments - remainingBudget;
-  const creditCardDues = calculateCreditCardDues(accounts, month, year);
+  const creditCardDues = calculateCreditCardDues(accounts, accountTransactions, accountEMIs, month, year);
   const netAvailable = expectedBalance - creditCardDues;
 
   return {
