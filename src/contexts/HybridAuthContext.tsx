@@ -4,6 +4,7 @@
  * Combines Auth0 (for social login) with Supabase (for database)
  * - Auth0 handles: Google Sign-in, Apple Sign-in, authentication tokens
  * - Supabase handles: Database operations, user profiles, RLS policies
+ * - Encryption: Initializes client-side encryption key on login
  */
 
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
@@ -13,6 +14,7 @@ import type { Profile } from '@/types/types';
 import { profileApi } from '@/db/api';
 import { useToast } from '@/hooks/use-toast';
 import { isAuth0Configured } from '@/config/auth0';
+import { useEncryption } from './EncryptionContext';
 
 interface HybridAuthContextType {
   // User info
@@ -38,6 +40,7 @@ const HybridAuthContext = createContext<HybridAuthContextType | undefined>(undef
 
 export function HybridAuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
+  const encryption = useEncryption();
   
   // Only use Auth0 hooks if Auth0 is configured
   const auth0Enabled = isAuth0Configured();
@@ -212,7 +215,22 @@ export function HybridAuthProvider({ children }: { children: ReactNode }) {
       // Load profile and initialize encryption
       const userProfile = await profileApi.getProfile(data.user.id);
       if (userProfile) {
-        setProfile(userProfile);      } else {
+        setProfile(userProfile);
+        
+        // Initialize encryption key if salt exists
+        if (userProfile.encryption_salt) {
+          try {
+            await encryption.initializeKey(password, userProfile.encryption_salt);
+          } catch (error) {
+            console.error('Failed to initialize encryption:', error);
+            toast({
+              title: 'Warning',
+              description: 'Failed to initialize encryption. Some data may not be accessible.',
+              variant: 'destructive',
+            });
+          }
+        }
+      } else {
         throw new Error('Failed to load user profile');
       }
       
@@ -327,7 +345,12 @@ export function HybridAuthProvider({ children }: { children: ReactNode }) {
 
       setUser(null);
       setProfile(null);
-      setAuthProvider(null);      toast({
+      setAuthProvider(null);
+      
+      // Clear encryption key from memory
+      encryption.clearKey();
+      
+      toast({
         title: 'Signed out',
         description: 'You have been signed out successfully',
       });

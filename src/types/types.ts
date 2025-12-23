@@ -11,6 +11,7 @@ export interface Profile {
   default_currency: string;
   role: UserRole;
   created_at: string;
+  encryption_salt: string | null;
 }
 
 export interface Account {
