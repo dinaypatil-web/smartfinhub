@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Sparkles, TrendingDown, TrendingUp, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useHybridAuth } from '@/contexts/HybridAuthContext';
@@ -220,10 +221,14 @@ export default function AIInsights() {
     text: string;
     color: string;
   } | null>(null);
+  const [loadingQuickInsight, setLoadingQuickInsight] = useState(false);
 
   useEffect(() => {
     if (user) {
-      getQuickInsight().then(setQuickInsight);
+      setLoadingQuickInsight(true);
+      getQuickInsight()
+        .then(setQuickInsight)
+        .finally(() => setLoadingQuickInsight(false));
     }
   }, [user]);
 
@@ -248,7 +253,14 @@ export default function AIInsights() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {quickInsight && (
+        {loadingQuickInsight && (
+          <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+            <Skeleton className="h-5 w-5 rounded-full bg-muted" />
+            <Skeleton className="h-4 flex-1 bg-muted" />
+          </div>
+        )}
+
+        {!loadingQuickInsight && quickInsight && (
           <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
             {quickInsight.icon}
             <p className={`text-sm font-medium ${quickInsight.color}`}>
