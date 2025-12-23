@@ -11,7 +11,8 @@ All colors MUST be HSL.
   :root {
     --radius: 0.75rem;
     /* ICICI Bank inspired color scheme - Orange primary with navy blue secondary */
-    --background: 0 0% 100%;
+    /* Saffron background for light theme */
+    --background: 40 100% 97%;
     --foreground: 210 20% 15%;
     --card: 0 0% 100%;
     --card-foreground: 210 20% 15%;
@@ -30,27 +31,27 @@ All colors MUST be HSL.
     --warning-foreground: 0 0% 100%;
     --danger: 0 84% 60%;
     --danger-foreground: 0 0% 100%;
-    --muted: 210 20% 96%;
+    --muted: 40 60% 95%;
     --muted-foreground: 210 10% 45%;
     --accent: 18 95% 55%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 210 20% 90%;
-    --input: 210 20% 95%;
+    --border: 40 40% 88%;
+    --input: 40 40% 94%;
     --ring: 18 95% 55%;
     --chart-1: 18 95% 55%;
     --chart-2: 210 100% 25%;
     --chart-3: 142 71% 45%;
     --chart-4: 38 92% 50%;
     --chart-5: 0 84% 60%;
-    --sidebar-background: 0 0% 100%;
+    --sidebar-background: 40 80% 98%;
     --sidebar-foreground: 210 20% 15%;
     --sidebar-primary: 18 95% 55%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 210 20% 96%;
+    --sidebar-accent: 40 60% 95%;
     --sidebar-accent-foreground: 210 20% 15%;
-    --sidebar-border: 210 20% 90%;
+    --sidebar-border: 40 40% 88%;
     --sidebar-ring: 18 95% 55%;
     --gradient-primary: linear-gradient(135deg, hsl(18 95% 55%), hsl(18 100% 65%));
     --gradient-secondary: linear-gradient(135deg, hsl(210 100% 25%), hsl(210 100% 35%));
