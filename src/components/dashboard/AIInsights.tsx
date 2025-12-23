@@ -57,6 +57,9 @@ export default function AIInsights() {
       type: acc.account_type,
     }));
 
+    // Calculate historical data for last 3 months
+    const historicalData = calculateHistoricalData(transactions, currentMonth, currentYear);
+
     return {
       totalIncome,
       totalExpenses,
@@ -68,6 +71,62 @@ export default function AIInsights() {
         date: t.transaction_date,
       })),
       accountBalances,
+      historicalData,
+    };
+  };
+
+  const calculateHistoricalData = (transactions: any[], currentMonth: number, currentYear: number) => {
+    const lastThreeMonths = [];
+    const categoryTrends: Record<string, number[]> = {};
+    
+    for (let i = 1; i <= 3; i++) {
+      let month = currentMonth - i;
+      let year = currentYear;
+      
+      if (month <= 0) {
+        month += 12;
+        year -= 1;
+      }
+      
+      const monthStr = `${year}-${String(month).padStart(2, '0')}`;
+      const monthTransactions = transactions.filter(t => t.transaction_date.startsWith(monthStr));
+      
+      const income = monthTransactions
+        .filter(t => t.transaction_type === 'income')
+        .reduce((sum, t) => sum + t.amount, 0);
+      
+      const expenses = monthTransactions
+        .filter(t => t.transaction_type === 'expense' || t.transaction_type === 'loan_payment')
+        .reduce((sum, t) => sum + t.amount, 0);
+      
+      lastThreeMonths.unshift({
+        month: monthStr,
+        income,
+        expenses,
+        savings: income - expenses,
+      });
+      
+      // Track category trends
+      monthTransactions
+        .filter(t => t.transaction_type === 'expense')
+        .forEach(t => {
+          if (!categoryTrends[t.category]) {
+            categoryTrends[t.category] = [];
+          }
+          categoryTrends[t.category].push(t.amount);
+        });
+    }
+    
+    const monthlyAverages = {
+      income: lastThreeMonths.reduce((sum, m) => sum + m.income, 0) / lastThreeMonths.length,
+      expenses: lastThreeMonths.reduce((sum, m) => sum + m.expenses, 0) / lastThreeMonths.length,
+      savings: lastThreeMonths.reduce((sum, m) => sum + m.savings, 0) / lastThreeMonths.length,
+    };
+    
+    return {
+      monthlyAverages,
+      categoryTrends,
+      lastThreeMonths,
     };
   };
 

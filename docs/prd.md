@@ -77,8 +77,7 @@ A comprehensive financial management web application designed for tracking and m
 - Automatic link refresh if broken or outdated links detected
 - **For India**: Bank selection page includes 'BOB World: Banking & Experience' app link for Bank of Baroda customers
 - Display bank/financial institution logo on account pages and dashboard
-- Manual bank name entry option if institution not listed
-- **Automatic Logo Fetching**: When bank/loan/credit card account logo is not available in the system database during account creation or editing, automatically fetch the logo from internet sources
+- Manual bank name entry option if institution not listed\n- **Automatic Logo Fetching**: When bank/loan/credit card account logo is not available in the system database during account creation or editing, automatically fetch the logo from internet sources
 - Fetched logos displayed on both account pages and dashboard
 - System caches fetched logos for future use
 - Optional account number entry (only last 4 digits visible on dashboard)
@@ -147,9 +146,9 @@ A comprehensive financial management web application designed for tracking and m
 - Automatic monthly interest calculation uses current applicable interest rate
 \n#### 2.2.6 Account Modification\n- Edit any account information at any time
 - Delete accounts with user confirmation
-\n### 2.3 Transaction Management\n
-#### 2.3.1 Transaction Types
-- Income transactions\n- Expense transactions
+\n### 2.3 Transaction Management
+
+#### 2.3.1 Transaction Types\n- Income transactions\n- Expense transactions
 - Cash withdrawals (from bank account or credit card)
 - Bank-to-bank transfers
 - Loan payment transactions (treated as expenses)
@@ -204,7 +203,8 @@ A comprehensive financial management web application designed for tracking and m
 - System-generated interest transactions cannot be edited or deleted by user
 - Credit card repayment transactions can be edited or deleted with automatic recalculation of both bank and credit card balances
 - Loan payment transactions can be edited or deleted with automatic recalculation of loan balance and payment history update
-\n### 2.4 Dashboard Display
+
+### 2.4 Dashboard Display
 
 #### 2.4.1 Tab-Based Dashboard Structure
 - **Dashboard organized into multiple tabs for better content organization and navigation**
@@ -309,37 +309,90 @@ A comprehensive financial management web application designed for tracking and m
 - **Income Stability Analysis**: AI analyzes income transaction patterns to assess income stability and flag potential income volatility concerns
 - **Budget Sustainability Projection**: AI projects whether current budget allocations are sustainable long-term based on spending trends and income patterns
 - **Financial Goal Timeline Estimation**: AI estimates realistic timelines for achieving financial goals (e.g., debt payoff, savings targets) based on current financial behavior
-\n#### 2.6.6 AI Insights Dashboard (AI Insights Tab)
+\n#### 2.6.6 Comprehensive Historical Data Analysis and Future Budget Recommendations
+- **Complete User Data Analysis**: AI engine analyzes entire financial dataset belonging to user including:
+  - All historical transactions across all accounts (Cash, Bank, Credit Card, Loan) from account inception to current date
+  - Complete income history with category-wise breakdown
+  - Complete expense history with category-wise breakdown
+  - Historical budget allocations and actual spending patterns
+  - Loan payment history and interest accrual patterns
+  - Credit card usage patterns and repayment behavior
+  - Account balance trends over time
+  - Seasonal spending variations and recurring expense patterns
+- **Current Month Transaction Advisory**: AI provides real-time advisory for current month based on:\n  - Month-to-date income and expense analysis
+  - Comparison of current month spending against historical averages
+  - Budget adherence status for each category in current month
+  - Identification of categories where user is overspending or underspending in current month
+  - Remaining days in month and projected spending trajectory
+  - Specific recommendations to stay within budget for remainder of current month
+  - Alerts for upcoming bill payments and financial obligations in current month
+  - Cash flow status and liquidity assessment for current month
+- **Future Month Budget Suggestions**: AI analyzes complete historical data to suggest optimized budget allocations for upcoming month:\n  - **Income Budget Recommendations**: AI suggests realistic income budget for next month based on:\n    - Historical income patterns and trends
+    - Seasonal income variations
+    - Income stability assessment
+    - Projected income for next month
+  - **Expense Budget Recommendations**: AI suggests category-wise expense budget for next month based on:
+    - Historical spending patterns in each category
+    - Seasonal expense variations
+    - Recurring expenses and fixed obligations
+    - Discretionary spending trends
+    - Identified cost-saving opportunities
+    - User's financial goals and priorities
+  - **Budget Optimization**: AI recommends adjustments to budget allocations to:\n    - Reduce overspending in problematic categories
+    - Reallocate budget from consistently underspent categories\n    - Increase savings allocation based on income surplus patterns
+    - Prioritize debt repayment if applicable
+    - Build emergency fund reserves
+  - **Comparative Analysis**: AI shows comparison between:\n    - Current month budget vs. suggested next month budget
+    - Historical average spending vs. suggested budget
+    - Expected savings increase with suggested budget
+- **Long-Term Trend Analysis**: AI identifies long-term financial trends including:
+  - Multi-month spending trends in each category
+  - Income growth or decline patterns
+  - Debt reduction progress over time
+  - Savings accumulation trends
+  - Financial health improvement or deterioration indicators
+- **Actionable Insights Presentation**: AI presents analysis and recommendations in clear, actionable format:\n  - Visual charts showing historical trends and projections
+  - Category-wise budget comparison tables
+  - Prioritized action items for current month
+  - Suggested budget template for next month with rationale for each allocation
+  - Expected financial outcomes if suggestions are implemented
+
+#### 2.6.7 AI Insights Dashboard (AI Insights Tab)
 - **Comprehensive AI Analysis Display**: Dedicated dashboard tab presenting all AI-generated insights, recommendations, and analysis in organized, easy-to-understand format
 - **Visual Insight Cards**: Key AI recommendations displayed as interactive cards with clear action items and expected impact
 - **Spending Heatmap**: Visual representation showing spending intensity across categories and time periods
 - **Recommendation Action Tracking**: User can mark AI recommendations as 'Implemented', 'In Progress', or 'Dismissed', with system tracking impact of implemented recommendations
 - **AI Insight History**: Historical record of all AI recommendations and their outcomes, allowing user to review past suggestions and their effectiveness
 - **Customizable Insight Preferences**: User can configure which types of AI insights and recommendations they want to receive (e.g., focus on expense reduction, debt management, or savings optimization)
+- **Current Month Advisory Section**: Dedicated section displaying real-time advisory for current month transactions with actionable recommendations
+- **Future Budget Suggestions Section**: Dedicated section displaying AI-suggested budget allocations for next month with detailed rationale and expected outcomes
+- **Historical Analysis Dashboard**: Interactive visualizations showing complete historical data analysis with trend charts and pattern recognition insights
 
-#### 2.6.7 AI Learning and Adaptation
+#### 2.6.8 AI Learning and Adaptation
 - **Continuous Learning**: AI engine continuously learns from user's financial behavior, transaction patterns, and responses to recommendations to improve suggestion accuracy over time
 - **Personalization Enhancement**: AI adapts recommendations based on user's acceptance or rejection of previous suggestions, becoming more aligned with user's financial priorities and preferences
 - **Seasonal Adjustment**: AI recognizes seasonal spending patterns (e.g., holiday expenses, annual subscriptions) and adjusts recommendations accordingly
 - **Life Event Recognition**: AI detects significant financial life events (e.g., job change, major purchases, income changes) and adapts recommendations to new financial circumstances
-\n#### 2.6.8 AI-Powered Notifications
+\n#### 2.6.9 AI-Powered Notifications
 - **Smart Budget Alerts**: AI sends timely notifications when spending patterns suggest user may exceed budget in specific categories before month end
 - **Savings Opportunity Alerts**: AI notifies user when it identifies immediate opportunities to save money or optimize spending
 - **Bill Payment Reminders**: AI learns user's bill payment patterns and sends proactive reminders for upcoming due dates\n- **Financial Milestone Notifications**: AI celebrates user's financial achievements (e.g., staying within budget for consecutive months, reaching savings goals) to encourage positive financial behavior
+- **Monthly Advisory Notifications**: At start of each month, AI sends comprehensive advisory summarizing previous month performance and presenting suggested budget for current month
 
 ### 2.7 Reporting\n- Transaction history reports with date range filters
 - Income and expense summary reports
 - Account balance reports across all accounts
 - Budget vs. actual analysis reports
-- **Credit Card Monthly Statement Report**: Reports section includes credit card statement view with month selector\n- User selects specific month from dropdown to view credit card statement for that period
+- **Credit Card Monthly Statement Report**: Reports section includes credit card statement view with month selector
+- User selects specific month from dropdown to view credit card statement for that period
 - Statement displays all transactions, payments, repayments, EMI installments, interest charges, and balance for selected month
 - Statement shows opening balance, closing balance, total spending, repayments made, and payment due information
 - **EMI Transaction Reports**: Detailed reports showing all EMI transactions, payment schedules, and outstanding balances
 - **Credit Card Repayment Reports**: Detailed reports showing all credit card repayment transactions with source bank account, target credit card, repayment amount, and date
 - **Loan Account Statement Report**: Comprehensive loan statement report included in Reports section showing:\n  - **Historical Loan Payments**: Complete record of all loan payment transactions with:\n    - Payment date for each transaction
-    - Payment amount\n    - Transaction details and reference\n  - **Historical EMI Payments**: Complete record of all EMI payments already made with:
-    - Payment date for each EMI
-    - Total EMI amount paid
+    - Payment amount
+    - Transaction details and reference\n  - **Historical EMI Payments**: Complete record of all EMI payments already made with:
+    - Payment date for each EMI\n    - Total EMI amount paid
     - Principal payment component (including user corrections)
     - Interest payment component (including user corrections)
     - Outstanding principal balance after each payment
@@ -357,7 +410,10 @@ A comprehensive financial management web application designed for tracking and m
   - Cumulative interest paid to date
   - Total accrued interest\n  - Remaining loan tenure
   - Complete amortization schedule showing full loan lifecycle
-- **Loan Payment Transaction Reports**: Detailed reports showing all loan payment transactions categorized under'Loan Repayments' expense budget category, with date, amount, and payment history\n- **AI Insights Report**: Comprehensive report summarizing all AI-generated recommendations, implemented actions, and their financial impact over selected time period
+- **Loan Payment Transaction Reports**: Detailed reports showing all loan payment transactions categorized under'Loan Repayments' expense budget category, with date, amount, and payment history
+- **AI Insights Report**: Comprehensive report summarizing all AI-generated recommendations, implemented actions, and their financial impact over selected time period
+- **Historical Data Analysis Report**: Detailed report showing complete historical financial data analysis with trends, patterns, and AI-generated insights
+- **Budget Recommendation Report**: Report displaying AI-suggested budget allocations for future months with comparative analysis and expected outcomes
 - Date range filter for loan statement reports
 - Export reports functionality\n
 ### 2.8 Data Backup and Restore
@@ -394,8 +450,7 @@ A comprehensive financial management web application designed for tracking and m
 - Encryption performed using Web Crypto API in user's browser
 - **Server Stores Only Encrypted Data**: Server database contains only encrypted ciphertext and cannot decrypt any user information
 - Application creator, system administrators, and database administrators have zero access to user's decrypted financial data
-- **Client-Side Decryption for Display**: When user logs in and views dashboard or reports:\n  - Encrypted data retrieved from server
-  - Decryption performed entirely in user's browser using user's encryption key
+- **Client-Side Decryption for Display**: When user logs in and views dashboard or reports:\n  - Encrypted data retrieved from server\n  - Decryption performed entirely in user's browser using user's encryption key
   - Decrypted data rendered on user interface without server involvement
   - Decrypted data never leaves user's device
 - **Seamless User Experience**: Encryption and decryption processes transparent to user, with no impact on interface responsiveness or data display
@@ -476,7 +531,8 @@ A comprehensive financial management web application designed for tracking and m
 - Primary color: Deep blue (#1E3A8A) conveying trust and financial stability
 - Secondary color: Emerald green (#10B981) for positive balances and income indicators
 - Accent color: Amber (#F59E0B) for alerts and important notifications
-- Negative indicator: Coral red (#EF4444) for liabilities and overspending\n- AI Insights color: Purple (#8B5CF6) for AI-generated recommendations and insights
+- Negative indicator: Coral red (#EF4444) for liabilities and overspending
+- AI Insights color: Purple (#8B5CF6) for AI-generated recommendations and insights
 
 ### 3.2 Visual Details
 - Card-based layout with subtle drop shadows for depth
@@ -491,6 +547,8 @@ A comprehensive financial management web application designed for tracking and m
 - Quick access buttons ('Open App' and 'Visit Website') styled with clear icons and hover effects for easy identification
 - AI insight cards with distinctive purple accent and lightbulb icons to differentiate AI-generated content
 - Interactive recommendation cards with action buttons for implementing AI suggestions
+- Historical trend charts with smooth animations and interactive tooltips
+- Future budget suggestion cards with comparison visualizations
 
 ### 3.3 Layout Structure
 - Grid-based dashboard for account cards with responsive columns
@@ -500,8 +558,11 @@ A comprehensive financial management web application designed for tracking and m
 - Clear visual hierarchy with prominent balance displays and chart visualizations
 - Sticky header for easy navigation access
 - AI Insights tab features scrollable card layout with categorized recommendations
+- Dedicated sections within AI Insights tab for current month advisory and future budget suggestions
+- Interactive historical analysis dashboard with expandable trend charts
 \n## 4. Reference Links
-- MojoAuth OTP Authentication Service: https://mojoauth.com\n\n## 5. Reference Images
+- MojoAuth OTP Authentication Service: https://mojoauth.com
+\n## 5. Reference Images
 - IMG_7805.png: SmartFinHub dashboard overview showing financial summary and account cards with quick access buttons
 - IMG_7806.jpeg: Bank app quick access section displaying ICICI Bank and Bank of Baroda app links with'Open banking app' buttons
 - IMG_7807.jpeg: Quick Payment Apps section showing Google Pay, PhonePe, Paytm, and BHIM payment app integration with descriptions and quick launch buttons
