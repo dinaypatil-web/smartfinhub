@@ -17,6 +17,7 @@ export interface AIAnalysisData {
     category: string;
     amount: number;
     date: string;
+    description?: string;
   }>;
   accountBalances: Array<{
     name: string;
@@ -172,15 +173,23 @@ ${data.accountBalances.map(acc => `- ${acc.name} (${acc.type}): ₹${acc.balance
 ${historicalSection}
 
 **Recent Transactions (last 10):**
-${data.transactions.slice(-10).map(t => 
-  `- ${t.date}: ${t.type} - ${t.category} - ₹${t.amount.toFixed(2)}`
-).join('\n')}
+${data.transactions.slice(-10).map(t => {
+  const desc = t.description ? ` - "${t.description}"` : '';
+  return `- ${t.date}: ${t.type} - ${t.category} - ₹${t.amount.toFixed(2)}${desc}`;
+}).join('\n')}
+
+**IMPORTANT**: Pay special attention to transaction descriptions as they provide valuable context about spending patterns, merchant names, and specific purchase details. Use these descriptions to:
+- Identify recurring expenses and subscriptions
+- Detect unusual or one-time purchases
+- Recognize specific merchants or vendors
+- Understand the nature of expenses better
+- Provide more personalized and actionable recommendations
 
 Please provide a comprehensive analysis with the following sections:
 
 ## 1. Current Month Analysis & Advice
 - Evaluate spending patterns for the current month
-- Identify any unusual or concerning transactions
+- Identify any unusual or concerning transactions (use descriptions for context)
 - Provide specific recommendations for the remaining days of this month
 - Highlight areas where the user is doing well
 
@@ -204,6 +213,7 @@ Based on historical data and current trends, suggest:
 ## 5. Expense Optimization Strategies
 - Specific, actionable recommendations to reduce expenses
 - Category-wise suggestions for the top spending categories
+- Use transaction descriptions to identify specific merchants or services that could be optimized
 - Quick wins vs. long-term changes
 
 ## 6. Savings & Investment Opportunities

@@ -121,6 +121,7 @@ export default function AIAnalysisPage() {
         category: t.category,
         amount: t.amount,
         date: t.transaction_date,
+        description: t.description,
       })),
       accountBalances,
       historicalData,
