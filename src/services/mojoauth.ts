@@ -164,7 +164,7 @@ export function formatPhoneNumber(phoneNumber: string): string {
  * @returns boolean indicating if MojoAuth proxy is available
  */
 export function isMojoAuthConfigured(): boolean {
-  // MojoAuth is now configured via Edge Function
-  // Always return true as the Edge Function handles the API key
+  // MojoAuth is configured via Supabase Edge Function
+  // The Edge Function securely handles the API key on the server side
   return true;
 }
