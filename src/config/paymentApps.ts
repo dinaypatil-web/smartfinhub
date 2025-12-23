@@ -37,7 +37,7 @@ export const paymentAppsByCountry: Record<string, PaymentApp[]> = {
     {
       name: 'Paytm',
       icon: '💰',
-      logoUrl: 'https://miaoda-site-img.s3cdn.medo.dev/images/7305d8c4-78b4-4156-bf1c-73344565fe19.jpg',
+      logoUrl: 'https://miaoda-conversation-file.s3cdn.medo.dev/user-7wr8a0fraxog/conv-7wraacwkpclc/20251223/file-8fdnv6wm5bls.jpg',
       deepLink: 'paytmmp://',
       webUrl: 'https://paytm.com',
       androidPackage: 'net.one97.paytm',
