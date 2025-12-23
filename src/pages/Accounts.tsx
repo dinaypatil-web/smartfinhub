@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { formatCurrency, formatAccountNumber } from '@/utils/format';
-import { Plus, Edit, Trash2, Building2, CreditCard, Wallet, TrendingUp, AlertCircle } from 'lucide-react';
+import { Plus, Edit, Trash2, Building2, CreditCard, Wallet, TrendingUp, AlertCircle, ChevronDown, ChevronUp, History } from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import InterestRateManager from '@/components/InterestRateManager';
@@ -53,6 +53,7 @@ export default function Accounts() {
   const [loanCalculations, setLoanCalculations] = useState<Record<string, { emi: number; accruedInterest: number }>>({});
   const [accountEMIs, setAccountEMIs] = useState<Record<string, EMITransaction[]>>({});
   const [accountTransactions, setAccountTransactions] = useState<Record<string, Transaction[]>>({});
+  const [expandedLoanHistory, setExpandedLoanHistory] = useState<Record<string, boolean>>({});
 
   const currency = profile?.default_currency || 'INR';
 
@@ -104,7 +105,7 @@ export default function Accounts() {
 
       setLoanCalculations(calculations);
 
-      // Load EMI data for credit card accounts
+      // Load EMI data for credit card accounts and transactions for loan accounts
       const emis: Record<string, EMITransaction[]> = {};
       const accountTxs: Record<string, Transaction[]> = {};
       for (const account of data) {
@@ -120,6 +121,17 @@ export default function Accounts() {
             accountTxs[account.id] = txs;
           } catch (error) {
             console.error(`Error loading data for account ${account.id}:`, error);
+          }
+        } else if (account.account_type === 'loan') {
+          try {
+            // Load loan payment transactions (where to_account_id is the loan account)
+            const txs = await transactionApi.getTransactionsByAccount(user.id, account.id);
+            const loanPayments = txs.filter(t => t.to_account_id === account.id && t.transaction_type === 'loan_payment');
+            if (loanPayments.length > 0) {
+              accountTxs[account.id] = loanPayments;
+            }
+          } catch (error) {
+            console.error(`Error loading loan payments for account ${account.id}:`, error);
           }
         }
       }
@@ -678,6 +690,62 @@ export default function Accounts() {
                           onRateUpdated={loadAccounts}
                         />
                       )}
+                      
+                      {/* Payment History Section */}
+                      {accountTransactions[account.id] && accountTransactions[account.id].length > 0 && (
+                        <div className="border-t pt-4">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-full justify-between"
+                            onClick={() => setExpandedLoanHistory(prev => ({ ...prev, [account.id]: !prev[account.id] }))}
+                          >
+                            <span className="flex items-center gap-2">
+                              <History className="h-4 w-4" />
+                              Payment History ({accountTransactions[account.id].length})
+                            </span>
+                            {expandedLoanHistory[account.id] ? (
+                              <ChevronUp className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
+                          </Button>
+                          
+                          {expandedLoanHistory[account.id] && (
+                            <div className="mt-3 space-y-2 max-h-60 overflow-y-auto">
+                              {accountTransactions[account.id]
+                                .sort((a, b) => new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime())
+                                .map(transaction => (
+                                  <div
+                                    key={transaction.id}
+                                    className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                                  >
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm font-medium">
+                                        {new Date(transaction.transaction_date).toLocaleDateString('en-US', {
+                                          year: 'numeric',
+                                          month: 'short',
+                                          day: 'numeric'
+                                        })}
+                                      </p>
+                                      {transaction.description && (
+                                        <p className="text-xs text-muted-foreground truncate">
+                                          {transaction.description}
+                                        </p>
+                                      )}
+                                    </div>
+                                    <div className="text-right">
+                                      <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                                        {formatCurrency(transaction.amount, transaction.currency)}
+                                      </p>
+                                    </div>
+                                  </div>
+                                ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
                       <div className="flex gap-2">
                         <Button
                           variant="outline"

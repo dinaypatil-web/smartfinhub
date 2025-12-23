@@ -95,9 +95,19 @@ export default function TransactionForm() {
     }
   }, [formData.from_account_id, formData.transaction_date, formData.is_emi, accounts]);
 
+  // Auto-select "Loan repayments" category when loan_payment transaction type is selected
   useEffect(() => {
-    // Load budget info when category changes and transaction type is expense
-    if (user && formData.category && formData.transaction_type === 'expense' && formData.transaction_date) {
+    if (formData.transaction_type === 'loan_payment') {
+      const loanRepaymentCategory = categories.find(c => c.name === 'Loan repayments');
+      if (loanRepaymentCategory && formData.category !== loanRepaymentCategory.name) {
+        setFormData(prev => ({ ...prev, category: loanRepaymentCategory.name }));
+      }
+    }
+  }, [formData.transaction_type, categories]);
+
+  useEffect(() => {
+    // Load budget info when category changes and transaction type is expense or loan_payment
+    if (user && formData.category && (formData.transaction_type === 'expense' || formData.transaction_type === 'loan_payment') && formData.transaction_date) {
       loadBudgetInfo();
     } else {
       setBudgetInfo(null);
@@ -584,7 +594,7 @@ export default function TransactionForm() {
               </div>
             </div>
 
-            {(formData.transaction_type === 'income' || formData.transaction_type === 'expense') && (
+            {(formData.transaction_type === 'income' || formData.transaction_type === 'expense' || formData.transaction_type === 'loan_payment') && (
               <div className="space-y-2">
                 <Label htmlFor="category">
                   {formData.transaction_type === 'income' ? 'Income Category' : 'Expense Category'}
@@ -623,8 +633,8 @@ export default function TransactionForm() {
                   </Select>
                 )}
 
-                {/* Budget Information Display for Expense Transactions */}
-                {formData.transaction_type === 'expense' && formData.category && (
+                {/* Budget Information Display for Expense and Loan Payment Transactions */}
+                {(formData.transaction_type === 'expense' || formData.transaction_type === 'loan_payment') && formData.category && (
                   <div className="mt-3">
                     {loadingBudget ? (
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
