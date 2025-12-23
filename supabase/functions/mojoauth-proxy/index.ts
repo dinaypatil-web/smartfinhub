@@ -122,12 +122,36 @@ serve(async (req) => {
         throw new Error(`Invalid action: ${action}`);
     }
 
-    // Parse MojoAuth response
-    const responseData = await mojoAuthResponse.json();
-
-    // Check if MojoAuth request was successful
+    // Check if MojoAuth request was successful first
     if (!mojoAuthResponse.ok) {
-      throw new Error(responseData.message || `MojoAuth API error: ${mojoAuthResponse.statusText}`);
+      // Try to parse error response
+      let errorMessage = `MojoAuth API error: ${mojoAuthResponse.statusText}`;
+      try {
+        const responseText = await mojoAuthResponse.text();
+        // Try to parse as JSON first
+        try {
+          const errorData = JSON.parse(responseText);
+          errorMessage = errorData.message || errorData.error || errorMessage;
+        } catch (jsonError) {
+          // If not JSON, use the text as error message
+          if (responseText) {
+            errorMessage = `MojoAuth API error: ${responseText}`;
+          }
+        }
+      } catch (textError) {
+        // Use default error message
+      }
+      throw new Error(errorMessage);
+    }
+
+    // Parse successful MojoAuth response
+    let responseData;
+    try {
+      const responseText = await mojoAuthResponse.text();
+      responseData = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('Failed to parse MojoAuth response as JSON:', parseError);
+      throw new Error(`Invalid response from MojoAuth API. Please check your API key and try again.`);
     }
 
     // Return success response
