@@ -918,8 +918,9 @@ export default function Dashboard() {
                   // Only show due amount after statement date
                   showDueAmount = shouldDisplayDueAmount(account.statement_day);
                   if (showDueAmount) {
-                    // After statement date, the entire balance is due
-                    dueAmount = Math.abs(account.balance);
+                    // Use calculated statement amount (only includes transactions up to statement date)
+                    // NOT the entire balance (which includes transactions after statement date)
+                    dueAmount = Math.abs(statementAmount);
                     if (account.due_day) {
                       dueDate = getStatementDueDate(account.statement_day, account.due_day);
                     }
