@@ -14,7 +14,9 @@ import type {
   FinancialSummary,
   BudgetAnalysis,
   CustomBankLink,
-  IncomeCategoryKey
+  IncomeCategoryKey,
+  BankLink,
+  UserCustomBankLink
 } from '@/types/types';
 
 export const profileApi = {
@@ -1130,6 +1132,149 @@ export const customBankLinkApi = {
       .delete()
       .eq('id', id);
 
+    if (error) throw error;
+  }
+};
+
+export const bankLinksApi = {
+  async getAllBankLinks(): Promise<BankLink[]> {
+    const { data, error } = await supabase
+      .from('bank_links')
+      .select('*')
+      .eq('is_active', true)
+      .order('country', { ascending: true })
+      .order('bank_name', { ascending: true });
+    
+    if (error) throw error;
+    return Array.isArray(data) ? data : [];
+  },
+
+  async getBankLinksByCountry(country: string): Promise<BankLink[]> {
+    const { data, error } = await supabase
+      .from('bank_links')
+      .select('*')
+      .eq('country', country)
+      .eq('is_active', true)
+      .order('bank_name', { ascending: true });
+    
+    if (error) throw error;
+    return Array.isArray(data) ? data : [];
+  },
+
+  async searchBankLinks(searchTerm: string): Promise<BankLink[]> {
+    const { data, error } = await supabase
+      .from('bank_links')
+      .select('*')
+      .ilike('bank_name', `%${searchTerm}%`)
+      .eq('is_active', true)
+      .order('bank_name', { ascending: true });
+    
+    if (error) throw error;
+    return Array.isArray(data) ? data : [];
+  },
+
+  async getBankLinkByName(bankName: string, country?: string): Promise<BankLink | null> {
+    let query = supabase
+      .from('bank_links')
+      .select('*')
+      .eq('bank_name', bankName)
+      .eq('is_active', true);
+    
+    if (country) {
+      query = query.eq('country', country);
+    }
+    
+    const { data, error } = await query.maybeSingle();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async createBankLink(bankLink: Omit<BankLink, 'id' | 'created_at' | 'updated_at'>): Promise<BankLink> {
+    const { data, error } = await supabase
+      .from('bank_links')
+      .insert(bankLink)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async updateBankLink(id: string, updates: Partial<BankLink>): Promise<BankLink> {
+    const { data, error } = await supabase
+      .from('bank_links')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async deleteBankLink(id: string) {
+    const { error } = await supabase
+      .from('bank_links')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+  }
+};
+
+export const userCustomBankLinksApi = {
+  async getUserCustomBankLinks(userId: string): Promise<UserCustomBankLink[]> {
+    const { data, error } = await supabase
+      .from('user_custom_bank_links')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return Array.isArray(data) ? data : [];
+  },
+
+  async getCustomBankLinksByAccount(accountId: string): Promise<UserCustomBankLink[]> {
+    const { data, error } = await supabase
+      .from('user_custom_bank_links')
+      .select('*')
+      .eq('account_id', accountId)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return Array.isArray(data) ? data : [];
+  },
+
+  async createCustomBankLink(link: Omit<UserCustomBankLink, 'id' | 'created_at'>): Promise<UserCustomBankLink> {
+    const { data, error } = await supabase
+      .from('user_custom_bank_links')
+      .insert(link)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async updateCustomBankLink(id: string, updates: Partial<UserCustomBankLink>): Promise<UserCustomBankLink> {
+    const { data, error } = await supabase
+      .from('user_custom_bank_links')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async deleteCustomBankLink(id: string) {
+    const { error } = await supabase
+      .from('user_custom_bank_links')
+      .delete()
+      .eq('id', id);
+    
     if (error) throw error;
   }
 };

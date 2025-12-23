@@ -35,6 +35,7 @@ import InterestRateTable from '@/components/InterestRateTable';
 import BankLogo from '@/components/BankLogo';
 import AccountStatementDialog from '@/components/AccountStatementDialog';
 import QuickLinks from '@/components/dashboard/QuickLinks';
+import BankQuickLinks from '@/components/BankQuickLinks';
 import { getBankAppLink } from '@/config/paymentApps';
 import { cache } from '@/utils/cache';
 
@@ -857,40 +858,40 @@ export default function Dashboard() {
                 </div>
               ))}
               {summary?.accounts_by_type.bank.map((account, index) => {
-                const bankLink = getBankAppLink(account.institution_name || '');
                 return (
                   <div 
                     key={account.id} 
-                    className={`flex items-center justify-between p-4 border-l-4 border-l-blue-500 rounded-lg bg-gradient-to-r from-blue-50/50 to-transparent dark:from-blue-950/20 hover-lift shadow-card cursor-pointer animate-slide-right animate-stagger-${Math.min(index + 1, 4)}`}
-                    onClick={() => handleAccountClick(account)}
+                    className={`p-4 border-l-4 border-l-blue-500 rounded-lg bg-gradient-to-r from-blue-50/50 to-transparent dark:from-blue-950/20 hover-lift shadow-card animate-slide-right animate-stagger-${Math.min(index + 1, 4)}`}
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center shadow-elegant border-2 border-blue-200 dark:border-blue-800">
-                        <BankLogo src={account.institution_logo} alt={account.institution_name || 'Bank'} bankName={account.institution_name || undefined} className="h-8 w-8" />
+                    <div 
+                      className="flex items-center justify-between cursor-pointer"
+                      onClick={() => handleAccountClick(account)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center shadow-elegant border-2 border-blue-200 dark:border-blue-800">
+                          <BankLogo src={account.institution_logo} alt={account.institution_name || 'Bank'} bankName={account.institution_name || undefined} className="h-8 w-8" />
+                        </div>
+                        <div>
+                          <p className="font-medium break-words line-clamp-2">{account.account_name}</p>
+                          <p className="text-sm text-muted-foreground break-words">
+                            {getAccountTypeLabel(account.account_type)} • {formatAccountNumber(account.last_4_digits)}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium break-words line-clamp-2">{account.account_name}</p>
-                        <p className="text-sm text-muted-foreground break-words">
-                          {getAccountTypeLabel(account.account_type)} • {formatAccountNumber(account.last_4_digits)}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
                       <div className="text-right font-semibold text-blue-600 dark:text-blue-400">
                         {formatCurrency(Number(account.balance), account.currency)}
                       </div>
-                      {bankLink && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 w-8 p-0"
-                          onClick={(e) => handleOpenBankApp(e, account.institution_name || '', bankLink.webUrl)}
-                          title={`Open ${account.institution_name} app`}
-                        >
-                          <ExternalLink className="h-4 w-4" />
-                        </Button>
-                      )}
                     </div>
+                    {user && (
+                      <div className="mt-3 pt-3 border-t border-muted" onClick={(e) => e.stopPropagation()}>
+                        <BankQuickLinks
+                          bankName={account.institution_name || ''}
+                          country={account.country}
+                          accountId={account.id}
+                          userId={user.id}
+                        />
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -1076,34 +1077,47 @@ export default function Dashboard() {
                         </div>
                       </div>
                     )}
+                    
+                    {/* Bank Quick Links */}
+                    {user && (
+                      <div className="pt-3 border-t border-muted" onClick={(e) => e.stopPropagation()}>
+                        <BankQuickLinks
+                          bankName={account.institution_name || ''}
+                          country={account.country}
+                          accountId={account.id}
+                          userId={user.id}
+                        />
+                      </div>
+                    )}
                   </div>
                 );
               })}
               {summary?.accounts_by_type.loan.map((account, index) => {
-                const bankLink = getBankAppLink(account.institution_name || '');
                 return (
                   <div 
                     key={account.id} 
-                    className={`flex items-center justify-between p-4 border-l-4 border-l-orange-500 rounded-lg bg-gradient-to-r from-orange-50/50 to-transparent dark:from-orange-950/20 hover:shadow-md transition-shadow cursor-pointer animate-slide-right animate-stagger-${Math.min(index + 1, 4)}`}
-                    onClick={() => handleAccountClick(account)}
+                    className={`p-4 border-l-4 border-l-orange-500 rounded-lg bg-gradient-to-r from-orange-50/50 to-transparent dark:from-orange-950/20 hover:shadow-md transition-shadow animate-slide-right animate-stagger-${Math.min(index + 1, 4)}`}
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center shadow-md border-2 border-orange-200 dark:border-orange-800">
-                        <BankLogo src={account.institution_logo} alt={account.institution_name || 'Loan'} bankName={account.institution_name || undefined} className="h-8 w-8" />
-                      </div>
-                      <div>
-                        <p className="font-medium break-words line-clamp-2">{account.account_name}</p>
-                        <p className="text-sm text-muted-foreground break-words">
-                          {getAccountTypeLabel(account.account_type)} • {account.interest_rate_type}
-                        </p>
-                        {loanCalculations[account.id] && (
-                          <p className="text-xs text-orange-600 dark:text-orange-400 font-medium mt-1">
-                            EMI: {formatCurrency(loanCalculations[account.id].emi, account.currency)}
+                    <div 
+                      className="flex items-center justify-between cursor-pointer"
+                      onClick={() => handleAccountClick(account)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center shadow-md border-2 border-orange-200 dark:border-orange-800">
+                          <BankLogo src={account.institution_logo} alt={account.institution_name || 'Loan'} bankName={account.institution_name || undefined} className="h-8 w-8" />
+                        </div>
+                        <div>
+                          <p className="font-medium break-words line-clamp-2">{account.account_name}</p>
+                          <p className="text-sm text-muted-foreground break-words">
+                            {getAccountTypeLabel(account.account_type)} • {account.interest_rate_type}
                           </p>
-                        )}
+                          {loanCalculations[account.id] && (
+                            <p className="text-xs text-orange-600 dark:text-orange-400 font-medium mt-1">
+                              EMI: {formatCurrency(loanCalculations[account.id].emi, account.currency)}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-3">
                       <div className="text-right">
                         <div className="font-semibold text-orange-600 dark:text-orange-400">
                           {formatCurrency(Number(account.balance), account.currency)}
@@ -1112,18 +1126,17 @@ export default function Dashboard() {
                           {account.current_interest_rate}% APR
                         </div>
                       </div>
-                      {bankLink && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 w-8 p-0"
-                          onClick={(e) => handleOpenBankApp(e, account.institution_name || '', bankLink.webUrl)}
-                          title={`Open ${account.institution_name} app`}
-                        >
-                          <ExternalLink className="h-4 w-4" />
-                        </Button>
-                      )}
                     </div>
+                    {user && (
+                      <div className="mt-3 pt-3 border-t border-muted" onClick={(e) => e.stopPropagation()}>
+                        <BankQuickLinks
+                          bankName={account.institution_name || ''}
+                          country={account.country}
+                          accountId={account.id}
+                          userId={user.id}
+                        />
+                      </div>
+                    )}
                   </div>
                 );
               })}
