@@ -16,6 +16,7 @@ import { calculateEMI, formatLoanAmount } from '@/utils/loanCalculations';
 import { detectDeviceType, getAppStoreName } from '@/utils/deviceDetection';
 import BankLogo from '@/components/BankLogo';
 import LoanEMIPaymentManager from '@/components/LoanEMIPaymentManager';
+import { cache } from '@/utils/cache';
 
 export default function AccountForm() {
   const { id } = useParams();
@@ -183,6 +184,9 @@ export default function AccountForm() {
           await loanEMIPaymentApi.createBulkPayments(paymentsToSave);
         }
 
+        // Clear dashboard cache to reflect updated account
+        cache.clearPattern('dashboard-');
+
         toast({
           title: 'Success',
           description: 'Account updated successfully',
@@ -206,6 +210,9 @@ export default function AccountForm() {
             await loanEMIPaymentApi.createBulkPayments(paymentsToSave);
           }
         }
+
+        // Clear dashboard cache to reflect new account
+        cache.clearPattern('dashboard-');
 
         toast({
           title: 'Success',

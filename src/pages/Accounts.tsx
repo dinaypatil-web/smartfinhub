@@ -29,6 +29,7 @@ import {
   getStatementDueDate 
 } from '@/utils/statementCalculations';
 import BankLogo from '@/components/BankLogo';
+import { cache } from '@/utils/cache';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -141,6 +142,10 @@ export default function Accounts() {
 
     try {
       await accountApi.deleteAccount(accountToDelete.id);
+      
+      // Clear dashboard cache to reflect deleted account
+      cache.clearPattern('dashboard-');
+      
       toast({
         title: 'Success',
         description: 'Account deleted successfully',

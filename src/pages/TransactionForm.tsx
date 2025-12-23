@@ -22,6 +22,7 @@ import {
 } from '@/utils/emiCalculations';
 import { getTransactionStatementInfo } from '@/utils/statementCalculations';
 import { INCOME_CATEGORIES } from '@/constants/incomeCategories';
+import { cache } from '@/utils/cache';
 
 // Transaction form for creating and editing transactions
 export default function TransactionForm() {
@@ -340,6 +341,10 @@ export default function TransactionForm() {
 
       if (id) {
         await transactionApi.updateTransaction(id, transactionData);
+        
+        // Clear dashboard cache to reflect updated transaction
+        cache.clearPattern('dashboard-');
+        
         toast({
           title: 'Success',
           description: 'Transaction updated successfully',
@@ -373,6 +378,9 @@ export default function TransactionForm() {
           
           await emiApi.createEMI(emiData);
         }
+        
+        // Clear dashboard cache to reflect new transaction
+        cache.clearPattern('dashboard-');
         
         toast({
           title: 'Success',
