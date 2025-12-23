@@ -12,10 +12,12 @@ import { Loader2, AlertCircle, CheckCircle2, Mail, Phone } from 'lucide-react';
 import PhoneAuth from '@/components/PhoneAuth';
 import { isMojoAuthConfigured } from '@/services/mojoauth';
 import { profileApi } from '@/db/api';
+import { useEncryption } from '@/contexts/EncryptionContext';
 
 export default function Register() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const encryption = useEncryption();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -51,17 +53,28 @@ export default function Register() {
     setLoading(true);
 
     try {
+      // Create encryption salt for this user
+      const encryptionSalt = await encryption.createNewKey(password);
+      
       const { data, error } = await supabase.auth.signUp({
         email: email,
         password: password,
         options: {
           emailRedirectTo: `${window.location.origin}/confirm-email`,
+          data: {
+            encryption_salt: encryptionSalt,
+          },
         },
       });
 
       if (error) throw error;
 
       if (data.user) {
+        // Update profile with encryption salt
+        await profileApi.updateProfile(data.user.id, {
+          encryption_salt: encryptionSalt,
+        });
+        
         setRegistrationSuccess(true);
         setRegistrationType('email');
         toast({
@@ -87,6 +100,9 @@ export default function Register() {
       // Create a temporary password for phone-based registration
       const tempPassword = `phone_${Date.now()}_${Math.random().toString(36).substring(7)}`;
       
+      // Create encryption salt for this user
+      const encryptionSalt = await encryption.createNewKey(tempPassword);
+      
       // Create user with phone as email (using phone@mojoauth.local format)
       const phoneEmail = `${phoneNumber.replace(/\+/g, '')}@mojoauth.local`;
       
@@ -98,6 +114,7 @@ export default function Register() {
             phone: phoneNumber,
             auth_method: 'phone',
             mojoauth_token: accessToken,
+            encryption_salt: encryptionSalt,
           },
         },
       });
@@ -105,10 +122,11 @@ export default function Register() {
       if (error) throw error;
 
       if (data.user) {
-        // Update profile with phone number
+        // Update profile with phone number and encryption salt
         await profileApi.updateProfile(data.user.id, { 
           phone: phoneNumber,
           email: phoneEmail,
+          encryption_salt: encryptionSalt,
         });
 
         setRegisteredPhone(phoneNumber);

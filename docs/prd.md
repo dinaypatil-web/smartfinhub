@@ -36,8 +36,7 @@ A comprehensive financial management web application designed for tracking and m
 - After entering valid verification code, user can set new password
 - Password reset verification code valid for 15 minutes
 - **Mobile Number Account Recovery**: For mobile number-based accounts, user can login anytime using OTP sent via MojoAuth
-
-#### 1.3.4 Account Settings
+\n#### 1.3.4 Account Settings
 - **Change Password on Dashboard**: Password change option available in user account settings on dashboard (for email-based accounts)
 - User must enter current password before setting new password
 - Password change confirmation sent to registered email address
@@ -63,7 +62,7 @@ A comprehensive financial management web application designed for tracking and m
 - **Complete bank name list available in dropdown for all supported countries**
 - Dropdown includes all major banks and financial institutions for selected country
 - **For India**: Bank selection page includes'BOB World: Banking & Experience' app link for Bank of Baroda customers
-- **Smart App Store Redirection**: When user clicks 'Open App' button for bank/financial institution mobile app:\n  - System automatically detects user's mobile device operating system
+- **Smart App Store Redirection**: When user clicks'Open App' button for bank/financial institution mobile app:\n  - System automatically detects user's mobile device operating system
   - For Android devices: Redirects to Google Play Store app page
   - For iOS devices: Redirects to Apple App Store app page
   - Seamless redirection without manual app store selection
@@ -82,7 +81,8 @@ A comprehensive financial management web application designed for tracking and m
 - Statement day and due day saved to credit card account profile
 - System displays statement date and due date reminders on dashboard
 - Payment reminders shown on credit card account detail page
-- Visual indicators for upcoming statement dates and due dates\n- **Credit Limit Alert**: System triggers alert notification when user attempts transaction that would exceed their set credit limit
+- Visual indicators for upcoming statement dates and due dates
+- **Credit Limit Alert**: System triggers alert notification when user attempts transaction that would exceed their set credit limit
 - Alert displayed before transaction confirmation to prevent overspending
 - Current available credit displayed on credit card account page and dashboard
 
@@ -137,12 +137,13 @@ A comprehensive financial management web application designed for tracking and m
 - **EMI Recalculation on Rate Change**: When floating interest rate is updated, system recalculates principal and interest components for all subsequent EMI payments
 - Updated interest breakdown reflected in loan account statement
 - Automatic monthly interest calculation uses current applicable interest rate
-\n#### 2.2.6 Account Modification\n- Edit any account information at any time
+\n#### 2.2.6 Account Modification
+- Edit any account information at any time
 - Delete accounts with user confirmation
 \n### 2.3 Transaction Management\n
 #### 2.3.1 Transaction Types
-- Income transactions\n- Expense transactions
-- Cash withdrawals (from bank account or credit card)
+- Income transactions
+- Expense transactions\n- Cash withdrawals (from bank account or credit card)
 - Bank-to-bank transfers
 - Loan payments
 - **Credit card repayment transactions**
@@ -193,8 +194,7 @@ A comprehensive financial management web application designed for tracking and m
 - System-generated interest transactions cannot be edited or deleted by user
 - Credit card repayment transactions can be edited or deleted with automatic recalculation of both bank and credit card balances
 \n### 2.4 Dashboard Display
-
-#### 2.4.1 Tab-Based Dashboard Structure
+\n#### 2.4.1 Tab-Based Dashboard Structure
 - **Dashboard organized into multiple tabs for better content organization and navigation**
 - **Tab 1 - Overview**: Financial summary and account cards
 - **Tab 2 - Analytics**: Visual charts including pie charts for balance distribution and expense breakdown, line charts for interest rate history\n- **Tab 3 - Cash Flow**: Monthly cash flow projection with opening balance, income, expenses, and credit card dues breakdown
@@ -318,62 +318,89 @@ A comprehensive financial management web application designed for tracking and m
 - Option to delete old backup files to manage storage\n- System maintains backup history log showing all backup and restore operations
 
 ### 2.8 Data Security and Privacy Protection
-\n#### 2.8.1 End-to-End Encryption
-- **User-Specific Encryption Key**: System generates unique encryption key for each user during registration
-- Encryption key derived from user's password using secure key derivation function (PBKDF2 with SHA-256)
-- Encryption key never stored on server in plain text
-- All user financial data encrypted using AES-256 encryption standard before storage
-- Encrypted data can only be decrypted using user's unique encryption key
-\n#### 2.8.2 Local Data Encryption
-- **Client-Side Encryption**: All sensitive data encrypted on user's device before transmission to server
-- Encryption performed in browser using Web Crypto API
-- Server stores only encrypted data and cannot decrypt user information
-- Account numbers, transaction details, balances, and personal information encrypted at rest
-\n#### 2.8.3Secure Data Transmission
-- **HTTPS Protocol**: All data transmission between client and server uses HTTPS with TLS 1.3encryption
+\n#### 2.8.1 Zero-Knowledge Architecture with Client-Side Encryption
+- **Complete Client-Side Encryption**: All user financial data encrypted exclusively on user's device (browser) before any transmission to server
+- **User-Controlled Encryption Key**: Unique encryption key generated on user's device during registration, derived from user's password using PBKDF2-SHA256 key derivation function
+- Encryption key exists only in user's browser session memory and is never transmitted to or stored on server
+- **AES-256-GCM Encryption**: All sensitive data encrypted using AES-256-GCM (Galois/Counter Mode) encryption standard on client side
+- Encryption performed using Web Crypto API in user's browser
+- **Server Stores Only Encrypted Data**: Server database contains only encrypted ciphertext and cannot decrypt any user information
+- Application creator, system administrators, and database administrators have zero access to user's decrypted financial data
+- **Client-Side Decryption for Display**: When user logs in and views dashboard or reports:\n  - Encrypted data retrieved from server
+  - Decryption performed entirely in user's browser using user's encryption key
+  - Decrypted data rendered on user interface without server involvement
+  - Decrypted data never leaves user's device
+- **Seamless User Experience**: Encryption and decryption processes transparent to user, with no impact on interface responsiveness or data display
+- Real-time balance updates, transaction displays, and reports rendered smoothly after client-side decryption
+
+#### 2.8.2 Encryption Key Management
+- **Key Derivation on Login**: Each time user logs in, encryption key re-derived from user's password on client side
+- Key derivation uses same PBKDF2-SHA256 algorithm with user-specific salt stored (encrypted) on server
+- Derived key loaded into browser session memory for duration of user session
+- **Automatic Key Destruction**: Encryption key automatically cleared from browser memory on logout or session timeout
+- No persistent storage of encryption key on user's device or server
+- **Password Change Protocol**: When user changes password:\n  - All encrypted data retrieved from server
+  - Data decrypted using old encryption key on client side
+  - New encryption key derived from new password
+  - All data re-encrypted with new key on client side
+  - Re-encrypted data uploaded to server, replacing old encrypted data
+\n#### 2.8.3 Secure Data Transmission
+- **HTTPS Protocol**: All data transmission between client and server uses HTTPS with TLS 1.3 encryption
 - SSL/TLS certificates ensure secure communication channel
 - Man-in-the-middle attacks prevented through certificate validation
-\n#### 2.8.4 Zero-Knowledge Architecture
-- **Server Cannot Access User Data**: Application designed with zero-knowledge architecture\n- Server has no access to user's encryption keys or decrypted data
-- Only authenticated user through application interface can decrypt and view their own data
-- System administrators and database administrators cannot view user's financial information
-
-#### 2.8.5 Session Security
-- **Secure Session Management**: User sessions protected with secure, httpOnly cookies
+- Encrypted data transmitted over secure channel, providing double-layer protection
+\n#### 2.8.4 Session Security
+- **Secure Session Management**: User sessions protected with secure, httpOnly, SameSite cookies
 - Session tokens encrypted and time-limited
-- Automatic session timeout after 30 minutes of inactivity\n- User must re-authenticate after session expiration
+- Automatic session timeout after 30 minutes of inactivity
+- User must re-authenticate after session expiration
+- Encryption key cleared from memory on session timeout
 - Single active session per user account (optional multi-device support with separate session management)
 
-#### 2.8.6 Password Security
+#### 2.8.5 Password Security
 - **Strong Password Requirements**: Minimum 8 characters with combination of uppercase, lowercase, numbers, and special characters (applicable for email-based accounts)
-- Password hashed using bcrypt algorithm with salt before storage
+- Password hashed using bcrypt algorithm with salt before storage on server
 - Original password never stored in database
+- Password used only for encryption key derivation on client side
 - Password reset requires email verification code authentication
-\n#### 2.8.7 Data Access Logging
+\n#### 2.8.6 Data Access Logging
 - **Audit Trail**: System maintains encrypted audit log of all data access attempts
 - Log records user authentication events, data access timestamps, and IP addresses
 - Audit logs accessible only to authenticated user for their own account
-- Failed login attempts logged and trigger account lockout after 5 consecutive failures
+- Failed login attempts logged and trigger account lockout after5 consecutive failures
+- Audit logs encrypted and cannot reveal user's financial data
 
-#### 2.8.8 Backup File Encryption
-- **Encrypted Backup Files**: All backup files encrypted using user's encryption key
-- Backup files protected with additional password set by user during backup creation
+#### 2.8.7 Backup File Encryption
+- **Client-Side Backup Encryption**: Backup files generated and encrypted entirely on user's device before download
+- Backup files encrypted using user's encryption key plus additional user-defined backup password
 - Encrypted backups cannot be accessed without both user's account credentials and backup password
-\n#### 2.8.9 Data Isolation
-- **Multi-Tenant Data Isolation**: Each user's data stored in isolated, encrypted database partitions
+- Server never has access to unencrypted backup contents
+\n#### 2.8.8 Data Isolation\n- **Multi-Tenant Data Isolation**: Each user's encrypted data stored in isolated database partitions
 - Database-level access controls prevent cross-user data access
 - Application logic enforces strict user data boundary checks
-\n#### 2.8.10 Compliance and Standards
-- Data protection implementation follows industry best practices
+- Even if database is compromised, encrypted data remains unreadable without user's encryption key
+
+#### 2.8.9 Compliance and Standards
+- Data protection implementation follows industry best practices and zero-knowledge security principles
 - Encryption standards compliant with financial data security requirements
 - Regular security audits and vulnerability assessments
 - Data retention policies configurable by user
-\n#### 2.8.11 User Control and Transparency
+\n#### 2.8.10 User Control and Transparency
 - **Data Privacy Dashboard**: User can view all data security settings and encryption status
+- Clear indicators showing that data is encrypted and inaccessible to application creator
 - Option to export all personal data in encrypted format
-- Option to permanently delete account and all associated data
-- Clear privacy policy explaining data handling and protection measures
+- Option to permanently delete account and all associated encrypted data from server
+- Clear privacy policy explaining zero-knowledge architecture and client-side encryption
 - No third-party data sharing without explicit user consent
+- User retains complete control over encryption keys and data access\n
+#### 2.8.11 Technical Implementation Notes
+- **Web Crypto API**: Utilize browser's native Web Crypto API for all cryptographic operations
+- **IndexedDB for Session Storage**: Temporarily store encrypted data in browser's IndexedDB during active session for performance optimization
+- IndexedDB cleared automatically on logout or session timeout
+- **Progressive Decryption**: Implement progressive decryption for large datasets to maintain interface responsiveness
+- Decrypt and render data in chunks as user navigates through dashboard and reports
+- **Encryption Metadata**: Store minimal non-sensitive metadata (account types, transaction dates without amounts) in plaintext for indexing and query optimization
+- All sensitive financial values (balances, amounts, account numbers) fully encrypted
 
 ## 3. Design Style\n
 ### 3.1 Color Scheme
@@ -389,7 +416,8 @@ A comprehensive financial management web application designed for tracking and m
 - Consistent spacing and padding throughout interface
 - Tab headers with clear labels and active state indicators
 - Smooth tab switching animations for better user experience
-- Security indicators (lock icons) displayed prominently to reinforce data protection
+- Security indicators (lock icons and 'Zero-Knowledge Encrypted' badges) displayed prominently to reinforce data protection
+- Visual encryption status indicators on dashboard showing data is protected
 
 ### 3.3 Layout Structure
 - Grid-based dashboard for account cards with responsive columns
