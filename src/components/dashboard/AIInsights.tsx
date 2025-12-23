@@ -70,6 +70,7 @@ export default function AIInsights() {
         category: t.category,
         amount: t.amount,
         date: t.transaction_date,
+        description: t.description,
       })),
       accountBalances,
       historicalData,
