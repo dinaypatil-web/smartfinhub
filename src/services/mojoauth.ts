@@ -1,10 +1,12 @@
 /**
  * MojoAuth Service for Phone Number Authentication with OTP
  * Documentation: https://mojoauth.com/docs/
+ * 
+ * This service uses a Supabase Edge Function as a proxy to MojoAuth API
+ * to avoid CORS issues and keep the API key secure.
  */
 
-const MOJOAUTH_API_KEY = import.meta.env.VITE_MOJOAUTH_API_KEY;
-const MOJOAUTH_BASE_URL = 'https://api.mojoauth.com';
+import { supabase } from '@/db/supabase';
 
 export interface SendOTPResponse {
   state_id: string;
@@ -30,24 +32,24 @@ export interface VerifyOTPResponse {
  */
 export async function sendOTP(phoneNumber: string): Promise<SendOTPResponse> {
   try {
-    const response = await fetch(`${MOJOAUTH_BASE_URL}/oauth/otp/send`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': MOJOAUTH_API_KEY,
-      },
-      body: JSON.stringify({
+    const { data, error } = await supabase.functions.invoke('mojoauth-proxy', {
+      body: {
+        action: 'send',
         phone: phoneNumber,
-      }),
+      },
     });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `Failed to send OTP: ${response.statusText}`);
+    if (error) {
+      const errorMsg = await error?.context?.text().catch(() => error.message);
+      console.error('MojoAuth sendOTP error:', errorMsg);
+      throw new Error(errorMsg || 'Failed to send OTP');
     }
 
-    const data = await response.json();
-    return data;
+    if (!data?.success) {
+      throw new Error(data?.error || 'Failed to send OTP');
+    }
+
+    return data.data;
   } catch (error: any) {
     console.error('MojoAuth sendOTP error:', error);
     throw new Error(error.message || 'Failed to send OTP. Please try again.');
@@ -62,25 +64,25 @@ export async function sendOTP(phoneNumber: string): Promise<SendOTPResponse> {
  */
 export async function verifyOTP(stateId: string, otp: string): Promise<VerifyOTPResponse> {
   try {
-    const response = await fetch(`${MOJOAUTH_BASE_URL}/oauth/otp/verify`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': MOJOAUTH_API_KEY,
-      },
-      body: JSON.stringify({
+    const { data, error } = await supabase.functions.invoke('mojoauth-proxy', {
+      body: {
+        action: 'verify',
         state_id: stateId,
         otp: otp,
-      }),
+      },
     });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `Failed to verify OTP: ${response.statusText}`);
+    if (error) {
+      const errorMsg = await error?.context?.text().catch(() => error.message);
+      console.error('MojoAuth verifyOTP error:', errorMsg);
+      throw new Error(errorMsg || 'Failed to verify OTP');
     }
 
-    const data = await response.json();
-    return data;
+    if (!data?.success) {
+      throw new Error(data?.error || 'Failed to verify OTP');
+    }
+
+    return data.data;
   } catch (error: any) {
     console.error('MojoAuth verifyOTP error:', error);
     throw new Error(error.message || 'Failed to verify OTP. Please check your code and try again.');
@@ -94,24 +96,24 @@ export async function verifyOTP(stateId: string, otp: string): Promise<VerifyOTP
  */
 export async function resendOTP(stateId: string): Promise<SendOTPResponse> {
   try {
-    const response = await fetch(`${MOJOAUTH_BASE_URL}/oauth/otp/resend`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': MOJOAUTH_API_KEY,
-      },
-      body: JSON.stringify({
+    const { data, error } = await supabase.functions.invoke('mojoauth-proxy', {
+      body: {
+        action: 'resend',
         state_id: stateId,
-      }),
+      },
     });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `Failed to resend OTP: ${response.statusText}`);
+    if (error) {
+      const errorMsg = await error?.context?.text().catch(() => error.message);
+      console.error('MojoAuth resendOTP error:', errorMsg);
+      throw new Error(errorMsg || 'Failed to resend OTP');
     }
 
-    const data = await response.json();
-    return data;
+    if (!data?.success) {
+      throw new Error(data?.error || 'Failed to resend OTP');
+    }
+
+    return data.data;
   } catch (error: any) {
     console.error('MojoAuth resendOTP error:', error);
     throw new Error(error.message || 'Failed to resend OTP. Please try again.');
@@ -159,8 +161,10 @@ export function formatPhoneNumber(phoneNumber: string): string {
 
 /**
  * Check if MojoAuth is configured
- * @returns boolean indicating if API key is set
+ * @returns boolean indicating if MojoAuth proxy is available
  */
 export function isMojoAuthConfigured(): boolean {
-  return !!MOJOAUTH_API_KEY && MOJOAUTH_API_KEY !== 'your_mojoauth_api_key_here';
+  // MojoAuth is now configured via Edge Function
+  // Always return true as the Edge Function handles the API key
+  return true;
 }
