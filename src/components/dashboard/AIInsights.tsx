@@ -166,47 +166,52 @@ export default function AIInsights() {
     );
   };
 
-  useEffect(() => {
-    if (user && !hasAnalysis && !isLoading) {
-      generateAnalysis();
-    }
-  }, [user]);
+  // Removed auto-generation on mount to improve mobile performance
+  // Users can now click "Generate Analysis" button to get insights
 
   const getQuickInsight = async () => {
     if (!user) return null;
 
-    const currentMonth = new Date().toISOString().slice(0, 7);
-    const transactions = await transactionApi.getTransactions(user.id);
-    const monthlyTransactions = transactions.filter(t => t.transaction_date.startsWith(currentMonth));
-    
-    const totalIncome = monthlyTransactions
-      .filter(t => t.transaction_type === 'income')
-      .reduce((sum, t) => sum + t.amount, 0);
+    try {
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+      
+      // Only fetch current month transactions for quick insight
+      const monthlyTransactions = await transactionApi.getTransactionsByDateRange(user.id, startOfMonth, endOfMonth);
+      
+      const totalIncome = monthlyTransactions
+        .filter(t => t.transaction_type === 'income')
+        .reduce((sum, t) => sum + t.amount, 0);
 
-    const totalExpenses = monthlyTransactions
-      .filter(t => t.transaction_type === 'expense' || t.transaction_type === 'loan_payment')
-      .reduce((sum, t) => sum + t.amount, 0);
+      const totalExpenses = monthlyTransactions
+        .filter(t => t.transaction_type === 'expense' || t.transaction_type === 'loan_payment')
+        .reduce((sum, t) => sum + t.amount, 0);
 
-    const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome * 100) : 0;
+      const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome * 100) : 0;
 
-    if (savingsRate >= 20) {
-      return {
-        icon: <TrendingUp className="h-5 w-5 text-green-500" />,
-        text: `Great job! You're saving ${savingsRate.toFixed(1)}% of your income.`,
-        color: 'text-green-600',
-      };
-    } else if (savingsRate >= 10) {
-      return {
-        icon: <TrendingUp className="h-5 w-5 text-yellow-500" />,
-        text: `You're saving ${savingsRate.toFixed(1)}% of your income. Let's aim for 20%!`,
-        color: 'text-yellow-600',
-      };
-    } else {
-      return {
-        icon: <TrendingDown className="h-5 w-5 text-red-500" />,
-        text: `Your savings rate is ${savingsRate.toFixed(1)}%. AI can help you improve!`,
-        color: 'text-red-600',
-      };
+      if (savingsRate >= 20) {
+        return {
+          icon: <TrendingUp className="h-5 w-5 text-green-500" />,
+          text: `Great job! You're saving ${savingsRate.toFixed(1)}% of your income.`,
+          color: 'text-green-600',
+        };
+      } else if (savingsRate >= 10) {
+        return {
+          icon: <TrendingUp className="h-5 w-5 text-yellow-500" />,
+          text: `You're saving ${savingsRate.toFixed(1)}% of your income. Let's aim for 20%!`,
+          color: 'text-yellow-600',
+        };
+      } else {
+        return {
+          icon: <TrendingDown className="h-5 w-5 text-red-500" />,
+          text: `Your savings rate is ${savingsRate.toFixed(1)}%. AI can help you improve!`,
+          color: 'text-red-600',
+        };
+      }
+    } catch (error) {
+      console.error('Error calculating quick insight:', error);
+      return null;
     }
   };
 
@@ -252,6 +257,23 @@ export default function AIInsights() {
           </div>
         )}
 
+        {!hasAnalysis && !isLoading && (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <Sparkles className="h-12 w-12 text-primary/40 mb-3" />
+            <p className="text-sm text-muted-foreground mb-4">
+              Get personalized financial insights and budget recommendations based on your spending patterns
+            </p>
+            <Button
+              onClick={generateAnalysis}
+              disabled={!user}
+              size="sm"
+            >
+              <Sparkles className="h-4 w-4 mr-2" />
+              Generate AI Analysis
+            </Button>
+          </div>
+        )}
+
         {isLoading && (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -261,7 +283,7 @@ export default function AIInsights() {
           </div>
         )}
 
-        {!isLoading && analysis && (
+        {!isLoading && analysis && hasAnalysis && (
           <div className="prose prose-sm max-w-none dark:prose-invert">
             <div 
               className="text-sm text-muted-foreground line-clamp-6"
@@ -270,34 +292,36 @@ export default function AIInsights() {
           </div>
         )}
 
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={generateAnalysis}
-            disabled={isLoading || !user}
-            className="flex-1"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Analyzing...
-              </>
-            ) : (
-              <>
-                <Sparkles className="h-4 w-4 mr-2" />
-                Refresh Analysis
-              </>
-            )}
-          </Button>
-          <Button
-            size="sm"
-            onClick={() => navigate('/ai-analysis')}
-            className="flex-1"
-          >
-            Full Report
-          </Button>
-        </div>
+        {hasAnalysis && (
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={generateAnalysis}
+              disabled={isLoading || !user}
+              className="flex-1"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Analyzing...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Refresh Analysis
+                </>
+              )}
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => navigate('/ai-analysis')}
+              className="flex-1"
+            >
+              Full Report
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
