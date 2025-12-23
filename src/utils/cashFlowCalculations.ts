@@ -117,6 +117,8 @@ export function calculateMonthIncome(
 
 /**
  * Calculate remaining budget for the month
+ * Returns the amount of budget still allocated for spending (positive value)
+ * Returns 0 if over budget (no remaining allocation)
  */
 export function calculateRemainingBudget(
   budget: Budget | null,
@@ -127,7 +129,9 @@ export function calculateRemainingBudget(
   }
 
   const remaining = budget.budgeted_expenses - actualExpenses;
-  return Math.round(remaining * 100) / 100;
+  // Only return positive remaining budget (money still allocated to spend)
+  // If over budget, return 0 (no remaining allocation)
+  return Math.max(0, Math.round(remaining * 100) / 100);
 }
 
 /**
@@ -382,7 +386,7 @@ export function calculateMonthlyCashFlow(
   const expensesIncurred = calculateMonthExpenses(transactions, month, year);
   const creditCardRepayments = calculateCreditCardRepayments(transactions, month, year);
   const remainingBudget = calculateRemainingBudget(budget, expensesIncurred);
-  const expectedBalance = openingBalance + incomeReceived - expensesIncurred - creditCardRepayments;
+  const expectedBalance = openingBalance + incomeReceived - expensesIncurred - creditCardRepayments - remainingBudget;
   const creditCardDues = calculateCreditCardDues(accounts, accountTransactions, accountEMIs, month, year);
   const netAvailable = expectedBalance - creditCardDues;
 
