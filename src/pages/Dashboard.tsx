@@ -156,7 +156,12 @@ export default function Dashboard() {
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
-      const monthExpenses = await transactionApi.getTransactionsByDateRange(user.id, startOfMonth, endOfMonth);
+      
+      // Fetch both month transactions and all transactions for proper calculations
+      const [monthExpenses, allTransactions] = await Promise.all([
+        transactionApi.getTransactionsByDateRange(user.id, startOfMonth, endOfMonth),
+        transactionApi.getTransactions(user.id) // Get all transactions without limit
+      ]);
 
       // Parallel processing for loan accounts
       const loanPromises = (summaryData?.accounts_by_type.loan || []).map(async (account) => {
@@ -250,9 +255,9 @@ export default function Dashboard() {
       const budget = await budgetApi.getBudget(user.id, currentMonth, currentYear);
       const cashFlowData = calculateMonthlyCashFlow(
         allAccounts,
-        monthExpenses, // Use already loaded month transactions
-        accountTxs,    // Pass account transactions for statement calculations
-        emis,          // Pass EMIs for statement calculations
+        allTransactions, // Use all transactions for proper opening balance calculation
+        accountTxs,      // Pass account transactions for statement calculations
+        emis,            // Pass EMIs for statement calculations
         budget,
         currentMonth,
         currentYear
