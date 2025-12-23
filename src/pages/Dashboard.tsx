@@ -643,8 +643,13 @@ export default function Dashboard() {
                   )}
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">Remaining Budget</span>
-                    <span className="text-lg font-semibold text-amber-600 dark:text-amber-400">
-                      - {formatCurrency(cashFlow.remainingBudget, currency)}
+                    <span className={`text-lg font-semibold ${
+                      cashFlow.remainingBudget >= 0 
+                        ? 'text-emerald-600 dark:text-emerald-400' 
+                        : 'text-red-600 dark:text-red-400'
+                    }`}>
+                      {formatCurrency(Math.abs(cashFlow.remainingBudget), currency)}
+                      {cashFlow.remainingBudget < 0 && ' (Over Budget)'}
                     </span>
                   </div>
                 </div>

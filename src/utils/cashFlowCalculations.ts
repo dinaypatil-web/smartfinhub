@@ -122,12 +122,12 @@ export function calculateRemainingBudget(
   budget: Budget | null,
   actualExpenses: number
 ): number {
-  if (!budget) {
+  if (!budget || !budget.budgeted_expenses) {
     return 0;
   }
 
   const remaining = budget.budgeted_expenses - actualExpenses;
-  return Math.max(0, Math.round(remaining * 100) / 100);
+  return Math.round(remaining * 100) / 100;
 }
 
 /**
@@ -382,7 +382,7 @@ export function calculateMonthlyCashFlow(
   const expensesIncurred = calculateMonthExpenses(transactions, month, year);
   const creditCardRepayments = calculateCreditCardRepayments(transactions, month, year);
   const remainingBudget = calculateRemainingBudget(budget, expensesIncurred);
-  const expectedBalance = openingBalance + incomeReceived - expensesIncurred - creditCardRepayments - remainingBudget;
+  const expectedBalance = openingBalance + incomeReceived - expensesIncurred - creditCardRepayments;
   const creditCardDues = calculateCreditCardDues(accounts, accountTransactions, accountEMIs, month, year);
   const netAvailable = expectedBalance - creditCardDues;
 
