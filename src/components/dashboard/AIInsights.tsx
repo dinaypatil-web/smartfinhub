@@ -1,0 +1,245 @@
+import { useEffect, useState } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Sparkles, TrendingDown, TrendingUp, Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useHybridAuth } from '@/contexts/HybridAuthContext';
+import { transactionApi, accountApi, budgetApi } from '@/db/api';
+import { generateFinancialAnalysis, type AIAnalysisData } from '@/services/aiService';
+import { marked } from 'marked';
+
+export default function AIInsights() {
+  const navigate = useNavigate();
+  const { user } = useHybridAuth();
+  const [analysis, setAnalysis] = useState('');
+  const [analysisHtml, setAnalysisHtml] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [hasAnalysis, setHasAnalysis] = useState(false);
+
+  const prepareAnalysisData = async (): Promise<AIAnalysisData> => {
+    if (!user) {
+      return {
+        totalIncome: 0,
+        totalExpenses: 0,
+        budgetedExpenses: 0,
+        transactions: [],
+        accountBalances: [],
+      };
+    }
+
+    const now = new Date();
+    const currentMonth = now.getMonth() + 1;
+    const currentYear = now.getFullYear();
+    const currentMonthStr = now.toISOString().slice(0, 7);
+    
+    const transactions = await transactionApi.getTransactions(user.id);
+    const accounts = await accountApi.getAccounts(user.id);
+    const budgets = await budgetApi.getBudgets(user.id);
+
+    const monthlyTransactions = transactions.filter(t => 
+      t.transaction_date.startsWith(currentMonthStr)
+    );
+
+    const totalIncome = monthlyTransactions
+      .filter(t => t.transaction_type === 'income')
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const totalExpenses = monthlyTransactions
+      .filter(t => t.transaction_type === 'expense')
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const currentBudget = budgets.find(b => b.month === currentMonth && b.year === currentYear);
+    const budgetedExpenses = currentBudget?.budgeted_expenses || 0;
+
+    const accountBalances = accounts.map(acc => ({
+      name: acc.account_name,
+      balance: acc.balance,
+      type: acc.account_type,
+    }));
+
+    return {
+      totalIncome,
+      totalExpenses,
+      budgetedExpenses,
+      transactions: monthlyTransactions.map(t => ({
+        type: t.transaction_type,
+        category: t.category,
+        amount: t.amount,
+        date: t.transaction_date,
+      })),
+      accountBalances,
+    };
+  };
+
+  const generateAnalysis = async () => {
+    const data = await prepareAnalysisData();
+    
+    if (data.transactions.length === 0) {
+      setAnalysis('No transaction data available. Start adding transactions to get AI-powered insights.');
+      setHasAnalysis(true);
+      return;
+    }
+
+    setIsLoading(true);
+    setAnalysis('');
+    setHasAnalysis(false);
+
+    let fullText = '';
+
+    await generateFinancialAnalysis(
+      data,
+      (chunk) => {
+        fullText += chunk;
+        setAnalysis(fullText);
+        const html = marked.parse(fullText.slice(0, 500) + '...') as string;
+        setAnalysisHtml(html);
+      },
+      () => {
+        setIsLoading(false);
+        setHasAnalysis(true);
+      },
+      (error) => {
+        setIsLoading(false);
+        setAnalysis(`Error generating analysis: ${error}`);
+        setAnalysisHtml(`Error generating analysis: ${error}`);
+        setHasAnalysis(true);
+      }
+    );
+  };
+
+  useEffect(() => {
+    if (user && !hasAnalysis && !isLoading) {
+      generateAnalysis();
+    }
+  }, [user]);
+
+  const getQuickInsight = async () => {
+    if (!user) return null;
+
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const transactions = await transactionApi.getTransactions(user.id);
+    const monthlyTransactions = transactions.filter(t => t.transaction_date.startsWith(currentMonth));
+    
+    const totalIncome = monthlyTransactions
+      .filter(t => t.transaction_type === 'income')
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const totalExpenses = monthlyTransactions
+      .filter(t => t.transaction_type === 'expense')
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome * 100) : 0;
+
+    if (savingsRate >= 20) {
+      return {
+        icon: <TrendingUp className="h-5 w-5 text-green-500" />,
+        text: `Great job! You're saving ${savingsRate.toFixed(1)}% of your income.`,
+        color: 'text-green-600',
+      };
+    } else if (savingsRate >= 10) {
+      return {
+        icon: <TrendingUp className="h-5 w-5 text-yellow-500" />,
+        text: `You're saving ${savingsRate.toFixed(1)}% of your income. Let's aim for 20%!`,
+        color: 'text-yellow-600',
+      };
+    } else {
+      return {
+        icon: <TrendingDown className="h-5 w-5 text-red-500" />,
+        text: `Your savings rate is ${savingsRate.toFixed(1)}%. AI can help you improve!`,
+        color: 'text-red-600',
+      };
+    }
+  };
+
+  const [quickInsight, setQuickInsight] = useState<{
+    icon: React.ReactElement;
+    text: string;
+    color: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (user) {
+      getQuickInsight().then(setQuickInsight);
+    }
+  }, [user]);
+
+  return (
+    <Card className="border-primary/20">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary" />
+            <CardTitle>AI Financial Insights</CardTitle>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate('/ai-analysis')}
+          >
+            View Details
+          </Button>
+        </div>
+        <CardDescription>
+          AI-powered analysis of your financial health
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {quickInsight && (
+          <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+            {quickInsight.icon}
+            <p className={`text-sm font-medium ${quickInsight.color}`}>
+              {quickInsight.text}
+            </p>
+          </div>
+        )}
+
+        {isLoading && (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <span className="ml-2 text-sm text-muted-foreground">
+              Analyzing your finances...
+            </span>
+          </div>
+        )}
+
+        {!isLoading && analysis && (
+          <div className="prose prose-sm max-w-none dark:prose-invert">
+            <div 
+              className="text-sm text-muted-foreground line-clamp-6"
+              dangerouslySetInnerHTML={{ __html: analysisHtml }}
+            />
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={generateAnalysis}
+            disabled={isLoading || !user}
+            className="flex-1"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Analyzing...
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-4 w-4 mr-2" />
+                Refresh Analysis
+              </>
+            )}
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => navigate('/ai-analysis')}
+            className="flex-1"
+          >
+            Full Report
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

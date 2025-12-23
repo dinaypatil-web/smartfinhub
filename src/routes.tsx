@@ -12,6 +12,7 @@ const Budgets = lazy(() => import('./pages/Budgets'));
 const Reports = lazy(() => import('./pages/Reports'));
 const Settings = lazy(() => import('./pages/Settings'));
 const BackupRestore = lazy(() => import('./pages/BackupRestore'));
+const AIAnalysisPage = lazy(() => import('./pages/AIAnalysisPage'));
 
 // Auth pages loaded immediately for faster initial access
 import Login from './pages/Login';
@@ -119,6 +120,13 @@ const routes: RouteConfig[] = [
     name: 'Reports',
     path: '/reports',
     element: <ProtectedRoute><Reports /></ProtectedRoute>,
+    visible: true,
+    protected: true,
+  },
+  {
+    name: 'AI Analysis',
+    path: '/ai-analysis',
+    element: <ProtectedRoute><AIAnalysisPage /></ProtectedRoute>,
     visible: true,
     protected: true,
   },
