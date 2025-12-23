@@ -250,19 +250,19 @@ export default function QuickLinks({ countryCode, accounts = [] }: QuickLinksPro
                           <img 
                             src={bank.logo} 
                             alt={`${bank.name} logo`}
-                            className="h-8 w-8 object-contain rounded"
+                            className="h-8 w-8 object-contain rounded flex-shrink-0"
                           />
                         ) : (
-                          <Building2 className="h-8 w-8 text-muted-foreground" />
+                          <Building2 className="h-8 w-8 text-muted-foreground flex-shrink-0" />
                         )}
-                        <span className="font-semibold text-sm break-words line-clamp-2 flex-1">{bank.name}</span>
+                        <span className="font-semibold text-sm break-words flex-1 text-left">{bank.name}</span>
                         {hasLink ? (
-                          <ExternalLink className="h-3 w-3 ml-auto opacity-50 flex-shrink-0" />
+                          <ExternalLink className="h-3 w-3 opacity-50 flex-shrink-0" />
                         ) : (
-                          <span className="text-xs text-muted-foreground ml-auto flex-shrink-0">⚙️</span>
+                          <span className="text-xs text-muted-foreground flex-shrink-0">⚙️</span>
                         )}
                       </div>
-                      <p className="text-xs text-muted-foreground text-left w-full break-words">
+                      <p className="text-xs text-muted-foreground text-left w-full break-words whitespace-normal">
                         {linkLabel}
                       </p>
                     </Button>
@@ -299,15 +299,15 @@ export default function QuickLinks({ countryCode, accounts = [] }: QuickLinksPro
                         <img 
                           src={app.logoUrl} 
                           alt={`${app.name} logo`}
-                          className="h-8 w-8 object-contain rounded"
+                          className="h-8 w-8 object-contain rounded flex-shrink-0"
                         />
                       ) : (
-                        <span className="text-2xl">{app.icon}</span>
+                        <span className="text-2xl flex-shrink-0">{app.icon}</span>
                       )}
-                      <span className="font-semibold text-sm break-words line-clamp-2 flex-1">{app.name}</span>
-                      <ExternalLink className="h-3 w-3 ml-auto opacity-50 flex-shrink-0" />
+                      <span className="font-semibold text-sm break-words flex-1 text-left">{app.name}</span>
+                      <ExternalLink className="h-3 w-3 opacity-50 flex-shrink-0" />
                     </div>
-                    <p className="text-xs text-muted-foreground text-left w-full break-words">
+                    <p className="text-xs text-muted-foreground text-left w-full break-words whitespace-normal">
                       {app.description}
                     </p>
                   </Button>
