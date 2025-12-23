@@ -144,7 +144,7 @@ export default function Reports() {
       transfers,
       loanPayments,
       creditCardRepayments,
-      netPosition: income - expenses,
+      netPosition: income - expenses - loanPayments,
       totalTransactions: filtered.length,
     };
   };

@@ -671,7 +671,7 @@ export const budgetApi = {
       .reduce((sum, t) => sum + Number(t.amount), 0);
 
     const actual_expenses = transactions
-      .filter(t => t.transaction_type === 'expense')
+      .filter(t => t.transaction_type === 'expense' || t.transaction_type === 'loan_payment')
       .reduce((sum, t) => sum + Number(t.amount), 0);
 
     // Fetch categories to map ID to name
@@ -685,7 +685,7 @@ export const budgetApi = {
       if (!categoryName) continue;
       
       const actual = transactions
-        .filter(t => t.category === categoryName && t.transaction_type === 'expense')
+        .filter(t => t.category === categoryName && (t.transaction_type === 'expense' || t.transaction_type === 'loan_payment'))
         .reduce((sum, t) => sum + Number(t.amount), 0);
       
       category_analysis[categoryId] = {
@@ -776,7 +776,7 @@ export const budgetApi = {
 
     const transactions = await transactionApi.getTransactionsByDateRange(userId, startDate, endDate);
     const spent = transactions
-      .filter(t => t.category === categoryName && t.transaction_type === 'expense')
+      .filter(t => t.category === categoryName && (t.transaction_type === 'expense' || t.transaction_type === 'loan_payment'))
       .reduce((sum, t) => sum + Number(t.amount), 0);
 
     return {

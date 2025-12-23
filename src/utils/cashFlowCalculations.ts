@@ -72,6 +72,7 @@ export function calculateMonthExpenses(
       transactionDate <= today &&
       (t.transaction_type === 'expense' || 
        t.transaction_type === 'withdrawal' ||
+       t.transaction_type === 'loan_payment' ||
        t.category === 'Expense')
     );
   });
