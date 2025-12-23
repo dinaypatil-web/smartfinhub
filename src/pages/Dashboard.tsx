@@ -122,8 +122,8 @@ export default function Dashboard() {
       setSummary(summaryData);
       setRecentTransactions(transactions);
       
-      // Filter only expense transactions for the chart
-      const expenses = monthExpenses.filter(t => t.transaction_type === 'expense');
+      // Filter expense and loan payment transactions for the chart
+      const expenses = monthExpenses.filter(t => t.transaction_type === 'expense' || t.transaction_type === 'loan_payment');
       setAllExpenses(expenses);
       
       // Cache the basic data

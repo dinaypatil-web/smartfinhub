@@ -50,7 +50,7 @@ export default function AIAnalysisPage() {
       .reduce((sum, t) => sum + t.amount, 0);
 
     const totalExpenses = monthlyTransactions
-      .filter(t => t.transaction_type === 'expense')
+      .filter(t => t.transaction_type === 'expense' || t.transaction_type === 'loan_payment')
       .reduce((sum, t) => sum + t.amount, 0);
 
     const currentBudget = budgets.find(b => b.month === currentMonth && b.year === currentYear);
@@ -97,7 +97,7 @@ export default function AIAnalysisPage() {
       .reduce((sum, t) => sum + t.amount, 0);
 
     const totalExpenses = monthlyTransactions
-      .filter(t => t.transaction_type === 'expense')
+      .filter(t => t.transaction_type === 'expense' || t.transaction_type === 'loan_payment')
       .reduce((sum, t) => sum + t.amount, 0);
 
     const currentBudget = budgets.find(b => b.month === currentMonth && b.year === currentYear);

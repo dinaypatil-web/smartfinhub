@@ -45,7 +45,7 @@ export default function AIInsights() {
       .reduce((sum, t) => sum + t.amount, 0);
 
     const totalExpenses = monthlyTransactions
-      .filter(t => t.transaction_type === 'expense')
+      .filter(t => t.transaction_type === 'expense' || t.transaction_type === 'loan_payment')
       .reduce((sum, t) => sum + t.amount, 0);
 
     const currentBudget = budgets.find(b => b.month === currentMonth && b.year === currentYear);
@@ -125,7 +125,7 @@ export default function AIInsights() {
       .reduce((sum, t) => sum + t.amount, 0);
 
     const totalExpenses = monthlyTransactions
-      .filter(t => t.transaction_type === 'expense')
+      .filter(t => t.transaction_type === 'expense' || t.transaction_type === 'loan_payment')
       .reduce((sum, t) => sum + t.amount, 0);
 
     const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome * 100) : 0;
