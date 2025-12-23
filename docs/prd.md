@@ -147,19 +147,23 @@ A comprehensive financial management web application designed for tracking and m
 - Automatic monthly interest calculation uses current applicable interest rate
 \n#### 2.2.6 Account Modification\n- Edit any account information at any time
 - Delete accounts with user confirmation
-\n### 2.3 Transaction Management
-
-#### 2.3.1 Transaction Types\n- Income transactions
-- Expense transactions\n- Cash withdrawals (from bank account or credit card)
+\n### 2.3 Transaction Management\n
+#### 2.3.1 Transaction Types
+- Income transactions\n- Expense transactions
+- Cash withdrawals (from bank account or credit card)
 - Bank-to-bank transfers
-- Loan payments
+- Loan payment transactions (treated as expenses)
 - **Credit card repayment transactions**
 - System-generated interest additions (for loan accounts)
 \n#### 2.3.2 Transaction Processing Logic
 - **Credit card accounts displayed as negative balances (liabilities)**
 - **Expense transactions from credit card increase card balance (more negative, higher liability)**
 - **Cash withdrawals from credit card increase card balance (more negative, higher liability)**
-- Loan accounts displayed as negative balances\n- Payments to loan accounts decrease loan balance (less negative)\n- **Credit Card Repayment Transaction**: New transaction type for paying credit card bills
+- Loan accounts displayed as negative balances\n- **Loan Payment Transactions**: Treated as expense transactions
+- During loan payment transaction entry, system automatically selects 'Loan Repayments' expense budget category by default
+- User can change budget category if needed, but default selection is 'Loan Repayments'\n- Loan payment transactions decrease loan balance (less negative)\n- All loan payment transactions automatically reflected in payment history on loan account page
+- Loan account page displays complete payment history including date, amount, and transaction details for all loan payments
+- **Credit Card Repayment Transaction**: New transaction type for paying credit card bills
   - User selects source bank account from which repayment is made
   - User selects target credit card account being paid
   - User enters repayment amount
@@ -199,6 +203,7 @@ A comprehensive financial management web application designed for tracking and m
 - Edit any transaction record\n- Delete transactions with automatic balance recalculation
 - System-generated interest transactions cannot be edited or deleted by user
 - Credit card repayment transactions can be edited or deleted with automatic recalculation of both bank and credit card balances
+- Loan payment transactions can be edited or deleted with automatic recalculation of loan balance and payment history update
 \n### 2.4 Dashboard Display
 
 #### 2.4.1 Tab-Based Dashboard Structure
@@ -223,7 +228,8 @@ A comprehensive financial management web application designed for tracking and m
 \n#### 2.4.3 Monthly Cash Flow Projection (Cash Flow Tab)
 - **Opening Balance Display**: Dashboard shows combined opening balance of Cash and Bank accounts for current month
 - **Income Transactions Addition**: System adds all income transactions recorded from start of month till current date to opening balance
-- **Month-to-Date Expenses Deduction**: System deducts all expenses incurred from start of month till current date\n- **Remaining Budget Deduction**: System deducts remaining budgeted expenses for the month (total monthly expense budget minus expenses already incurred)
+- **Month-to-Date Expenses Deduction**: System deducts all expenses incurred from start of month till current date (including loan payment transactions)
+- **Remaining Budget Deduction**: System deducts remaining budgeted expenses for the month (total monthly expense budget minus expenses already incurred)
 - **Expected Balance Calculation**: System calculates and displays expected balance after accounting for income received and remaining budgeted expenses
 - **Credit Card Dues Breakdown**: System displays upcoming credit card payment due amounts separately for each credit card account:\n  - Identifies the next upcoming due date for each credit card
   - Shows credit card name/bank with logo
@@ -231,13 +237,13 @@ A comprehensive financial management web application designed for tracking and m
   - Shows payment due amount for each card separately
   - Lists all credit cards with upcoming dues in chronological order by due date
   - Deducts each credit card due amount individually from expected balance
-- **Final Projected Balance**: Dashboard prominently displays final projected balance showing expected cash and bank account balance after all income, planned expenses and all credit card payments\n- Calculation formula: Opening Balance + Income Till Date - Expenses Till Date - Remaining Budget - (Sum of All Individual Credit Card Due Amounts) = Final Projected Balance
+- **Final Projected Balance**: Dashboard prominently displays final projected balance showing expected cash and bank account balance after all income, planned expenses and all credit card payments\n- Calculation formula: Opening Balance + Income Till Date - Expenses Till Date (including loan payments) - Remaining Budget - (Sum of All Individual Credit Card Due Amounts) = Final Projected Balance
 - Visual indicator showing positive (green) or negative (red) projected balance
 - Breakdown view available showing each component of the calculation including individual credit card dues
 
 #### 2.4.4 Visual Analytics (Analytics Tab)
 - 3D pie chart showing Cash and Bank Account balance distribution
-- 3D pie chart showing Expenses breakdown by category
+- 3D pie chart showing Expenses breakdown by category (including Loan Repayments category)
 - Line chart displaying Floating Interest Rate history for loan accounts
 \n#### 2.4.5 Account Display Cards (Overview Tab & Accounts Tab)
 - Bank or financial institution logo\n- Account type indicator\n- Last 4 digits of account number only\n- Real-time current balance\n- **Quick Access Buttons**: Each account card displays:
@@ -257,20 +263,17 @@ A comprehensive financial management web application designed for tracking and m
 \n#### 2.4.6 Account Quick View (Accounts Tab)
 - **Click-to-View Statement**: When user clicks on any account card on dashboard, system displays popup window showing last 90 days statement for that account
 - Popup includes transaction history, balance changes, and account activity for the 90-day period
-- **For loan accounts**: Popup displays detailed EMI payment history with principal and interest breakdown for each payment within the 90-day period, including automatic monthly interest additions
-- **For credit card accounts**: Popup displays all transactions including expenses, withdrawals, and repayment transactions for the 90-day period
-- Statement popup available for all account types: Cash, Bank, Credit Card, and Loan accounts
+- **For loan accounts**: Popup displays detailed payment history including all loan payment transactions with date, amount, and transaction details for the 90-day period, plus EMI payment history with principal and interest breakdown, and automatic monthly interest additions
+- **For credit card accounts**: Popup displays all transactions including expenses, withdrawals, and repayment transactions for the 90-day period\n- Statement popup available for all account types: Cash, Bank, Credit Card, and Loan accounts
 - Close button to dismiss popup and return to dashboard
 
 ### 2.5 Budget Management
 - **Income Budget Categories**: Input monthly budgeted income amounts by category:\n  - Salaries\n  - Allowances
   - Family Income
-  - Others
-- **Expense Budget Categories**: Input monthly budgeted expense amounts by category including:
+  - Others\n- **Expense Budget Categories**: Input monthly budgeted expense amounts by category including:
   - Standard expense categories (Food, Transportation, Entertainment, Shopping, etc.)
-  - Loan Repayments
-  - Credit Card Repayment
-- Compare actual expenses against budgeted amounts
+  - Loan Repayments (default category for loan payment transactions)
+  - Credit Card Repayment\n- Compare actual expenses against budgeted amounts
 - Display budget variance (over/under budget) on dashboard
 - Monthly budget tracking and analysis
 - Editing or saving budget automatically triggers immediate update of Budget vs. Actual analysis
@@ -278,10 +281,9 @@ A comprehensive financial management web application designed for tracking and m
 - Updated Budget vs. Actual analysis immediately reflected on dashboard and reports
 - System recalculates remaining budget for each category after budget modification
 \n### 2.6 AI-Powered Financial Intelligence
-
-#### 2.6.1 AI Transaction Analysis
+\n#### 2.6.1 AI Transaction Analysis
 - **Automated Transaction Pattern Recognition**: AI engine continuously analyzes all user transactions across all accounts to identify spending patterns, recurring expenses, and financial behavior trends
-- **Category-Wise Spending Analysis**: AI breaks down expenses by budget categories and identifies which categories consistently exceed or stay within budget limits
+- **Category-Wise Spending Analysis**: AI breaks down expenses by budget categories (including Loan Repayments) and identifies which categories consistently exceed or stay within budget limits
 - **Temporal Spending Patterns**: AI detects spending patterns based on time periods (weekly, monthly, seasonal) to identify high-spending periods and low-spending periods
 - **Merchant and Vendor Analysis**: AI identifies frequently used merchants and vendors, analyzing spending concentration and suggesting alternatives if cost-saving opportunities exist
 - **Anomaly Detection**: AI flags unusual or unexpected transactions that deviate significantly from user's normal spending patterns for review
@@ -329,20 +331,22 @@ A comprehensive financial management web application designed for tracking and m
 - Income and expense summary reports
 - Account balance reports across all accounts
 - Budget vs. actual analysis reports
-- **Credit Card Monthly Statement Report**: Reports section includes credit card statement view with month selector
-- User selects specific month from dropdown to view credit card statement for that period
+- **Credit Card Monthly Statement Report**: Reports section includes credit card statement view with month selector\n- User selects specific month from dropdown to view credit card statement for that period
 - Statement displays all transactions, payments, repayments, EMI installments, interest charges, and balance for selected month
 - Statement shows opening balance, closing balance, total spending, repayments made, and payment due information
 - **EMI Transaction Reports**: Detailed reports showing all EMI transactions, payment schedules, and outstanding balances
 - **Credit Card Repayment Reports**: Detailed reports showing all credit card repayment transactions with source bank account, target credit card, repayment amount, and date
-- **Loan Account Statement Report**: Comprehensive loan statement report included in Reports section showing:\n  - **Historical EMI Payments**: Complete record of all EMI payments already made with:\n    - Payment date for each EMI
+- **Loan Account Statement Report**: Comprehensive loan statement report included in Reports section showing:\n  - **Historical Loan Payments**: Complete record of all loan payment transactions with:\n    - Payment date for each transaction
+    - Payment amount\n    - Transaction details and reference\n  - **Historical EMI Payments**: Complete record of all EMI payments already made with:
+    - Payment date for each EMI
     - Total EMI amount paid
     - Principal payment component (including user corrections)
     - Interest payment component (including user corrections)
     - Outstanding principal balance after each payment
   - **Automatic Monthly Interest Additions**: Complete record of all system-generated monthly interest transactions with:
     - Interest calculation date
-    - Interest amount added\n    - Outstanding balance after interest addition
+    - Interest amount added
+    - Outstanding balance after interest addition
     - Interest rate applied for calculation
   - **Future EMI Payments**: Scheduled upcoming EMI payments with:
     - Projected payment dates
@@ -353,13 +357,13 @@ A comprehensive financial management web application designed for tracking and m
   - Cumulative interest paid to date
   - Total accrued interest\n  - Remaining loan tenure
   - Complete amortization schedule showing full loan lifecycle
-- **AI Insights Report**: Comprehensive report summarizing all AI-generated recommendations, implemented actions, and their financial impact over selected time period
+- **Loan Payment Transaction Reports**: Detailed reports showing all loan payment transactions categorized under'Loan Repayments' expense budget category, with date, amount, and payment history\n- **AI Insights Report**: Comprehensive report summarizing all AI-generated recommendations, implemented actions, and their financial impact over selected time period
 - Date range filter for loan statement reports
 - Export reports functionality\n
 ### 2.8 Data Backup and Restore
 - **Backup Functionality**: User can create complete backup of all application data at any time
 - Backup includes:\n  - All account information (Cash, Bank, Credit Card, Loan accounts)
-  - Complete transaction history for all accounts
+  - Complete transaction history for all accounts (including loan payment transactions)
   - Budget settings and historical budget data
   - User preferences and settings
   - EMI payment history and configurations
@@ -390,7 +394,8 @@ A comprehensive financial management web application designed for tracking and m
 - Encryption performed using Web Crypto API in user's browser
 - **Server Stores Only Encrypted Data**: Server database contains only encrypted ciphertext and cannot decrypt any user information
 - Application creator, system administrators, and database administrators have zero access to user's decrypted financial data
-- **Client-Side Decryption for Display**: When user logs in and views dashboard or reports:\n  - Encrypted data retrieved from server\n  - Decryption performed entirely in user's browser using user's encryption key
+- **Client-Side Decryption for Display**: When user logs in and views dashboard or reports:\n  - Encrypted data retrieved from server
+  - Decryption performed entirely in user's browser using user's encryption key
   - Decrypted data rendered on user interface without server involvement
   - Decrypted data never leaves user's device
 - **Seamless User Experience**: Encryption and decryption processes transparent to user, with no impact on interface responsiveness or data display
@@ -471,8 +476,7 @@ A comprehensive financial management web application designed for tracking and m
 - Primary color: Deep blue (#1E3A8A) conveying trust and financial stability
 - Secondary color: Emerald green (#10B981) for positive balances and income indicators
 - Accent color: Amber (#F59E0B) for alerts and important notifications
-- Negative indicator: Coral red (#EF4444) for liabilities and overspending
-- AI Insights color: Purple (#8B5CF6) for AI-generated recommendations and insights
+- Negative indicator: Coral red (#EF4444) for liabilities and overspending\n- AI Insights color: Purple (#8B5CF6) for AI-generated recommendations and insights
 
 ### 3.2 Visual Details
 - Card-based layout with subtle drop shadows for depth
@@ -498,6 +502,6 @@ A comprehensive financial management web application designed for tracking and m
 - AI Insights tab features scrollable card layout with categorized recommendations
 \n## 4. Reference Links
 - MojoAuth OTP Authentication Service: https://mojoauth.com\n\n## 5. Reference Images
-- IMG_7777.jpeg: Banking app selection interface showing system's ability to detect and redirect to appropriate app store based on device type\n- IMG_7805.png: SmartFinHub dashboard overview showing financial summary and account cards with quick access buttons
+- IMG_7805.png: SmartFinHub dashboard overview showing financial summary and account cards with quick access buttons
 - IMG_7806.jpeg: Bank app quick access section displaying ICICI Bank and Bank of Baroda app links with'Open banking app' buttons
 - IMG_7807.jpeg: Quick Payment Apps section showing Google Pay, PhonePe, Paytm, and BHIM payment app integration with descriptions and quick launch buttons
