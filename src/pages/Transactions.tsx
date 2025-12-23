@@ -10,6 +10,7 @@ import { formatCurrency, formatDate } from '@/utils/format';
 import { Plus, Edit, Trash2, ArrowUpRight, ArrowDownRight, ArrowLeftRight } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
+import { cache } from '@/utils/cache';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -70,6 +71,10 @@ export default function Transactions() {
 
     try {
       await transactionApi.deleteTransaction(transactionToDelete.id);
+      
+      // Clear dashboard cache to reflect deleted transaction
+      cache.clearPattern('dashboard-');
+      
       toast({
         title: 'Success',
         description: 'Transaction deleted successfully',
