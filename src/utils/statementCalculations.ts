@@ -31,6 +31,27 @@ export function getStatementPeriod(statementDay: number, referenceDate: Date = n
 
 /**
  * Calculate the statement amount for a credit card
+ * 
+ * IMPORTANT: This calculates the amount that is CURRENTLY DUE for payment,
+ * which is based on the LAST COMPLETED statement period.
+ * 
+ * Credit Card Billing Cycle Logic:
+ * - Statement Date (e.g., 13th): Bank generates statement for transactions from last statement to this date
+ * - Due Date (e.g., 30th): Payment for the statement is due
+ * - Transactions AFTER the statement date go into the NEXT billing cycle
+ * 
+ * Example with statement_day=13, due_day=30:
+ * - Today is Dec 23 (after statement date)
+ *   → Statement was generated on Dec 13
+ *   → Shows transactions from Nov 13 to Dec 13
+ *   → Due on Dec 30
+ *   → Transaction on Dec 23 will be in NEXT statement (Jan 13) and due on Jan 30
+ * 
+ * - Today is Dec 10 (before statement date)
+ *   → Statement will be generated on Dec 13
+ *   → Shows transactions from Oct 13 to Nov 13 (previous statement)
+ *   → Due on Nov 30
+ * 
  * Includes:
  * - Transactions between last statement day and current statement day
  * - EMI installments due for this statement period
@@ -51,18 +72,25 @@ export function calculateCreditCardStatementAmount(
 } {
   const { lastStatementDate, currentStatementDate, isAfterStatementDate } = getStatementPeriod(statementDay, referenceDate);
 
-  // If we haven't reached the statement date yet, use previous period
+  // Calculate the statement period that is currently due for payment
+  // The due amount always represents transactions from the LAST completed statement period
   let periodStart: Date;
   let periodEnd: Date;
   
   if (isAfterStatementDate) {
-    // We're after the statement date, so calculate for current period
-    periodStart = currentStatementDate;
-    periodEnd = new Date(currentStatementDate.getFullYear(), currentStatementDate.getMonth() + 1, statementDay);
-  } else {
-    // We're before the statement date, so use last period
+    // We're after the statement date, so the statement was already generated
+    // Show the amount from the last completed period (which is now due for payment)
+    // Example: Today is Dec 23, statement date is Dec 13
+    // Period: Nov 13 to Dec 13 (due on Dec 30)
     periodStart = lastStatementDate;
     periodEnd = currentStatementDate;
+  } else {
+    // We're before the statement date, so we're still in the current billing cycle
+    // Show the amount from the previous period (which is currently due)
+    // Example: Today is Dec 10, statement date is Dec 13
+    // Period: Oct 13 to Nov 13 (due on Nov 30)
+    periodStart = new Date(lastStatementDate.getFullYear(), lastStatementDate.getMonth() - 1, statementDay);
+    periodEnd = lastStatementDate;
   }
 
   // Get all transactions for this credit card in the statement period
@@ -173,7 +201,13 @@ export function isDueDatePassed(statementDay: number, dueDay: number, referenceD
 }
 
 /**
- * Check if we should display the due amount (only after statement date)
+ * Check if we should display the due amount
+ * Returns true after the statement date has passed (statement has been generated)
+ * 
+ * Example: If statement date is 13th
+ * - On Dec 10: returns false (statement not yet generated)
+ * - On Dec 13: returns true (statement generated, showing amount due on Dec 30)
+ * - On Dec 23: returns true (statement generated, showing amount due on Dec 30)
  */
 export function shouldDisplayDueAmount(statementDay: number, referenceDate: Date = new Date()): boolean {
   const { isAfterStatementDate } = getStatementPeriod(statementDay, referenceDate);
