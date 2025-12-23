@@ -29,8 +29,7 @@ A comprehensive financial management web application designed for tracking and m
 - **No Third-Party Dependency**: Email verification system built into application without relying on external authentication services
 - Application uses its own SMTP server configuration to send verification emails
 - Verified email address serves as username for secure login
-
-#### 1.3.3 Password Recovery\n- **Forgot Password Option**: Forgot password link displayed on login page (applicable only for email-based accounts)
+\n#### 1.3.3 Password Recovery\n- **Forgot Password Option**: Forgot password link displayed on login page (applicable only for email-based accounts)
 - Password reset via email verification code
 - User receives6-digit verification code to registered email address
 - After entering valid verification code, user can set new password
@@ -61,14 +60,25 @@ A comprehensive financial management web application designed for tracking and m
 - Bank or financial institution selection based on chosen country
 - **Complete bank name list available in dropdown for all supported countries**
 - Dropdown includes all major banks and financial institutions for selected country
-- **For India**: Bank selection page includes'BOB World: Banking & Experience' app link for Bank of Baroda customers
-- **Smart App Store Redirection**: When user clicks'Open App' button for bank/financial institution mobile app:\n  - System automatically detects user's mobile device operating system
+- **Automatic Bank App/Website Link Fetching**: When user selects a bank or financial institution during account creation or editing, system automatically fetches official mobile app links and website URLs for that institution from internet sources
+- System retrieves both Android app (Google Play Store) link and iOS app (Apple App Store) link for the selected bank
+- System also fetches official website URL for the bank or financial institution
+- Fetched links stored in account profile and displayed on account pages and dashboard
+- **Quick Link Display on Account Cards**: Each bank, credit card, and loan account card on dashboard displays quick access buttons:\n  - 'Open App' button: Opens bank's mobile application
+  - 'Visit Website' button: Opens bank's official website in new browser tab
+- **Smart App Store Redirection**: When user clicks 'Open App' button:\n  - System automatically detects user's mobile device operating system
   - For Android devices: Redirects to Google Play Store app page
   - For iOS devices: Redirects to Apple App Store app page
+  - For desktop browsers: Displays QR code for mobile app download or redirects to web version if available
   - Seamless redirection without manual app store selection
-  - Works for all bank and financial institution app links throughout the application
+- **Website Quick Access**: When user clicks 'Visit Website' button, system opens bank's official website in new browser tab
+- Quick links available for all bank accounts, credit card accounts, and loan accounts
+- **Link Validation and Updates**: System periodically validates fetched links to ensure they remain active and accurate
+- Automatic link refresh if broken or outdated links detected
+- **For India**: Bank selection page includes 'BOB World: Banking & Experience' app link for Bank of Baroda customers
 - Display bank/financial institution logo on account pages and dashboard
-- Manual bank name entry option if institution not listed\n- **Automatic Logo Fetching**: When bank/loan/credit card account logo is not available in the system database during account creation or editing, automatically fetch the logo from internet sources
+- Manual bank name entry option if institution not listed
+- **Automatic Logo Fetching**: When bank/loan/credit card account logo is not available in the system database during account creation or editing, automatically fetch the logo from internet sources
 - Fetched logos displayed on both account pages and dashboard
 - System caches fetched logos for future use
 - Optional account number entry (only last 4 digits visible on dashboard)
@@ -137,13 +147,12 @@ A comprehensive financial management web application designed for tracking and m
 - **EMI Recalculation on Rate Change**: When floating interest rate is updated, system recalculates principal and interest components for all subsequent EMI payments
 - Updated interest breakdown reflected in loan account statement
 - Automatic monthly interest calculation uses current applicable interest rate
-\n#### 2.2.6 Account Modification
-- Edit any account information at any time
+\n#### 2.2.6 Account Modification\n- Edit any account information at any time
 - Delete accounts with user confirmation
 \n### 2.3 Transaction Management\n
 #### 2.3.1 Transaction Types
-- Income transactions
-- Expense transactions\n- Cash withdrawals (from bank account or credit card)
+- Income transactions\n- Expense transactions
+- Cash withdrawals (from bank account or credit card)
 - Bank-to-bank transfers
 - Loan payments
 - **Credit card repayment transactions**
@@ -171,8 +180,7 @@ A comprehensive financial management web application designed for tracking and m
 - Interest transaction marked as system-generated and non-editable by user
 - All loan account transactions considered in monthly interest calculation
 \n#### 2.3.3 Credit Card Transaction with EMI Option
-- **EMI Payment Option**: During credit card transaction entry, system prompts user to select payment method\n- Payment options: Full Payment or EMI (Equated Monthly Installment)
-- **EMI Configuration**: If EMI option selected, user provides:
+- **EMI Payment Option**: During credit card transaction entry, system prompts user to select payment method\n- Payment options: Full Payment or EMI (Equated Monthly Installment)\n- **EMI Configuration**: If EMI option selected, user provides:
   - EMI Duration: Number of months for installment plan
   - Bank EMI Charges: Processing fee or interest charges applied by bank
 - **EMI Calculation**: System automatically calculates monthly EMI amount based on transaction amount, duration, and bank charges
@@ -194,7 +202,8 @@ A comprehensive financial management web application designed for tracking and m
 - System-generated interest transactions cannot be edited or deleted by user
 - Credit card repayment transactions can be edited or deleted with automatic recalculation of both bank and credit card balances
 \n### 2.4 Dashboard Display
-\n#### 2.4.1 Tab-Based Dashboard Structure
+
+#### 2.4.1 Tab-Based Dashboard Structure
 - **Dashboard organized into multiple tabs for better content organization and navigation**
 - **Tab 1 - Overview**: Financial summary and account cards
 - **Tab 2 - Analytics**: Visual charts including pie charts for balance distribution and expense breakdown, line charts for interest rate history\n- **Tab 3 - Cash Flow**: Monthly cash flow projection with opening balance, income, expenses, and credit card dues breakdown
@@ -203,7 +212,8 @@ A comprehensive financial management web application designed for tracking and m
 - Active tab highlighted with visual indicator
 - Each tab loads relevant content dynamically
 - Tab selection persists during user session
-\n#### 2.4.2 Financial Summary (Overview Tab)
+
+#### 2.4.2 Financial Summary (Overview Tab)
 - Current Assets: Sum of Cash and Bank Account balances
 - Current Liabilities: Sum of Credit Card balances only
 - Liquid Assets: Sum of Cash and Bank Account balances
@@ -230,7 +240,11 @@ A comprehensive financial management web application designed for tracking and m
 - 3D pie chart showing Cash and Bank Account balance distribution\n- 3D pie chart showing Expenses breakdown by category
 - Line chart displaying Floating Interest Rate history for loan accounts
 \n#### 2.4.5 Account Display Cards (Overview Tab & Accounts Tab)
-- Bank or financial institution logo\n- Account type indicator\n- Last 4 digits of account number only\n- Real-time current balance\n- For loan accounts: Total accrued interest till date including automatic monthly interest additions
+- Bank or financial institution logo\n- Account type indicator\n- Last 4 digits of account number only\n- Real-time current balance\n- **Quick Access Buttons**: Each account card displays:
+  - 'Open App' button with bank's mobile app icon
+  - 'Visit Website' button with globe icon
+  - Buttons prominently positioned on account card for easy access
+- For loan accounts: Total accrued interest till date including automatic monthly interest additions
 - **For credit card accounts**:
   - Display next statement date and payment due date as reminders
   - Show user-defined credit limit
@@ -263,8 +277,7 @@ A comprehensive financial management web application designed for tracking and m
 - Real-time recalculation of budget variance when budget values are modified
 - Updated Budget vs. Actual analysis immediately reflected on dashboard and reports
 - System recalculates remaining budget for each category after budget modification
-\n### 2.6 Reporting
-- Transaction history reports with date range filters
+\n### 2.6 Reporting\n- Transaction history reports with date range filters
 - Income and expense summary reports
 - Account balance reports across all accounts
 - Budget vs. actual analysis reports
@@ -367,7 +380,7 @@ A comprehensive financial management web application designed for tracking and m
 - **Audit Trail**: System maintains encrypted audit log of all data access attempts
 - Log records user authentication events, data access timestamps, and IP addresses
 - Audit logs accessible only to authenticated user for their own account
-- Failed login attempts logged and trigger account lockout after5 consecutive failures
+- Failed login attempts logged and trigger account lockout after 5 consecutive failures
 - Audit logs encrypted and cannot reveal user's financial data
 
 #### 2.8.7 Backup File Encryption
@@ -418,6 +431,7 @@ A comprehensive financial management web application designed for tracking and m
 - Smooth tab switching animations for better user experience
 - Security indicators (lock icons and 'Zero-Knowledge Encrypted' badges) displayed prominently to reinforce data protection
 - Visual encryption status indicators on dashboard showing data is protected
+- Quick access buttons ('Open App' and 'Visit Website') styled with clear icons and hover effects for easy identification
 
 ### 3.3 Layout Structure
 - Grid-based dashboard for account cards with responsive columns
@@ -427,5 +441,6 @@ A comprehensive financial management web application designed for tracking and m
 - Clear visual hierarchy with prominent balance displays and chart visualizations
 - Sticky header for easy navigation access
 \n## 4. Reference Links
-- MojoAuth OTP Authentication Service: https://mojoauth.com\n\n## 5. Reference Images
+- MojoAuth OTP Authentication Service: https://mojoauth.com
+\n## 5. Reference Images
 - IMG_7777.jpeg: Banking app selection interface showing system's ability to detect and redirect to appropriate app store based on device type

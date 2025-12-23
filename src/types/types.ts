@@ -113,6 +113,33 @@ export interface CustomBankLink {
   updated_at: string;
 }
 
+export interface BankLink {
+  id: string;
+  bank_name: string;
+  country: string;
+  web_url: string | null;
+  ios_app_url: string | null;
+  android_app_url: string | null;
+  deep_link_ios: string | null;
+  deep_link_android: string | null;
+  logo_url: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserCustomBankLink {
+  id: string;
+  user_id: string;
+  account_id: string | null;
+  bank_name: string;
+  web_url: string | null;
+  ios_app_url: string | null;
+  android_app_url: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
 export interface AccountWithInterestHistory extends Account {
   interest_history?: InterestRateHistory[];
 }
