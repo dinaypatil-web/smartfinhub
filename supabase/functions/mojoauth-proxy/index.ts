@@ -67,7 +67,7 @@ serve(async (req) => {
         }
 
         // Send OTP via MojoAuth
-        mojoAuthResponse = await fetch(`${MOJOAUTH_BASE_URL}/oauth/otp/send`, {
+        mojoAuthResponse = await fetch(`${MOJOAUTH_BASE_URL}/users/otp/send`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -87,7 +87,7 @@ serve(async (req) => {
         }
 
         // Verify OTP via MojoAuth
-        mojoAuthResponse = await fetch(`${MOJOAUTH_BASE_URL}/oauth/otp/verify`, {
+        mojoAuthResponse = await fetch(`${MOJOAUTH_BASE_URL}/users/otp/verify`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -107,7 +107,7 @@ serve(async (req) => {
         }
 
         // Resend OTP via MojoAuth
-        mojoAuthResponse = await fetch(`${MOJOAUTH_BASE_URL}/oauth/otp/resend`, {
+        mojoAuthResponse = await fetch(`${MOJOAUTH_BASE_URL}/users/otp/resend`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
