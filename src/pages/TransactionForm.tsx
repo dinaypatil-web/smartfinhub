@@ -534,7 +534,8 @@ export default function TransactionForm() {
               <div className="space-y-2">
                 <Label htmlFor="to_account_id">
                   {formData.transaction_type === 'withdrawal' ? 'To Cash Account *' : 
-                   formData.transaction_type === 'credit_card_repayment' ? 'To Credit Card *' : 'To Account *'}
+                   formData.transaction_type === 'credit_card_repayment' ? 'To Credit Card *' : 
+                   formData.transaction_type === 'loan_payment' ? 'To Loan Account *' : 'To Account *'}
                 </Label>
                 <Select
                   value={formData.to_account_id}
@@ -552,6 +553,12 @@ export default function TransactionForm() {
                         ))
                       : formData.transaction_type === 'credit_card_repayment'
                       ? accounts.filter(a => a.account_type === 'credit_card').map(account => (
+                          <SelectItem key={account.id} value={account.id}>
+                            {account.account_name}
+                          </SelectItem>
+                        ))
+                      : formData.transaction_type === 'loan_payment'
+                      ? accounts.filter(a => a.account_type === 'loan').map(account => (
                           <SelectItem key={account.id} value={account.id}>
                             {account.account_name}
                           </SelectItem>
