@@ -8,11 +8,19 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, TrendingUp, TrendingDown, Plus, Trash2 } from 'lucide-react';
+import { Loader2, TrendingUp, TrendingDown, Plus, Trash2, Edit2 } from 'lucide-react';
 import { formatCurrency, getMonthName, getCurrentMonthYear } from '@/utils/format';
 import { Progress } from '@/components/ui/progress';
 import { INCOME_CATEGORIES } from '@/constants/incomeCategories';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 export default function Budgets() {
   const { user, profile } = useAuth();
@@ -33,6 +41,15 @@ export default function Budgets() {
     family_income: '',
     others: ''
   });
+  
+  // Custom category management state
+  const [showCategoryDialog, setShowCategoryDialog] = useState(false);
+  const [newCategory, setNewCategory] = useState({
+    name: '',
+    icon: '📁',
+    color: '#6B7280'
+  });
+  const [deletingCategory, setDeletingCategory] = useState<string | null>(null);
 
   const currency = profile?.default_currency || 'INR';
 
@@ -191,6 +208,78 @@ export default function Budgets() {
     }, 0);
   };
 
+  // Custom category management functions
+  const handleCreateCategory = async () => {
+    if (!user || !newCategory.name.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Please enter a category name',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      await categoryApi.createCategory({
+        user_id: user.id,
+        name: newCategory.name.trim(),
+        icon: newCategory.icon,
+        color: newCategory.color,
+        is_system: false
+      });
+
+      toast({
+        title: 'Success',
+        description: 'Category created successfully',
+      });
+
+      setShowCategoryDialog(false);
+      setNewCategory({ name: '', icon: '📁', color: '#6B7280' });
+      loadCategories();
+    } catch (error: any) {
+      console.error('Error creating category:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to create category',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDeleteCategory = async (categoryId: string) => {
+    if (!user) return;
+
+    try {
+      setDeletingCategory(categoryId);
+      await categoryApi.deleteCategory(categoryId);
+
+      toast({
+        title: 'Success',
+        description: 'Category deleted successfully',
+      });
+
+      // Remove from budget if it exists
+      setCategoryBudgets(prev => {
+        const newBudgets = { ...prev };
+        delete newBudgets[categoryId];
+        return newBudgets;
+      });
+
+      loadCategories();
+    } catch (error: any) {
+      console.error('Error deleting category:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to delete category',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeletingCategory(null);
+    }
+  };
+
+  const commonEmojis = ['📁', '💰', '🏠', '🚗', '🍔', '🎬', '🏥', '💡', '📚', '✈️', '🛍️', '📱', '⚡', '🎯', '💳', '🎁'];
+
   const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i);
   const months = Array.from({ length: 12 }, (_, i) => i + 1);
 
@@ -283,9 +372,20 @@ export default function Budgets() {
                 <TabsContent value="expenses" className="space-y-4 mt-4">
                   <div className="flex justify-between items-center">
                     <Label>Expense Categories</Label>
-                    <span className="text-sm text-muted-foreground">
-                      Total: {formatCurrency(getTotalCategoryBudgets(), currency)}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">
+                        Total: {formatCurrency(getTotalCategoryBudgets(), currency)}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowCategoryDialog(true)}
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add Category
+                      </Button>
+                    </div>
                   </div>
 
                   <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
@@ -295,6 +395,9 @@ export default function Budgets() {
                         <div className="flex-1">
                           <Label htmlFor={`category-${category.id}`} className="text-sm">
                             {category.name}
+                            {!category.is_system && (
+                              <span className="ml-2 text-xs text-muted-foreground">(Custom)</span>
+                            )}
                           </Label>
                         </div>
                         <Input
@@ -307,14 +410,19 @@ export default function Budgets() {
                           placeholder="0.00"
                           className="w-32"
                         />
-                        {categoryBudgets[category.id] && (
+                        {!category.is_system && (
                           <Button
                             type="button"
                             variant="ghost"
                             size="icon"
-                            onClick={() => removeCategoryBudget(category.id)}
+                            onClick={() => handleDeleteCategory(category.id)}
+                            disabled={deletingCategory === category.id}
                           >
-                            <Trash2 className="h-4 w-4" />
+                            {deletingCategory === category.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            )}
                           </Button>
                         )}
                       </div>
@@ -479,6 +587,77 @@ export default function Budgets() {
           </CardContent>
         </Card>
       )}
+
+      {/* Add Custom Category Dialog */}
+      <Dialog open={showCategoryDialog} onOpenChange={setShowCategoryDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Custom Category</DialogTitle>
+            <DialogDescription>
+              Create a new expense category for your budget tracking
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="category-name">Category Name *</Label>
+              <Input
+                id="category-name"
+                value={newCategory.name}
+                onChange={(e) => setNewCategory(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="e.g., Gym Membership"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Icon</Label>
+              <div className="grid grid-cols-8 gap-2">
+                {commonEmojis.map(emoji => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => setNewCategory(prev => ({ ...prev, icon: emoji }))}
+                    className={`text-2xl p-2 rounded hover:bg-muted transition-colors ${
+                      newCategory.icon === emoji ? 'bg-primary/10 ring-2 ring-primary' : ''
+                    }`}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="category-color">Color</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="category-color"
+                  type="color"
+                  value={newCategory.color}
+                  onChange={(e) => setNewCategory(prev => ({ ...prev, color: e.target.value }))}
+                  className="w-20 h-10"
+                />
+                <Input
+                  type="text"
+                  value={newCategory.color}
+                  onChange={(e) => setNewCategory(prev => ({ ...prev, color: e.target.value }))}
+                  placeholder="#6B7280"
+                  className="flex-1"
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCategoryDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreateCategory} disabled={!newCategory.name.trim()}>
+              Create Category
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
