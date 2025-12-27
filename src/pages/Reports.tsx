@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useHybridAuth as useAuth } from '@/contexts/HybridAuthContext';
-import { transactionApi, accountApi, emiApi } from '@/db/api';
-import type { Transaction, Account, EMITransaction } from '@/types/types';
+import { transactionApi, accountApi, emiApi, categoryApi } from '@/db/api';
+import type { Transaction, Account, EMITransaction, ExpenseCategory } from '@/types/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, Download, TrendingUp, TrendingDown, Calendar, CreditCard } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/utils/format';
 import { calculateTotalDueAmount, getBillingCycleInfo } from '@/utils/billingCycleCalculations';
+import { INCOME_CATEGORIES } from '@/constants/incomeCategories';
 import BankLogo from '@/components/BankLogo';
 
 export default function Reports() {
@@ -20,11 +21,14 @@ export default function Reports() {
   const [loading, setLoading] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [filters, setFilters] = useState({
     startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0],
     accountId: 'all',
     transactionType: 'all',
+    expenseCategory: 'all',
+    incomeCategory: 'all',
   });
   
   // Credit card statement state
@@ -73,12 +77,14 @@ export default function Reports() {
     
     setLoading(true);
     try {
-      const [transactionsData, accountsData] = await Promise.all([
+      const [transactionsData, accountsData, categoriesData] = await Promise.all([
         transactionApi.getTransactions(user.id),
         accountApi.getAccounts(user.id),
+        categoryApi.getCategories(user.id),
       ]);
       setTransactions(transactionsData);
       setAccounts(accountsData);
+      setCategories(categoriesData);
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
@@ -98,8 +104,16 @@ export default function Reports() {
         t.from_account_id === filters.accountId || 
         t.to_account_id === filters.accountId;
       const typeMatch = filters.transactionType === 'all' || t.transaction_type === filters.transactionType;
+      
+      // Category filters
+      const expenseCategoryMatch = filters.expenseCategory === 'all' || 
+        (t.transaction_type === 'expense' && t.category === filters.expenseCategory);
+      const incomeCategoryMatch = filters.incomeCategory === 'all' || 
+        (t.transaction_type === 'income' && t.income_category === filters.incomeCategory);
 
-      return dateMatch && accountMatch && typeMatch;
+      return dateMatch && accountMatch && typeMatch && 
+        (filters.expenseCategory === 'all' || expenseCategoryMatch) &&
+        (filters.incomeCategory === 'all' || incomeCategoryMatch);
     });
   };
 
@@ -321,6 +335,49 @@ export default function Reports() {
                   <SelectItem value="transfer">Transfer</SelectItem>
                   <SelectItem value="loan_payment">Loan Payment</SelectItem>
                   <SelectItem value="credit_card_repayment">Credit Card Repayment</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Category Filters */}
+          <div className="grid gap-4 md:grid-cols-2 mt-4">
+            <div className="space-y-2">
+              <Label htmlFor="expenseCategory">Expense Category</Label>
+              <Select
+                value={filters.expenseCategory}
+                onValueChange={(value) => setFilters({ ...filters, expenseCategory: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Expense Categories</SelectItem>
+                  {categories.map(category => (
+                    <SelectItem key={category.id} value={category.name}>
+                      {category.icon} {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="incomeCategory">Income Category</Label>
+              <Select
+                value={filters.incomeCategory}
+                onValueChange={(value) => setFilters({ ...filters, incomeCategory: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Income Categories</SelectItem>
+                  {INCOME_CATEGORIES.map(category => (
+                    <SelectItem key={category.key} value={category.key}>
+                      {category.icon} {category.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
