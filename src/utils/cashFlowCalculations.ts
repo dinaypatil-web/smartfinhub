@@ -56,25 +56,38 @@ export function calculateOpeningBalance(
 
 /**
  * Calculate total expenses incurred in the current month till date
+ * Excludes expenses paid through credit cards (those are shown in credit card dues)
  */
 export function calculateMonthExpenses(
   transactions: Transaction[],
+  accounts: Account[],
   month: number,
   year: number
 ): number {
   const monthStart = new Date(year, month - 1, 1);
   const today = new Date();
 
+  // Get all credit card account IDs
+  const creditCardAccountIds = new Set(
+    accounts
+      .filter(acc => acc.account_type === 'credit_card')
+      .map(acc => acc.id)
+  );
+
   const expenseTransactions = transactions.filter(t => {
     const transactionDate = new Date(t.transaction_date);
-    return (
-      transactionDate >= monthStart &&
-      transactionDate <= today &&
-      (t.transaction_type === 'expense' || 
-       t.transaction_type === 'withdrawal' ||
-       t.transaction_type === 'loan_payment' ||
-       t.category === 'Expense')
+    const isInDateRange = transactionDate >= monthStart && transactionDate <= today;
+    const isExpenseType = (
+      t.transaction_type === 'expense' || 
+      t.transaction_type === 'withdrawal' ||
+      t.transaction_type === 'loan_payment' ||
+      t.category === 'Expense'
     );
+    
+    // Exclude expenses paid from credit cards
+    const isPaidFromCreditCard = t.from_account_id && creditCardAccountIds.has(t.from_account_id);
+    
+    return isInDateRange && isExpenseType && !isPaidFromCreditCard;
   });
 
   const totalExpenses = expenseTransactions.reduce(
@@ -383,7 +396,7 @@ export function calculateMonthlyCashFlow(
 } {
   const openingBalance = calculateOpeningBalance(accounts, transactions, month, year);
   const incomeReceived = calculateMonthIncome(transactions, month, year);
-  const expensesIncurred = calculateMonthExpenses(transactions, month, year);
+  const expensesIncurred = calculateMonthExpenses(transactions, accounts, month, year);
   const creditCardRepayments = calculateCreditCardRepayments(transactions, month, year);
   const remainingBudget = calculateRemainingBudget(budget, expensesIncurred);
   const expectedBalance = openingBalance + incomeReceived - expensesIncurred - creditCardRepayments - remainingBudget;
