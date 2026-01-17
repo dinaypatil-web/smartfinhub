@@ -2,7 +2,7 @@
  * EMI (Equated Monthly Installment) calculation utilities for SmartFinHub
  */
 
-import type { Account, EMITransaction } from '@/types/types';
+import type { EMITransaction } from '@/types/types';
 
 /**
  * Calculate monthly EMI amount
@@ -29,15 +29,22 @@ export function calculateTotalEMIAmount(
 }
 
 /**
- * Calculate total statement amount for a credit card
- * Statement Amount = Current Balance + Sum of all monthly EMI installments
+ * Calculate total statement amount or due amount for a credit card
+ * This shows the amount that SHOULD be paid, considering EMIs.
+ * If the current balance includes the full EMI purchase amount, we only want to show one installment.
+ * Formula: Due Amount = Current Balance - Sum of (monthly_emi * (remaining_installments - 1))
  */
 export function calculateStatementAmount(
   currentBalance: number,
   activeEMIs: EMITransaction[]
 ): number {
-  const totalMonthlyEMI = activeEMIs.reduce((sum, emi) => sum + emi.monthly_emi, 0);
-  return currentBalance + totalMonthlyEMI;
+  const futureEMIPrincipal = activeEMIs.reduce((sum, emi) => {
+    // If there are N installments remaining, and 1 is due now, then N-1 are future.
+    const installmentsAfterThisOne = Math.max(0, emi.remaining_installments - 1);
+    return sum + (emi.monthly_emi * installmentsAfterThisOne);
+  }, 0);
+
+  return Math.max(0, currentBalance - futureEMIPrincipal);
 }
 
 /**
@@ -73,9 +80,9 @@ export function getCreditLimitWarningLevel(
   creditLimit: number | null
 ): 'safe' | 'warning' | 'danger' {
   if (!creditLimit) return 'safe';
-  
+
   const utilization = calculateCreditUtilization(currentBalance, creditLimit);
-  
+
   if (utilization >= 100) return 'danger';
   if (utilization >= 80) return 'warning';
   return 'safe';
@@ -91,16 +98,16 @@ export function getCreditLimitWarningMessage(
 ): string | null {
   const level = getCreditLimitWarningLevel(currentBalance, creditLimit);
   const utilization = calculateCreditUtilization(currentBalance, creditLimit);
-  
+
   if (level === 'danger') {
     return `⚠️ Credit limit exceeded! You are at ${utilization.toFixed(1)}% utilization.`;
   }
-  
+
   if (level === 'warning') {
-    const available = calculateAvailableCredit(creditLimit, currentBalance);
+    const available = calculateAvailableCredit(currentBalance, creditLimit);
     return `⚠️ Approaching credit limit! ${utilization.toFixed(1)}% used. ${currency} ${available.toFixed(2)} available.`;
   }
-  
+
   return null;
 }
 
@@ -157,9 +164,9 @@ export function validateCreditLimit(
   if (!creditLimit) {
     return { valid: true };
   }
-  
+
   const newBalance = currentBalance + transactionAmount;
-  
+
   if (newBalance > creditLimit) {
     const excess = newBalance - creditLimit;
     return {
@@ -167,7 +174,7 @@ export function validateCreditLimit(
       message: `Transaction exceeds credit limit by ${excess.toFixed(2)}. Current balance: ${currentBalance.toFixed(2)}, Credit limit: ${creditLimit.toFixed(2)}`
     };
   }
-  
+
   return { valid: true };
 }
 
@@ -190,7 +197,7 @@ export function calculateEMIDetails(
   const monthlyEMI = calculateMonthlyEMI(purchaseAmount, bankCharges, months);
   const totalInterest = bankCharges;
   const effectiveRate = months > 0 ? (bankCharges / purchaseAmount) * 100 : 0;
-  
+
   return {
     monthlyEMI,
     totalAmount,

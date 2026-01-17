@@ -8,25 +8,32 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { formatCurrency, formatAccountNumber } from '@/utils/format';
-import { Plus, Edit, Trash2, Building2, CreditCard, Wallet, TrendingUp, AlertCircle, ChevronDown, ChevronUp, History } from 'lucide-react';
+import {
+  Plus, Edit, Trash2, Wallet,
+  CreditCard,
+  Building2,
+  AlertCircle,
+  ChevronDown,
+  ChevronUp,
+  History as HistoryIcon
+} from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import InterestRateManager from '@/components/InterestRateManager';
 import { calculateEMI, calculateAccruedInterest } from '@/utils/loanCalculations';
-import { 
-  calculateAvailableCredit, 
-  calculateCreditUtilization, 
+import {
+  calculateAvailableCredit,
+  calculateCreditUtilization,
   getCreditLimitWarningLevel,
-  calculateStatementAmount 
+  calculateStatementAmount
 } from '@/utils/emiCalculations';
 import {
-  getBillingCycleInfo,
-  isDueDatePassed
+  getBillingCycleInfo
 } from '@/utils/billingCycleCalculations';
-import { 
-  calculateCreditCardStatementAmount, 
-  shouldDisplayDueAmount, 
-  getStatementDueDate 
+import {
+  calculateCreditCardStatementAmount,
+  shouldDisplayDueAmount,
+  getStatementDueDate
 } from '@/utils/statementCalculations';
 import BankLogo from '@/components/BankLogo';
 import { cache } from '@/utils/cache';
@@ -65,7 +72,7 @@ export default function Accounts() {
 
   const loadAccounts = async () => {
     if (!user) return;
-    
+
     setLoading(true);
     try {
       const data = await accountApi.getAccounts(user.id);
@@ -73,7 +80,7 @@ export default function Accounts() {
 
       // Calculate loan metrics for all loan accounts
       const calculations: Record<string, { emi: number; accruedInterest: number }> = {};
-      
+
       for (const account of data) {
         if (account.account_type === 'loan' && account.loan_principal && account.current_interest_rate && account.loan_tenure_months) {
           // Calculate EMI
@@ -115,7 +122,7 @@ export default function Accounts() {
             if (accountEMIs.length > 0) {
               emis[account.id] = accountEMIs;
             }
-            
+
             // Load transactions for due amount calculation
             const txs = await transactionApi.getTransactionsByAccount(user.id, account.id);
             accountTxs[account.id] = txs;
@@ -154,10 +161,10 @@ export default function Accounts() {
 
     try {
       await accountApi.deleteAccount(accountToDelete.id);
-      
+
       // Clear dashboard cache to reflect deleted account
       cache.clearPattern('dashboard-');
-      
+
       toast({
         title: 'Success',
         description: 'Account deleted successfully',
@@ -176,20 +183,6 @@ export default function Accounts() {
     }
   };
 
-  const getAccountTypeIcon = (type: string) => {
-    switch (type) {
-      case 'cash':
-        return <Wallet className="h-5 w-5" />;
-      case 'bank':
-        return <Building2 className="h-5 w-5" />;
-      case 'credit_card':
-        return <CreditCard className="h-5 w-5" />;
-      case 'loan':
-        return <Wallet className="h-5 w-5" />;
-      default:
-        return <Wallet className="h-5 w-5" />;
-    }
-  };
 
   const getAccountTypeLabel = (type: string) => {
     switch (type) {
@@ -350,9 +343,9 @@ export default function Accounts() {
                   <Card key={account.id} className="hover:shadow-lg transition-shadow">
                     <CardHeader className="flex flex-row items-start justify-between space-y-0">
                       <div className="flex items-center gap-3">
-                        <BankLogo 
-                          src={account.institution_logo} 
-                          alt={account.institution_name || 'Bank'} 
+                        <BankLogo
+                          src={account.institution_logo}
+                          alt={account.institution_name || 'Bank'}
                           className="h-10 w-10"
                         />
                         <div className="flex-1 min-w-0">
@@ -413,14 +406,14 @@ export default function Accounts() {
                 {groupedAccounts.credit_card.map(account => {
                   const emis = accountEMIs[account.id] || [];
                   const transactions = accountTransactions[account.id] || [];
-                  
+
                   // Calculate statement amount using proper statement period logic
                   let statementAmount = account.balance;
                   let dueAmount = 0;
                   let showDueAmount = false;
                   let dueDate: Date | null = null;
                   let billingInfo = null;
-                  
+
                   if (account.statement_day) {
                     const statementCalc = calculateCreditCardStatementAmount(
                       account.id,
@@ -429,12 +422,11 @@ export default function Accounts() {
                       emis
                     );
                     statementAmount = statementCalc.statementAmount;
-                    
+
                     // Only show due amount after statement date
                     showDueAmount = shouldDisplayDueAmount(account.statement_day);
                     if (showDueAmount) {
                       // Use calculated statement amount (only includes transactions up to statement date)
-                      // NOT the entire balance (which includes transactions after statement date)
                       dueAmount = Math.abs(statementAmount);
                       if (account.due_day) {
                         dueDate = getStatementDueDate(account.statement_day, account.due_day);
@@ -444,24 +436,26 @@ export default function Accounts() {
                   } else {
                     // Fallback to old calculation if no statement day
                     statementAmount = calculateStatementAmount(account.balance, emis);
-                    dueAmount = Math.abs(account.balance);
+                    dueAmount = Math.abs(statementAmount);
                     showDueAmount = true;
                     if (account.statement_day && account.due_day) {
                       billingInfo = getBillingCycleInfo(account.statement_day, account.due_day);
                     }
                   }
-                  
+
+                  const monthlyEMIs = emis.reduce((sum, emi) => sum + emi.monthly_emi, 0);
+
                   const utilization = account.credit_limit ? calculateCreditUtilization(account.balance, account.credit_limit) : null;
                   const warningLevel = account.credit_limit ? getCreditLimitWarningLevel(account.balance, account.credit_limit) : 'safe';
                   const availableCredit = account.credit_limit ? calculateAvailableCredit(account.balance, account.credit_limit) : null;
-                  
+
                   return (
                     <Card key={account.id} className="hover:shadow-lg transition-shadow">
                       <CardHeader className="flex flex-row items-start justify-between space-y-0">
                         <div className="flex items-center gap-3">
-                          <BankLogo 
-                            src={account.institution_logo} 
-                            alt={account.institution_name || 'Credit Card'} 
+                          <BankLogo
+                            src={account.institution_logo}
+                            alt={account.institution_name || 'Credit Card'}
                             className="h-10 w-10"
                           />
                           <div className="flex-1 min-w-0">
@@ -485,7 +479,7 @@ export default function Accounts() {
                           </p>
                           {emis.length > 0 && (
                             <p className="text-xs text-muted-foreground mt-1">
-                              + {formatCurrency(statementAmount - account.balance, account.currency)} in EMIs
+                              + {formatCurrency(monthlyEMIs, account.currency)} in monthly installments
                             </p>
                           )}
                         </div>
@@ -496,22 +490,20 @@ export default function Accounts() {
                             <div className="flex items-center justify-between">
                               <p className="text-sm text-muted-foreground">Credit Utilization</p>
                               <div className="flex items-center gap-2">
-                                <span className={`text-sm font-semibold ${
-                                  warningLevel === 'danger' ? 'text-red-600 dark:text-red-400' :
+                                <span className={`text-sm font-semibold ${warningLevel === 'danger' ? 'text-red-600 dark:text-red-400' :
                                   warningLevel === 'warning' ? 'text-amber-600 dark:text-amber-400' :
-                                  'text-emerald-600 dark:text-emerald-400'
-                                }`}>
+                                    'text-emerald-600 dark:text-emerald-400'
+                                  }`}>
                                   {utilization?.toFixed(1)}%
                                 </span>
                                 {warningLevel !== 'safe' && (
-                                  <AlertCircle className={`h-4 w-4 ${
-                                    warningLevel === 'danger' ? 'text-red-600' : 'text-amber-600'
-                                  }`} />
+                                  <AlertCircle className={`h-4 w-4 ${warningLevel === 'danger' ? 'text-red-600' : 'text-amber-600'
+                                    }`} />
                                 )}
                               </div>
                             </div>
-                            <Progress 
-                              value={utilization || 0} 
+                            <Progress
+                              value={utilization || 0}
                               className="h-2"
                             />
                             <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -547,8 +539,8 @@ export default function Accounts() {
                                       <span className="text-muted-foreground">Remaining</span>
                                       <span className="font-semibold">{formatCurrency(remainingAmount, account.currency)}</span>
                                     </div>
-                                    <Progress 
-                                      value={((emi.emi_months - emi.remaining_installments) / emi.emi_months) * 100} 
+                                    <Progress
+                                      value={((emi.emi_months - emi.remaining_installments) / emi.emi_months) * 100}
                                       className="h-1 mt-2"
                                     />
                                   </div>
@@ -574,7 +566,7 @@ export default function Accounts() {
                               </p>
                             </div>
                             <div className="text-xs text-muted-foreground text-right">
-                              Due on {dueDate 
+                              Due on {dueDate
                                 ? dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
                                 : billingInfo?.dueDateStr
                               }
@@ -629,9 +621,9 @@ export default function Accounts() {
                   <Card key={account.id} className="hover:shadow-lg transition-shadow">
                     <CardHeader className="flex flex-row items-start justify-between space-y-0">
                       <div className="flex items-center gap-3">
-                        <BankLogo 
-                          src={account.institution_logo} 
-                          alt={account.institution_name || 'Loan'} 
+                        <BankLogo
+                          src={account.institution_logo}
+                          alt={account.institution_name || 'Loan'}
                           className="h-10 w-10"
                         />
                         <div className="flex-1 min-w-0">
@@ -690,7 +682,7 @@ export default function Accounts() {
                           onRateUpdated={loadAccounts}
                         />
                       )}
-                      
+
                       {/* Payment History Section */}
                       {accountTransactions[account.id] && accountTransactions[account.id].length > 0 && (
                         <div className="border-t pt-4">
@@ -701,7 +693,7 @@ export default function Accounts() {
                             onClick={() => setExpandedLoanHistory(prev => ({ ...prev, [account.id]: !prev[account.id] }))}
                           >
                             <span className="flex items-center gap-2">
-                              <History className="h-4 w-4" />
+                              <HistoryIcon className="h-4 w-4" />
                               Payment History ({accountTransactions[account.id].length})
                             </span>
                             {expandedLoanHistory[account.id] ? (
@@ -710,7 +702,7 @@ export default function Accounts() {
                               <ChevronDown className="h-4 w-4" />
                             )}
                           </Button>
-                          
+
                           {expandedLoanHistory[account.id] && (
                             <div className="mt-3 space-y-2 max-h-60 overflow-y-auto">
                               {accountTransactions[account.id]
@@ -745,7 +737,7 @@ export default function Accounts() {
                           )}
                         </div>
                       )}
-                      
+
                       <div className="flex gap-2">
                         <Button
                           variant="outline"
