@@ -846,6 +846,17 @@ export const emiApi = {
     return Array.isArray(data) ? data : [];
   },
 
+  async getEMIByTransactionId(transactionId: string): Promise<EMITransaction | null> {
+    const { data, error } = await supabase
+      .from('emi_transactions')
+      .select('*')
+      .eq('transaction_id', transactionId)
+      .maybeSingle();
+    
+    if (error) throw error;
+    return data;
+  },
+
   async getActiveEMIsByAccount(accountId: string): Promise<EMITransaction[]> {
     const { data, error } = await supabase
       .from('emi_transactions')

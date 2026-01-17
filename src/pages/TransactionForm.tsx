@@ -14,11 +14,11 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, ArrowLeft, TrendingDown, AlertCircle, CreditCard } from 'lucide-react';
 import { formatCurrency } from '@/utils/format';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { 
-  calculateMonthlyEMI, 
-  calculateEMIDetails, 
+import {
+  calculateMonthlyEMI,
+  calculateEMIDetails,
   validateCreditLimit,
-  getCreditLimitWarningMessage 
+  getCreditLimitWarningMessage
 } from '@/utils/emiCalculations';
 import { getTransactionStatementInfo } from '@/utils/statementCalculations';
 import { INCOME_CATEGORIES } from '@/constants/incomeCategories';
@@ -65,6 +65,10 @@ export default function TransactionForm() {
     dueDate: Date;
   } | null>(null);
 
+  const [existingEMI, setExistingEMI] = useState<any>(null);
+  const [originalAmount, setOriginalAmount] = useState<number>(0);
+  const [originalAccountId, setOriginalAccountId] = useState<string | null>(null);
+
   useEffect(() => {
     if (user) {
       loadData();
@@ -82,7 +86,7 @@ export default function TransactionForm() {
           account.due_day,
           transactionDate
         );
-        
+
         setStatementInfo({
           statementDate,
           dueDate
@@ -120,7 +124,7 @@ export default function TransactionForm() {
       const amount = parseFloat(formData.amount);
       const months = parseInt(formData.emi_months);
       const charges = parseFloat(formData.bank_charges);
-      
+
       if (!isNaN(amount) && !isNaN(months) && !isNaN(charges) && months > 0) {
         const emiDetails = calculateEMIDetails(amount, charges, months);
         setCalculatedEMI(emiDetails);
@@ -139,11 +143,17 @@ export default function TransactionForm() {
       if (account && account.account_type === 'credit_card') {
         const amount = parseFloat(formData.amount);
         if (!isNaN(amount)) {
-          const warning = getCreditLimitWarningMessage(account.balance, account.credit_limit, account.currency);
+          // Adjust balance based on the original transaction if we are editing
+          const isSameAccount = formData.from_account_id === originalAccountId;
+          const baseBalance = (id && isSameAccount) ? account.balance - originalAmount : account.balance;
+          const projectedBalance = baseBalance + amount;
+
+          // Display warning based on the result of the edit
+          const warning = getCreditLimitWarningMessage(projectedBalance, account.credit_limit, account.currency);
           setCreditLimitWarning(warning);
-          
-          // Validate if transaction would exceed limit
-          const validation = validateCreditLimit(account.balance, amount, account.credit_limit);
+
+          // Validate if the net change would exceed the limit
+          const validation = validateCreditLimit(baseBalance, amount, account.credit_limit);
           if (!validation.valid) {
             setCreditLimitWarning(`⚠️ ${validation.message}`);
           }
@@ -154,7 +164,7 @@ export default function TransactionForm() {
     } else {
       setCreditLimitWarning(null);
     }
-  }, [formData.from_account_id, formData.amount, accounts]);
+  }, [formData.from_account_id, formData.amount, accounts, id, originalAmount, originalAccountId]);
 
   const loadBudgetInfo = async () => {
     if (!user || !formData.category || formData.transaction_type !== 'expense') return;
@@ -177,14 +187,14 @@ export default function TransactionForm() {
 
   const loadData = async () => {
     if (!user) return;
-    
+
     setLoadingData(true);
     try {
       const [accountsData, categoriesData] = await Promise.all([
         accountApi.getAccounts(user.id),
         categoryApi.getCategories(user.id)
       ]);
-      
+
       setAccounts(accountsData);
       setCategories(categoriesData);
 
@@ -192,6 +202,18 @@ export default function TransactionForm() {
         const transactions = await transactionApi.getTransactions(user.id);
         const transaction = transactions.find(t => t.id === id);
         if (transaction) {
+          // Fetch EMI details if it's a credit card transaction
+          let emiData = null;
+          if (transaction.from_account_id) {
+            const account = accountsData.find((a: Account) => a.id === transaction.from_account_id);
+            if (account && account.account_type === 'credit_card') {
+              emiData = await emiApi.getEMIByTransactionId(transaction.id);
+            }
+          }
+
+          setExistingEMI(emiData);
+          setOriginalAmount(Number(transaction.amount));
+          setOriginalAccountId(transaction.from_account_id);
           setFormData({
             transaction_type: transaction.transaction_type,
             from_account_id: transaction.from_account_id || '',
@@ -202,9 +224,9 @@ export default function TransactionForm() {
             income_category: transaction.income_category || '',
             description: transaction.description || '',
             transaction_date: transaction.transaction_date,
-            is_emi: false,
-            emi_months: '',
-            bank_charges: '',
+            is_emi: !!emiData,
+            emi_months: emiData ? emiData.emi_months.toString() : '',
+            bank_charges: emiData ? emiData.bank_charges.toString() : '',
           });
         }
       }
@@ -263,8 +285,8 @@ export default function TransactionForm() {
       return;
     }
 
-    if ((formData.transaction_type === 'transfer' || formData.transaction_type === 'withdrawal') && 
-        (!formData.from_account_id || !formData.to_account_id)) {
+    if ((formData.transaction_type === 'transfer' || formData.transaction_type === 'withdrawal') &&
+      (!formData.from_account_id || !formData.to_account_id)) {
       toast({
         title: 'Error',
         description: 'Please select both source and destination accounts',
@@ -315,8 +337,11 @@ export default function TransactionForm() {
     if (formData.from_account_id) {
       const account = accounts.find((a: Account) => a.id === formData.from_account_id);
       if (account && account.account_type === 'credit_card' && account.credit_limit) {
+        const isSameAccount = formData.from_account_id === originalAccountId;
+        const baseBalance = (id && isSameAccount) ? account.balance - originalAmount : account.balance;
+
         const validation = validateCreditLimit(
-          account.balance,
+          baseBalance,
           parseFloat(formData.amount),
           account.credit_limit
         );
@@ -351,17 +376,51 @@ export default function TransactionForm() {
 
       if (id) {
         await transactionApi.updateTransaction(id, transactionData);
-        
+
+        // Handle EMI update
+        if (formData.is_emi) {
+          const purchaseAmount = parseFloat(formData.amount);
+          const bankCharges = parseFloat(formData.bank_charges);
+          const emiMonths = parseInt(formData.emi_months);
+          const monthlyEMI = calculateMonthlyEMI(purchaseAmount, bankCharges, emiMonths);
+          const totalAmount = purchaseAmount + bankCharges;
+
+          const emiData = {
+            user_id: user.id,
+            account_id: formData.from_account_id,
+            transaction_id: id,
+            purchase_amount: purchaseAmount,
+            bank_charges: bankCharges,
+            total_amount: totalAmount,
+            emi_months: emiMonths,
+            monthly_emi: monthlyEMI,
+            remaining_installments: existingEMI ? existingEMI.remaining_installments : emiMonths,
+            start_date: formData.transaction_date,
+            next_due_date: formData.transaction_date,
+            description: formData.description || `EMI for ${formData.category || 'purchase'}`,
+            status: 'active' as const,
+          };
+
+          if (existingEMI) {
+            await emiApi.updateEMI(existingEMI.id, emiData);
+          } else {
+            await emiApi.createEMI(emiData);
+          }
+        } else if (existingEMI) {
+          // If was EMI but now turned off, delete the EMI record
+          await emiApi.deleteEMI(existingEMI.id);
+        }
+
         // Clear dashboard cache to reflect updated transaction
         cache.clearPattern('dashboard-');
-        
+
         toast({
           title: 'Success',
           description: 'Transaction updated successfully',
         });
       } else {
         createdTransaction = await transactionApi.createTransaction(transactionData);
-        
+
         // Create EMI transaction if EMI option is selected
         if (formData.is_emi && createdTransaction) {
           const purchaseAmount = parseFloat(formData.amount);
@@ -369,7 +428,7 @@ export default function TransactionForm() {
           const emiMonths = parseInt(formData.emi_months);
           const monthlyEMI = calculateMonthlyEMI(purchaseAmount, bankCharges, emiMonths);
           const totalAmount = purchaseAmount + bankCharges;
-          
+
           const emiData = {
             user_id: user.id,
             account_id: formData.from_account_id,
@@ -385,17 +444,17 @@ export default function TransactionForm() {
             description: formData.description || `EMI for ${formData.category || 'purchase'}`,
             status: 'active' as const,
           };
-          
+
           await emiApi.createEMI(emiData);
         }
-        
+
         // Clear dashboard cache to reflect new transaction
         cache.clearPattern('dashboard-');
-        
+
         toast({
           title: 'Success',
-          description: formData.is_emi 
-            ? 'Transaction and EMI created successfully' 
+          description: formData.is_emi
+            ? 'Transaction and EMI created successfully'
             : 'Transaction created successfully',
         });
       }
@@ -454,125 +513,137 @@ export default function TransactionForm() {
               </Select>
             </div>
 
-            {(formData.transaction_type === 'expense' || formData.transaction_type === 'withdrawal' || 
+            {(formData.transaction_type === 'expense' || formData.transaction_type === 'withdrawal' ||
               formData.transaction_type === 'transfer' || formData.transaction_type === 'loan_payment' ||
               formData.transaction_type === 'credit_card_repayment') && (
-              <div className="space-y-2">
-                <Label htmlFor="from_account_id">
-                  {formData.transaction_type === 'withdrawal' ? 'From Bank/Credit Card *' : 
-                   formData.transaction_type === 'credit_card_repayment' ? 'From Bank Account *' : 'From Account *'}
-                </Label>
-                <Select
-                  value={formData.from_account_id}
-                  onValueChange={(value) => setFormData({ ...formData, from_account_id: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select account" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {formData.transaction_type === 'withdrawal'
-                      ? accounts.filter(a => a.account_type === 'bank' || a.account_type === 'credit_card').map(account => (
+                <div className="space-y-2">
+                  <Label htmlFor="from_account_id">
+                    {formData.transaction_type === 'withdrawal' ? 'From Bank/Credit Card *' :
+                      formData.transaction_type === 'credit_card_repayment' ? 'From Bank Account *' : 'From Account *'}
+                  </Label>
+                  <Select
+                    value={formData.from_account_id}
+                    onValueChange={(value) => setFormData({ ...formData, from_account_id: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select account" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {formData.transaction_type === 'withdrawal'
+                        ? accounts.filter(a => a.account_type === 'bank' || a.account_type === 'credit_card').map(account => (
                           <SelectItem key={account.id} value={account.id}>
                             {account.account_name} ({account.account_type})
                           </SelectItem>
                         ))
-                      : formData.transaction_type === 'credit_card_repayment'
-                      ? accounts.filter(a => a.account_type === 'bank' || a.account_type === 'cash').map(account => (
-                          <SelectItem key={account.id} value={account.id}>
-                            {account.account_name}
-                          </SelectItem>
-                        ))
-                      : accounts.filter(a => a.account_type !== 'loan').map(account => (
-                          <SelectItem key={account.id} value={account.id}>
-                            {account.account_name} ({account.account_type})
-                          </SelectItem>
-                        ))
-                    }
-                  </SelectContent>
-                </Select>
-                
-                {/* Display available balance for selected account */}
-                {formData.from_account_id && (() => {
-                  const selectedAccount = accounts.find((a: Account) => a.id === formData.from_account_id);
-                  if (selectedAccount) {
-                    const isCreditCard = selectedAccount.account_type === 'credit_card';
-                    const availableBalance = isCreditCard 
-                      ? (selectedAccount.credit_limit || 0) + selectedAccount.balance // Credit card: limit + negative balance
-                      : selectedAccount.balance; // Other accounts: actual balance
-                    
-                    return (
-                      <div className="mt-2 p-3 rounded-lg bg-muted/50 border border-border">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">
-                            {isCreditCard ? 'Available Credit' : 'Available Balance'}
-                          </span>
-                          <span className={`text-sm font-semibold ${
-                            availableBalance < 0 ? 'text-destructive' : 'text-emerald-600 dark:text-emerald-400'
-                          }`}>
-                            {formatCurrency(availableBalance, selectedAccount.currency)}
-                          </span>
-                        </div>
-                        {isCreditCard && selectedAccount.credit_limit && (
-                          <div className="flex items-center justify-between mt-1">
-                            <span className="text-xs text-muted-foreground">Credit Limit</span>
-                            <span className="text-xs text-muted-foreground">
-                              {formatCurrency(selectedAccount.credit_limit, selectedAccount.currency)}
+                        : formData.transaction_type === 'credit_card_repayment'
+                          ? accounts.filter(a => a.account_type === 'bank' || a.account_type === 'cash').map(account => (
+                            <SelectItem key={account.id} value={account.id}>
+                              {account.account_name}
+                            </SelectItem>
+                          ))
+                          : accounts.filter(a => a.account_type !== 'loan').map(account => (
+                            <SelectItem key={account.id} value={account.id}>
+                              {account.account_name} ({account.account_type})
+                            </SelectItem>
+                          ))
+                      }
+                    </SelectContent>
+                  </Select>
+
+                  {/* Display available balance for selected account */}
+                  {formData.from_account_id && (() => {
+                    const selectedAccount = accounts.find((a: Account) => a.id === formData.from_account_id);
+                    if (selectedAccount) {
+                      const isCreditCard = selectedAccount.account_type === 'credit_card';
+                      const amount = parseFloat(formData.amount) || 0;
+
+                      // Calculate projected Available Credit for Credit Cards
+                      let availableBalance = selectedAccount.balance;
+                      let projectedAvailable = 0;
+                      let isOverLimit = false;
+
+                      if (isCreditCard && selectedAccount.credit_limit) {
+                        const isSameAccount = formData.from_account_id === originalAccountId;
+                        const baseBalance = (id && isSameAccount) ? selectedAccount.balance - originalAmount : selectedAccount.balance;
+                        const projectedBalance = baseBalance + amount;
+
+                        availableBalance = selectedAccount.credit_limit - selectedAccount.balance;
+                        projectedAvailable = selectedAccount.credit_limit - projectedBalance;
+                        isOverLimit = projectedBalance > selectedAccount.credit_limit;
+                      }
+
+                      return (
+                        <div className="mt-2 p-3 rounded-lg bg-muted/50 border border-border">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">
+                              {isCreditCard ? 'Current Balance Limit' : 'Current Balance'}
+                            </span>
+                            <span className={`text-sm font-semibold ${!isCreditCard && availableBalance < 0 ? 'text-destructive' : ''}`}>
+                              {formatCurrency(isCreditCard ? (selectedAccount.credit_limit || 0) - selectedAccount.balance : availableBalance, selectedAccount.currency)}
                             </span>
                           </div>
-                        )}
-                      </div>
-                    );
-                  }
-                  return null;
-                })()}
-              </div>
-            )}
 
-            {(formData.transaction_type === 'income' || formData.transaction_type === 'transfer' || 
+                          {isCreditCard && (
+                            <div className="flex items-center justify-between mt-1 pt-1 border-t border-dashed">
+                              <span className="text-sm font-medium">Projected Balance Limit</span>
+                              <span className={`text-sm font-bold ${isOverLimit ? 'text-destructive' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                {formatCurrency(projectedAvailable, selectedAccount.currency)}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+                </div>
+              )}
+
+            {(formData.transaction_type === 'income' || formData.transaction_type === 'transfer' ||
               formData.transaction_type === 'withdrawal' || formData.transaction_type === 'loan_payment' ||
               formData.transaction_type === 'credit_card_repayment') && (
-              <div className="space-y-2">
-                <Label htmlFor="to_account_id">
-                  {formData.transaction_type === 'withdrawal' ? 'To Cash Account *' : 
-                   formData.transaction_type === 'credit_card_repayment' ? 'To Credit Card *' : 
-                   formData.transaction_type === 'loan_payment' ? 'To Loan Account *' : 'To Account *'}
-                </Label>
-                <Select
-                  value={formData.to_account_id}
-                  onValueChange={(value) => setFormData({ ...formData, to_account_id: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select account" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {formData.transaction_type === 'withdrawal' 
-                      ? accounts.filter(a => a.account_type === 'cash').map(account => (
+                <div className="space-y-2">
+                  <Label htmlFor="to_account_id">
+                    {formData.transaction_type === 'withdrawal' ? 'To Cash Account *' :
+                      formData.transaction_type === 'credit_card_repayment' ? 'To Credit Card *' :
+                        formData.transaction_type === 'loan_payment' ? 'To Loan Account *' : 'To Account *'}
+                  </Label>
+                  <Select
+                    value={formData.to_account_id}
+                    onValueChange={(value) => setFormData({ ...formData, to_account_id: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select account" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {formData.transaction_type === 'withdrawal'
+                        ? accounts.filter(a => a.account_type === 'cash').map(account => (
                           <SelectItem key={account.id} value={account.id}>
                             {account.account_name}
                           </SelectItem>
                         ))
-                      : formData.transaction_type === 'credit_card_repayment'
-                      ? accounts.filter(a => a.account_type === 'credit_card').map(account => (
-                          <SelectItem key={account.id} value={account.id}>
-                            {account.account_name}
-                          </SelectItem>
-                        ))
-                      : formData.transaction_type === 'loan_payment'
-                      ? accounts.filter(a => a.account_type === 'loan').map(account => (
-                          <SelectItem key={account.id} value={account.id}>
-                            {account.account_name}
-                          </SelectItem>
-                        ))
-                      : accounts.map(account => (
-                          <SelectItem key={account.id} value={account.id}>
-                            {account.account_name} ({account.account_type})
-                          </SelectItem>
-                        ))
-                    }
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+                        : formData.transaction_type === 'credit_card_repayment'
+                          ? accounts.filter(a => a.account_type === 'credit_card').map(account => (
+                            <SelectItem key={account.id} value={account.id}>
+                              {account.account_name}
+                            </SelectItem>
+                          ))
+                          : formData.transaction_type === 'loan_payment'
+                            ? accounts.filter(a => a.account_type === 'loan').map(account => (
+                              <SelectItem key={account.id} value={account.id}>
+                                {account.account_name}
+                              </SelectItem>
+                            ))
+                            : accounts.map(account => (
+                              <SelectItem key={account.id} value={account.id}>
+                                {account.account_name} ({account.account_type})
+                              </SelectItem>
+                            ))
+                      }
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -702,151 +773,150 @@ export default function TransactionForm() {
             )}
 
             {/* EMI Option for Credit Card Transactions */}
-            {formData.from_account_id && 
-             accounts.find((a: Account) => a.id === formData.from_account_id)?.account_type === 'credit_card' && 
-             !id && (
-              <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="is_emi"
-                    checked={formData.is_emi}
-                    onCheckedChange={(checked) => 
-                      setFormData({ 
-                        ...formData, 
-                        is_emi: checked as boolean,
-                        emi_months: checked ? formData.emi_months : '',
-                        bank_charges: checked ? formData.bank_charges : '',
-                      })
-                    }
-                  />
-                  <Label htmlFor="is_emi" className="flex items-center gap-2 cursor-pointer">
-                    <CreditCard className="h-4 w-4" />
-                    Convert to EMI (Equated Monthly Installment)
-                  </Label>
+            {formData.from_account_id &&
+              accounts.find((a: Account) => a.id === formData.from_account_id)?.account_type === 'credit_card' && (
+                <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="is_emi"
+                      checked={formData.is_emi}
+                      onCheckedChange={(checked) =>
+                        setFormData({
+                          ...formData,
+                          is_emi: checked as boolean,
+                          emi_months: checked ? formData.emi_months : '',
+                          bank_charges: checked ? formData.bank_charges : '',
+                        })
+                      }
+                    />
+                    <Label htmlFor="is_emi" className="flex items-center gap-2 cursor-pointer">
+                      <CreditCard className="h-4 w-4" />
+                      Convert to EMI (Equated Monthly Installment)
+                    </Label>
+                  </div>
+
+                  {formData.is_emi && (
+                    <>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="emi_months">EMI Duration (Months) *</Label>
+                          <Input
+                            id="emi_months"
+                            type="number"
+                            min="1"
+                            max="60"
+                            value={formData.emi_months}
+                            onChange={(e) => setFormData({ ...formData, emi_months: e.target.value })}
+                            placeholder="e.g., 12"
+                            required={formData.is_emi}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Number of monthly installments (1-60)
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="bank_charges">Bank Charges *</Label>
+                          <Input
+                            id="bank_charges"
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={formData.bank_charges}
+                            onChange={(e) => setFormData({ ...formData, bank_charges: e.target.value })}
+                            placeholder="0.00"
+                            required={formData.is_emi}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Processing fees and interest charges
+                          </p>
+                        </div>
+                      </div>
+
+                      {calculatedEMI && (
+                        <Alert className="border-blue-500 bg-blue-50 dark:bg-blue-950/20">
+                          <CreditCard className="h-4 w-4 text-blue-600" />
+                          <AlertDescription>
+                            <div className="space-y-2">
+                              <div className="font-semibold text-sm text-blue-900 dark:text-blue-200">
+                                EMI Calculation Summary
+                              </div>
+                              <div className="grid grid-cols-2 gap-3 text-xs">
+                                <div>
+                                  <div className="text-muted-foreground">Monthly EMI</div>
+                                  <div className="font-bold text-lg text-blue-600 dark:text-blue-400">
+                                    {formatCurrency(calculatedEMI.monthlyEMI, formData.currency)}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="text-muted-foreground">Total Amount</div>
+                                  <div className="font-medium">
+                                    {formatCurrency(calculatedEMI.totalAmount, formData.currency)}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="text-muted-foreground">Total Interest</div>
+                                  <div className="font-medium">
+                                    {formatCurrency(calculatedEMI.totalInterest, formData.currency)}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="text-muted-foreground">Effective Rate</div>
+                                  <div className="font-medium">
+                                    {calculatedEMI.effectiveRate.toFixed(2)}%
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                    </>
+                  )}
                 </div>
-
-                {formData.is_emi && (
-                  <>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="emi_months">EMI Duration (Months) *</Label>
-                        <Input
-                          id="emi_months"
-                          type="number"
-                          min="1"
-                          max="60"
-                          value={formData.emi_months}
-                          onChange={(e) => setFormData({ ...formData, emi_months: e.target.value })}
-                          placeholder="e.g., 12"
-                          required={formData.is_emi}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Number of monthly installments (1-60)
-                        </p>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="bank_charges">Bank Charges *</Label>
-                        <Input
-                          id="bank_charges"
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={formData.bank_charges}
-                          onChange={(e) => setFormData({ ...formData, bank_charges: e.target.value })}
-                          placeholder="0.00"
-                          required={formData.is_emi}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Processing fees and interest charges
-                        </p>
-                      </div>
-                    </div>
-
-                    {calculatedEMI && (
-                      <Alert className="border-blue-500 bg-blue-50 dark:bg-blue-950/20">
-                        <CreditCard className="h-4 w-4 text-blue-600" />
-                        <AlertDescription>
-                          <div className="space-y-2">
-                            <div className="font-semibold text-sm text-blue-900 dark:text-blue-200">
-                              EMI Calculation Summary
-                            </div>
-                            <div className="grid grid-cols-2 gap-3 text-xs">
-                              <div>
-                                <div className="text-muted-foreground">Monthly EMI</div>
-                                <div className="font-bold text-lg text-blue-600 dark:text-blue-400">
-                                  {formatCurrency(calculatedEMI.monthlyEMI, formData.currency)}
-                                </div>
-                              </div>
-                              <div>
-                                <div className="text-muted-foreground">Total Amount</div>
-                                <div className="font-medium">
-                                  {formatCurrency(calculatedEMI.totalAmount, formData.currency)}
-                                </div>
-                              </div>
-                              <div>
-                                <div className="text-muted-foreground">Total Interest</div>
-                                <div className="font-medium">
-                                  {formatCurrency(calculatedEMI.totalInterest, formData.currency)}
-                                </div>
-                              </div>
-                              <div>
-                                <div className="text-muted-foreground">Effective Rate</div>
-                                <div className="font-medium">
-                                  {calculatedEMI.effectiveRate.toFixed(2)}%
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </AlertDescription>
-                      </Alert>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
+              )}
 
             {/* Statement and Due Date Info for Credit Card Transactions (Non-EMI) */}
-            {formData.from_account_id && 
-             !formData.is_emi &&
-             accounts.find((a: Account) => a.id === formData.from_account_id)?.account_type === 'credit_card' && 
-             statementInfo && (
-              <Alert className="border-purple-500 bg-purple-50 dark:bg-purple-950/20">
-                <CreditCard className="h-4 w-4 text-purple-600" />
-                <AlertDescription>
-                  <div className="space-y-2">
-                    <div className="font-semibold text-sm text-purple-900 dark:text-purple-200">
-                      Credit Card Billing Information
-                    </div>
-                    <div className="grid grid-cols-2 gap-3 text-xs">
-                      <div>
-                        <div className="text-muted-foreground">Statement Date</div>
-                        <div className="font-medium text-purple-600 dark:text-purple-400">
-                          {statementInfo.statementDate.toLocaleDateString('en-US', { 
-                            month: 'short', 
-                            day: 'numeric', 
-                            year: 'numeric' 
-                          })}
+            {formData.from_account_id &&
+              !formData.is_emi &&
+              accounts.find((a: Account) => a.id === formData.from_account_id)?.account_type === 'credit_card' &&
+              statementInfo && (
+                <Alert className="border-purple-500 bg-purple-50 dark:bg-purple-950/20">
+                  <CreditCard className="h-4 w-4 text-purple-600" />
+                  <AlertDescription>
+                    <div className="space-y-2">
+                      <div className="font-semibold text-sm text-purple-900 dark:text-purple-200">
+                        Credit Card Billing Information
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 text-xs">
+                        <div>
+                          <div className="text-muted-foreground">Statement Date</div>
+                          <div className="font-medium text-purple-600 dark:text-purple-400">
+                            {statementInfo.statementDate.toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric'
+                            })}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-muted-foreground">Payment Due Date</div>
+                          <div className="font-medium text-purple-600 dark:text-purple-400">
+                            {statementInfo.dueDate.toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric'
+                            })}
+                          </div>
                         </div>
                       </div>
-                      <div>
-                        <div className="text-muted-foreground">Payment Due Date</div>
-                        <div className="font-medium text-purple-600 dark:text-purple-400">
-                          {statementInfo.dueDate.toLocaleDateString('en-US', { 
-                            month: 'short', 
-                            day: 'numeric', 
-                            year: 'numeric' 
-                          })}
-                        </div>
-                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        This transaction will be included in the statement generated on {statementInfo.statementDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} and payment will be due on {statementInfo.dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}.
+                      </p>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      This transaction will be included in the statement generated on {statementInfo.statementDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} and payment will be due on {statementInfo.dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}.
-                    </p>
-                  </div>
-                </AlertDescription>
-              </Alert>
-            )}
+                  </AlertDescription>
+                </Alert>
+              )}
 
             <div className="space-y-2">
               <Label htmlFor="description">Description</Label>
