@@ -267,18 +267,22 @@ export function calculateCreditCardDues(
 
     const totalDues = filteredAccounts.reduce((sum, acc) => {
       // Use statement amount calculation if statement day is configured
-      if (acc.statement_day && shouldDisplayDueAmount(acc.statement_day)) {
-        const transactions = accountTransactions[acc.id] || [];
-        const emis = accountEMIs[acc.id] || [];
-        const statementCalc = calculateCreditCardStatementAmount(
-          acc.id,
-          acc.statement_day,
-          transactions,
-          emis
-        );
-        return sum + Math.abs(statementCalc.statementAmount);
+      if (acc.statement_day) {
+        if (shouldDisplayDueAmount(acc.statement_day)) {
+          const transactions = accountTransactions[acc.id] || [];
+          const emis = accountEMIs[acc.id] || [];
+          const statementCalc = calculateCreditCardStatementAmount(
+            acc.id,
+            acc.statement_day,
+            transactions,
+            emis
+          );
+          return sum + Math.abs(statementCalc.statementAmount);
+        }
+        // If statement not generated yet, dues are 0 for this month
+        return sum;
       }
-      // Fallback to calculated due amount for cards without statement day or before statement date
+      // Fallback to calculated due amount for cards without statement day
       const emis = accountEMIs[acc.id] || [];
       return sum + calculateStatementAmount(Math.abs(Number(acc.balance)), emis);
     }, 0);
@@ -289,18 +293,22 @@ export function calculateCreditCardDues(
   // For credit cards, calculate statement amount or use balance
   const totalDues = creditCardAccounts.reduce((sum, acc) => {
     // Use statement amount calculation if statement day is configured
-    if (acc.statement_day && shouldDisplayDueAmount(acc.statement_day)) {
-      const transactions = accountTransactions[acc.id] || [];
-      const emis = accountEMIs[acc.id] || [];
-      const statementCalc = calculateCreditCardStatementAmount(
-        acc.id,
-        acc.statement_day,
-        transactions,
-        emis
-      );
-      return sum + Math.abs(statementCalc.statementAmount);
+    if (acc.statement_day) {
+      if (shouldDisplayDueAmount(acc.statement_day)) {
+        const transactions = accountTransactions[acc.id] || [];
+        const emis = accountEMIs[acc.id] || [];
+        const statementCalc = calculateCreditCardStatementAmount(
+          acc.id,
+          acc.statement_day,
+          transactions,
+          emis
+        );
+        return sum + Math.abs(statementCalc.statementAmount);
+      }
+      // If statement not generated yet, dues are 0 for this month
+      return sum;
     }
-    // Fallback to calculated due amount for cards without statement day or before statement date
+    // Fallback to calculated due amount for cards without statement day
     const emis = accountEMIs[acc.id] || [];
     return sum + calculateStatementAmount(Math.abs(Number(acc.balance)), emis);
   }, 0);
@@ -336,18 +344,24 @@ export function getCreditCardDuesDetails(
     let dueAmount = Math.abs(Number(acc.balance));
 
     // Use statement amount calculation if statement day is configured
-    if (acc.statement_day && shouldDisplayDueAmount(acc.statement_day)) {
-      const transactions = accountTransactions[acc.id] || [];
-      const emis = accountEMIs[acc.id] || [];
-      const statementCalc = calculateCreditCardStatementAmount(
-        acc.id,
-        acc.statement_day,
-        transactions,
-        emis
-      );
-      dueAmount = Math.abs(statementCalc.statementAmount);
+    // Use statement amount calculation if statement day is configured
+    if (acc.statement_day) {
+      if (shouldDisplayDueAmount(acc.statement_day)) {
+        const transactions = accountTransactions[acc.id] || [];
+        const emis = accountEMIs[acc.id] || [];
+        const statementCalc = calculateCreditCardStatementAmount(
+          acc.id,
+          acc.statement_day,
+          transactions,
+          emis
+        );
+        dueAmount = Math.abs(statementCalc.statementAmount);
+      } else {
+        // If statement not generated yet, dues are 0 for this month
+        dueAmount = 0;
+      }
     } else {
-      // For cards without statement day or before statement date, use calculated due amount
+      // For cards without statement day, use calculated due amount
       const emis = accountEMIs[acc.id] || [];
       dueAmount = calculateStatementAmount(Math.abs(Number(acc.balance)), emis);
     }

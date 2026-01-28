@@ -406,20 +406,23 @@ export default function Accounts() {
                 {(() => {
                   const totalDues = groupedAccounts.credit_card.reduce((sum, account) => {
                     if (account.statement_day) {
-                      const transactions = accountTransactions[account.id] || [];
-                      const emis = accountEMIs[account.id] || [];
-                      const statementCalc = calculateCreditCardStatementAmount(
-                        account.id,
-                        account.statement_day,
-                        transactions,
-                        emis
-                      );
-                      // Only include in total if statement has been generated
-                      return shouldDisplayDueAmount(account.statement_day)
-                        ? sum + Math.abs(statementCalc.statementAmount)
-                        : sum;
+                      if (shouldDisplayDueAmount(account.statement_day)) {
+                        const transactions = accountTransactions[account.id] || [];
+                        const emis = accountEMIs[account.id] || [];
+                        const statementCalc = calculateCreditCardStatementAmount(
+                          account.id,
+                          account.statement_day,
+                          transactions,
+                          emis
+                        );
+                        return sum + Math.abs(statementCalc.statementAmount);
+                      }
+                      return sum;
                     }
-                    return sum;
+                    // For accounts without statement day, assume balance is due
+                    const emis = accountEMIs[account.id] || [];
+                    const statementAmount = calculateStatementAmount(Number(account.balance), emis);
+                    return sum + Math.abs(statementAmount);
                   }, 0);
 
                   if (totalDues > 0) {
