@@ -629,7 +629,7 @@ export default function Dashboard() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">Opening Balance</span>
+                        <span className="text-sm text-muted-foreground">Opening Balance (Cash & Bank)</span>
                         <span className="text-lg font-semibold text-blue-600 dark:text-blue-400">
                           {formatCurrency(cashFlow.openingBalance, currency)}
                         </span>
@@ -641,19 +641,11 @@ export default function Dashboard() {
                         </span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">Expenses Incurred</span>
+                        <span className="text-sm text-muted-foreground">Expenses Incurred (Cash & Bank)</span>
                         <span className="text-lg font-semibold text-red-600 dark:text-red-400">
                           - {formatCurrency(cashFlow.expensesIncurred, currency)}
                         </span>
                       </div>
-                      {cashFlow.creditCardRepayments > 0 && (
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-muted-foreground">Credit Card Repayments</span>
-                          <span className="text-lg font-semibold text-purple-600 dark:text-purple-400">
-                            - {formatCurrency(cashFlow.creditCardRepayments, currency)}
-                          </span>
-                        </div>
-                      )}
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-muted-foreground">Remaining Budget (Expenses)</span>
                         <span className="text-lg font-semibold text-amber-600 dark:text-amber-400">
@@ -668,15 +660,6 @@ export default function Dashboard() {
                           </span>
                         </div>
                       )}
-                    </div>
-
-                    <div className="space-y-2 border-l-2 border-muted pl-4">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium text-muted-foreground">Expected Balance</span>
-                        <span className="text-xl font-bold text-blue-600 dark:text-blue-400">
-                          {formatCurrency(cashFlow.expectedBalance, currency)}
-                        </span>
-                      </div>
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-muted-foreground">Credit Card Dues</span>
                         <span className="text-lg font-semibold text-purple-600 dark:text-purple-400">
@@ -685,7 +668,7 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    <div className="border-l-2 border-muted pl-4 flex items-center justify-between">
+                    <div className="border-t-2 border-muted pt-2 flex items-center justify-between mt-4">
                       <span className="text-base font-semibold text-muted-foreground">Net Available</span>
                       <span className={`text-2xl font-bold ${cashFlow.netAvailable >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
                         {formatCurrency(cashFlow.netAvailable, currency)}
@@ -695,7 +678,7 @@ export default function Dashboard() {
 
                   <div className="pt-2 border-t border-muted">
                     <p className="text-xs text-muted-foreground">
-                      This summary shows your projected cash position: Opening Balance + Income Received - Expenses (Cash/Bank) - Credit Card Repayments - Remaining Expense Budget + Remaining Income Budget - Credit Card Dues.
+                      Formula: Opening Balance + Income Received - Expenses Incurred - Remaining Expense Budget + Remaining Income Budget - Credit Card Dues.
                     </p>
                   </div>
 
