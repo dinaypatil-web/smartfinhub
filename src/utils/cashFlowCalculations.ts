@@ -60,17 +60,29 @@ export function calculateOpeningBalance(
  */
 export function calculateMonthExpenses(
   transactions: Transaction[],
+  accounts: Account[],
   month: number,
   year: number
 ): number {
   const monthStart = new Date(year, month - 1, 1);
   const today = new Date();
 
+  // Identify cash and bank account IDs
+  const cashAndBankIds = new Set(
+    accounts
+      .filter(acc => acc.account_type === 'cash' || acc.account_type === 'bank')
+      .map(acc => acc.id)
+  );
+
   const expenseTransactions = transactions.filter(t => {
     const transactionDate = new Date(t.transaction_date);
+    const isCashOrBank = (t.from_account_id && cashAndBankIds.has(t.from_account_id)) ||
+      (t.to_account_id && cashAndBankIds.has(t.to_account_id));
+
     return (
       transactionDate >= monthStart &&
       transactionDate <= today &&
+      isCashOrBank &&
       (t.transaction_type === 'expense' ||
         t.transaction_type === 'withdrawal' ||
         t.transaction_type === 'loan_payment' ||
@@ -132,6 +144,24 @@ export function calculateRemainingBudget(
   const remaining = budget.budgeted_expenses - actualExpenses;
   // Only return positive remaining budget (money still allocated to spend)
   // If over budget, return 0 (no remaining allocation)
+  return Math.max(0, Math.round(remaining * 100) / 100);
+}
+
+/**
+ * Calculate remaining income budget for the month
+ * Returns the amount of income still expected (positive value)
+ * Returns 0 if already exceeded expected income
+ */
+export function calculateRemainingIncomeBudget(
+  budget: Budget | null,
+  actualIncome: number
+): number {
+  if (!budget || !budget.budgeted_income) {
+    return 0;
+  }
+
+  const remaining = budget.budgeted_income - actualIncome;
+  // Only return positive remaining income budget (money still expected)
   return Math.max(0, Math.round(remaining * 100) / 100);
 }
 
@@ -384,18 +414,24 @@ export function calculateMonthlyCashFlow(
   expensesIncurred: number;
   creditCardRepayments: number;
   remainingBudget: number;
+  remainingIncomeBudget: number;
   expectedBalance: number;
   creditCardDues: number;
   netAvailable: number;
 } {
   const openingBalance = calculateOpeningBalance(accounts, transactions, month, year);
   const incomeReceived = calculateMonthIncome(transactions, month, year);
-  const expensesIncurred = calculateMonthExpenses(transactions, month, year);
+  const expensesIncurred = calculateMonthExpenses(transactions, accounts, month, year);
   const creditCardRepayments = calculateCreditCardRepayments(transactions, month, year);
   const remainingBudget = calculateRemainingBudget(budget, expensesIncurred);
+  const remainingIncomeBudget = calculateRemainingIncomeBudget(budget, incomeReceived);
   const creditCardDues = calculateCreditCardDues(accounts, accountTransactions, accountEMIs, month, year);
+
+  // Formula: Opening Balance + Income Received - Expenses (Cash/Bank) - Credit Card Repayments
   const expectedBalance = openingBalance + incomeReceived - expensesIncurred - creditCardRepayments;
-  const netAvailable = expectedBalance - creditCardDues;
+
+  // Formula: Expected Balance - Remaining Expense Budget + Remaining Income Budget - Credit Card Dues
+  const netAvailable = expectedBalance - remainingBudget + remainingIncomeBudget - creditCardDues;
 
   return {
     openingBalance,
@@ -403,6 +439,7 @@ export function calculateMonthlyCashFlow(
     expensesIncurred,
     creditCardRepayments,
     remainingBudget,
+    remainingIncomeBudget,
     expectedBalance,
     creditCardDues,
     netAvailable

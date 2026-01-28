@@ -398,10 +398,48 @@ export default function Accounts() {
 
           {groupedAccounts.credit_card.length > 0 && (
             <div className="space-y-4">
-              <h2 className="text-2xl font-semibold flex items-center gap-2">
-                <CreditCard className="h-6 w-6" />
-                Credit Cards
-              </h2>
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <h2 className="text-2xl font-semibold flex items-center gap-2">
+                  <CreditCard className="h-6 w-6" />
+                  Credit Cards
+                </h2>
+                {(() => {
+                  const totalDues = groupedAccounts.credit_card.reduce((sum, account) => {
+                    if (account.statement_day) {
+                      const transactions = accountTransactions[account.id] || [];
+                      const emis = accountEMIs[account.id] || [];
+                      const statementCalc = calculateCreditCardStatementAmount(
+                        account.id,
+                        account.statement_day,
+                        transactions,
+                        emis
+                      );
+                      // Only include in total if statement has been generated
+                      return shouldDisplayDueAmount(account.statement_day)
+                        ? sum + Math.abs(statementCalc.statementAmount)
+                        : sum;
+                    }
+                    return sum;
+                  }, 0);
+
+                  if (totalDues > 0) {
+                    return (
+                      <Card className="bg-purple-50 dark:bg-purple-950/20 border-purple-100 dark:border-purple-900 shadow-sm animate-fade-in">
+                        <CardContent className="py-2 px-4 flex items-center gap-3">
+                          <AlertCircle className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                          <div>
+                            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Total Monthly Dues</p>
+                            <p className="text-lg font-bold text-purple-600 dark:text-purple-400">
+                              {formatCurrency(totalDues, currency)}
+                            </p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  }
+                  return null;
+                })()}
+              </div>
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {groupedAccounts.credit_card.map(account => {
                   const emis = accountEMIs[account.id] || [];
