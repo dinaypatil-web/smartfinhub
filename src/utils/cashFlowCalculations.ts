@@ -275,7 +275,9 @@ export function calculateCreditCardDues(
             acc.id,
             acc.statement_day,
             transactions,
-            emis
+            emis,
+            new Date(),
+            Number(acc.balance)
           );
           return sum + Math.abs(statementCalc.statementAmount);
         }
@@ -301,7 +303,9 @@ export function calculateCreditCardDues(
           acc.id,
           acc.statement_day,
           transactions,
-          emis
+          emis,
+          new Date(),
+          Number(acc.balance)
         );
         return sum + Math.abs(statementCalc.statementAmount);
       }
@@ -353,7 +357,9 @@ export function getCreditCardDuesDetails(
           acc.id,
           acc.statement_day,
           transactions,
-          emis
+          emis,
+          new Date(),
+          Number(acc.balance)
         );
         dueAmount = Math.abs(statementCalc.statementAmount);
       } else {

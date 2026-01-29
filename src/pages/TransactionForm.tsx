@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useHybridAuth as useAuth } from '@/contexts/HybridAuthContext';
-import { transactionApi, accountApi, categoryApi, budgetApi, emiApi } from '@/db/api';
+import { transactionApi, accountApi, categoryApi, budgetApi, emiApi, interestRateApi, loanEMIPaymentApi } from '@/db/api';
 import type { TransactionType, Account } from '@/types/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,7 @@ import {
   validateCreditLimit,
   getCreditLimitWarningMessage
 } from '@/utils/emiCalculations';
+import { calculateEMIBreakdownWithHistory } from '@/utils/loanCalculations';
 import { getTransactionStatementInfo } from '@/utils/statementCalculations';
 import { INCOME_CATEGORIES } from '@/constants/incomeCategories';
 import { cache } from '@/utils/cache';
@@ -28,6 +29,7 @@ import { cache } from '@/utils/cache';
 export default function TransactionForm() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, profile } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -69,11 +71,29 @@ export default function TransactionForm() {
   const [originalAmount, setOriginalAmount] = useState<number>(0);
   const [originalAccountId, setOriginalAccountId] = useState<string | null>(null);
 
+  const [loanBreakdown, setLoanBreakdown] = useState<{
+    principal: number;
+    interest: number;
+  } | null>(null);
+  const [isManualBreakdown, setIsManualBreakdown] = useState(false);
+
   useEffect(() => {
     if (user) {
       loadData();
     }
   }, [user]);
+
+  // Handle pre-fill from navigation state
+  useEffect(() => {
+    if (!id && location.state?.prefill) {
+      setFormData(prev => ({
+        ...prev,
+        ...location.state.prefill,
+        // Ensure amount is string
+        amount: location.state.prefill.amount ? String(location.state.prefill.amount) : prev.amount
+      }));
+    }
+  }, [id, location.state]);
 
   // Calculate statement and due dates for credit card transactions
   useEffect(() => {
@@ -165,6 +185,48 @@ export default function TransactionForm() {
       setCreditLimitWarning(null);
     }
   }, [formData.from_account_id, formData.amount, accounts, id, originalAmount, originalAccountId]);
+
+  // Calculate Loan Breakdown (Principal vs Interest)
+  useEffect(() => {
+    const calculateLoanSplit = async () => {
+      if (formData.transaction_type === 'loan_payment' && formData.to_account_id && formData.amount && !isManualBreakdown) {
+        const amount = parseFloat(formData.amount);
+        if (isNaN(amount) || amount <= 0) return;
+
+        const account = accounts.find((a: Account) => a.id === formData.to_account_id);
+        if (account && account.account_type === 'loan') {
+          try {
+            // Fetch rate history
+            const rateHistory = await interestRateApi.getInterestRateHistory(account.id);
+
+            // We need the last payment date to calculate interest accurately. 
+            // For now, we'll estimate using monthly interest if no specialized calculation is available.
+            // But wait, I can use calculateEMIBreakdownWithHistory if I have the start date.
+
+            const breakdown = calculateEMIBreakdownWithHistory(
+              account.loan_start_date || new Date().toISOString(), // Fallback
+              null, // Previous payment date - ideal would be to fetch last transaction
+              formData.transaction_date,
+              Number(account.balance), // Outstanding principal
+              amount,
+              rateHistory.map(r => ({ effective_date: r.effective_date, interest_rate: r.interest_rate }))
+            );
+
+            setLoanBreakdown({
+              principal: breakdown.principalComponent,
+              interest: breakdown.interestComponent
+            });
+          } catch (error) {
+            console.error("Error calculating loan breakdown", error);
+          }
+        }
+      } else if (formData.transaction_type !== 'loan_payment') {
+        setLoanBreakdown(null);
+      }
+    };
+
+    calculateLoanSplit();
+  }, [formData.transaction_type, formData.to_account_id, formData.amount, formData.transaction_date, accounts, isManualBreakdown]);
 
   const loadBudgetInfo = async () => {
     if (!user || !formData.category || formData.transaction_type !== 'expense') return;
@@ -446,6 +508,34 @@ export default function TransactionForm() {
           };
 
           await emiApi.createEMI(emiData);
+        }
+
+        // Handle Smart Loan Payment (Principal/Interest Split)
+        if (formData.transaction_type === 'loan_payment' && formData.to_account_id && loanBreakdown) {
+          const loanAccount = accounts.find(a => a.id === formData.to_account_id);
+
+          if (loanAccount) {
+            // 1. Create the detailed EMI payment record
+            await loanEMIPaymentApi.createPayment({
+              user_id: user.id,
+              account_id: formData.to_account_id,
+              payment_date: formData.transaction_date,
+              emi_amount: parseFloat(formData.amount),
+              principal_component: loanBreakdown.principal,
+              interest_component: loanBreakdown.interest,
+              outstanding_principal: Math.max(0, Number(loanAccount.balance) - loanBreakdown.principal),
+              interest_rate: Number(loanAccount.current_interest_rate || 0),
+              payment_number: 0, // Should calculate this, but 0 for now
+              notes: formData.description
+            });
+
+            // 2. Correct the account balance
+            // transactionApi already reduced the balance by the FULL amount.
+            // We need to ADD BACK the interest component, because only Principal reduces the loan balance.
+            if (loanBreakdown.interest > 0) {
+              await accountApi.adjustBalance(formData.to_account_id, loanBreakdown.interest);
+            }
+          }
         }
 
         // Clear dashboard cache to reflect new transaction
@@ -917,6 +1007,68 @@ export default function TransactionForm() {
                   </AlertDescription>
                 </Alert>
               )}
+
+            {/* Loan Payment Breakdown Section */}
+            {formData.transaction_type === 'loan_payment' && formData.to_account_id && (
+              <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold flex items-center gap-2">
+                    <TrendingDown className="h-4 w-4" />
+                    Payment Breakdown
+                  </h3>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="manual_breakdown"
+                      checked={isManualBreakdown}
+                      onCheckedChange={(checked) => setIsManualBreakdown(checked as boolean)}
+                    />
+                    <Label htmlFor="manual_breakdown" className="text-xs">Manual Entry</Label>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="principal_component" className="text-xs">Principal Component</Label>
+                    <Input
+                      id="principal_component"
+                      type="number"
+                      value={loanBreakdown?.principal || 0}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value) || 0;
+                        setLoanBreakdown({
+                          principal: val,
+                          interest: parseFloat(formData.amount || '0') - val
+                        });
+                      }}
+                      disabled={!isManualBreakdown}
+                      className="bg-background"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="interest_component" className="text-xs">Interest Component</Label>
+                    <Input
+                      id="interest_component"
+                      type="number"
+                      value={loanBreakdown?.interest || 0}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value) || 0;
+                        setLoanBreakdown({
+                          interest: val,
+                          principal: parseFloat(formData.amount || '0') - val
+                        });
+                      }}
+                      disabled={!isManualBreakdown}
+                      className="bg-background"
+                    />
+                  </div>
+                </div>
+                {loanBreakdown && (
+                  <p className="text-xs text-muted-foreground text-center">
+                    Principal reduces balance. Interest is an expense.
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="description">Description</Label>

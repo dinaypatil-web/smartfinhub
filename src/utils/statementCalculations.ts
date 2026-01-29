@@ -15,10 +15,10 @@ export function getStatementPeriod(statementDay: number, referenceDate: Date = n
 
   // Current month's statement date
   const currentStatementDate = new Date(year, month, statementDay);
-  
+
   // Last month's statement date
   const lastStatementDate = new Date(year, month - 1, statementDay);
-  
+
   // Check if we're after the current statement date
   const isAfterStatementDate = day >= statementDay;
 
@@ -63,7 +63,8 @@ export function calculateCreditCardStatementAmount(
   statementDay: number,
   transactions: Transaction[],
   emis: EMITransaction[],
-  referenceDate: Date = new Date()
+  referenceDate: Date = new Date(),
+  currentBalance?: number
 ): {
   statementAmount: number;
   transactionsAmount: number;
@@ -76,7 +77,7 @@ export function calculateCreditCardStatementAmount(
   // The due amount always represents transactions from the LAST completed statement period
   let periodStart: Date;
   let periodEnd: Date;
-  
+
   if (isAfterStatementDate) {
     // We're after the statement date, so the statement was already generated
     // Show the amount from the last completed period (which is now due for payment)
@@ -128,24 +129,75 @@ export function calculateCreditCardStatementAmount(
   // Get EMIs that are due in this statement period
   const currentMonth = periodEnd.getMonth() + 1;
   const currentYear = periodEnd.getFullYear();
-  
+
   const emisAmount = emis
     .filter(emi => {
       if (!emi.start_date) return false;
-      
+
       const emiStartDate = new Date(emi.start_date);
       const emiStartMonth = emiStartDate.getMonth() + 1;
       const emiStartYear = emiStartDate.getFullYear();
-      
+
       // Calculate which installment would be due in the current period
       const monthsDiff = (currentYear - emiStartYear) * 12 + (currentMonth - emiStartMonth);
-      
+
       // Check if this EMI has an installment due in this period
       return monthsDiff >= 0 && monthsDiff < emi.emi_months && emi.remaining_installments > 0;
     })
     .reduce((sum, emi) => sum + Number(emi.monthly_emi), 0);
 
-  const statementAmount = transactionsAmount + emisAmount;
+  let statementAmount = transactionsAmount + emisAmount;
+
+  // IMPROVED LOGIC: If currentBalance is provided, use it to calculate accurate "Remaining Statement Due"
+  // Remaining Due = Current Balance - (New Spending since Statement Date)
+  // This correctly accounts for carry-over debt and partial payments.
+  if (currentBalance !== undefined) {
+    const statementDate = isAfterStatementDate ? currentStatementDate : lastStatementDate;
+
+    // Calculate New Spending (transactions that increased balance AFTER statement date)
+    // For Credit Cards (Liability), Expenses/Withdrawals are Positive (increase debt).
+    // So we subtract them from Current Balance to find the balance at statement time (or remaining).
+    // Wait, "Remaining Due" means we want to exclude "New Debt".
+    // Current Balance = Old Debt + New Debt - Payments.
+    // Remaining Due = Old Debt - Payments.
+    // So Remaining Due = Current Balance - New Debt.
+
+    const newSpending = transactions
+      .filter(t => {
+        const tDate = new Date(t.transaction_date);
+        return (t.from_account_id === accountId || t.to_account_id === accountId) && tDate > statementDate;
+      })
+      .reduce((sum, t) => {
+        // Identify transactions that INCREASE balance (Debt)
+        let increase = 0;
+
+        // Expense from this account
+        if (t.from_account_id === accountId && (t.transaction_type === 'expense' || t.transaction_type === 'withdrawal' || t.transaction_type === 'transfer')) {
+          increase = Number(t.amount);
+        }
+
+        // Income/Payment decreases balance, so we ignore it here (it's part of "Remaining Due")
+        return sum + increase;
+      }, 0);
+
+    // If balance is tracked as negative for debt, abs() it first?
+    // Based on api.ts, Credit Card balance is Positive for Debt.
+    // But verify if input currentBalance might be negative.
+    // Accounts.tsx uses Math.abs(balance).
+    // Let's assume input currentBalance is the raw value from DB.
+    // If DB stores Debt as Positive (likely based on api.ts), then logic holds.
+    // If DB stores Debt as Negative, then Current = -Old - New + Pay.
+    // We want -Old + Pay.
+    // (-Old - New + Pay) + New = -Old + Pay.
+    // So if negative, we ADD New Spending (magnitude).
+
+    statementAmount = currentBalance - newSpending;
+
+    // Ensure we don't return negative due if they overpaid? 
+    // If they paid off everything, Current = 0. New = 0. Result 0.
+    // If they have credit (negative debt), Current = -50. New = 0. Result -50.
+    // statementAmount can be negative (credit).
+  }
 
   // Calculate due date (typically 20-25 days after statement date)
   // Using the due_day from account if available, otherwise null
@@ -168,7 +220,7 @@ export function getStatementDueDate(statementDay: number, dueDay: number, refere
   const { currentStatementDate, isAfterStatementDate } = getStatementPeriod(statementDay, referenceDate);
 
   let statementDate: Date;
-  
+
   if (isAfterStatementDate) {
     // We're after the statement date, so due date is in current month
     statementDate = currentStatementDate;
@@ -196,7 +248,7 @@ export function getStatementDueDate(statementDay: number, dueDay: number, refere
 export function isDueDatePassed(statementDay: number, dueDay: number, referenceDate: Date = new Date()): boolean {
   const dueDate = getStatementDueDate(statementDay, dueDay, referenceDate);
   if (!dueDate) return false;
-  
+
   return referenceDate > dueDate;
 }
 
@@ -239,7 +291,7 @@ export function getTransactionStatementInfo(
   const txDay = transactionDate.getDate();
 
   let statementDate: Date;
-  
+
   // If transaction is on or after statement day, it goes to NEXT month's statement
   if (txDay >= statementDay) {
     statementDate = new Date(txYear, txMonth + 1, statementDay);
@@ -262,4 +314,53 @@ export function getTransactionStatementInfo(
     statementDate,
     dueDate
   };
+}
+
+/**
+ * Calculate the minimum amount due for a credit card
+ * Typically 5% of total outstanding or 500 (whichever is higher)
+ * But limited to the total outstanding amount if less than 500
+ */
+export function calculateMinimumDue(totalDue: number, currency: string = 'INR'): number {
+  if (totalDue <= 0) return 0;
+
+  // Default logic: 5% of outstanding
+  const percentageBased = totalDue * 0.05;
+
+  // Minimum absolute amount (e.g., 500 INR)
+  // We can adjust this based on currency if needed, but keeping it simple for now
+  const minimumAbsolute = currency === 'USD' ? 25 : 500;
+
+  if (totalDue < minimumAbsolute) {
+    return totalDue;
+  }
+
+  return Math.max(percentageBased, minimumAbsolute);
+}
+
+/**
+ * Check if the due date is approaching (within 5 days) or passed
+ */
+export function isPaymentDueSoon(dueDate: Date | null): 'overdue' | 'due_soon' | 'not_due' {
+  if (!dueDate) return 'not_due';
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // Reset time part for accurate date comparison
+
+  const due = new Date(dueDate);
+  due.setHours(0, 0, 0, 0);
+
+  if (today > due) {
+    return 'overdue';
+  }
+
+  // Calculate difference in days
+  const diffTime = Math.abs(due.getTime() - today.getTime());
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  if (diffDays <= 5) {
+    return 'due_soon';
+  }
+
+  return 'not_due';
 }

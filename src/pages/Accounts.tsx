@@ -15,12 +15,21 @@ import {
   AlertCircle,
   ChevronDown,
   ChevronUp,
-  History as HistoryIcon
+  History as HistoryIcon,
+  TrendingDown
 } from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import InterestRateManager from '@/components/InterestRateManager';
 import { calculateEMI, calculateAccruedInterest } from '@/utils/loanCalculations';
+import LoanAmortizationSchedule from '@/components/LoanAmortizationSchedule';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import type { InterestRateHistory } from '@/types/types';
 import {
   calculateAvailableCredit,
   calculateCreditUtilization,
@@ -30,11 +39,7 @@ import {
 import {
   getBillingCycleInfo
 } from '@/utils/billingCycleCalculations';
-import {
-  calculateCreditCardStatementAmount,
-  shouldDisplayDueAmount,
-  getStatementDueDate
-} from '@/utils/statementCalculations';
+import { calculateCreditCardStatementAmount, shouldDisplayDueAmount, getStatementDueDate, calculateMinimumDue } from '@/utils/statementCalculations';
 import BankLogo from '@/components/BankLogo';
 import { cache } from '@/utils/cache';
 import {
@@ -61,6 +66,11 @@ export default function Accounts() {
   const [accountEMIs, setAccountEMIs] = useState<Record<string, EMITransaction[]>>({});
   const [accountTransactions, setAccountTransactions] = useState<Record<string, Transaction[]>>({});
   const [expandedLoanHistory, setExpandedLoanHistory] = useState<Record<string, boolean>>({});
+
+  // Schedule Dialog State
+  const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
+  const [selectedLoanAccount, setSelectedLoanAccount] = useState<Account | null>(null);
+  const [selectedRateHistory, setSelectedRateHistory] = useState<InterestRateHistory[]>([]);
 
   const currency = profile?.default_currency || 'INR';
 
@@ -184,6 +194,19 @@ export default function Accounts() {
   };
 
 
+  const handleViewSchedule = async (account: Account) => {
+    setSelectedLoanAccount(account);
+    setScheduleDialogOpen(true);
+    try {
+      const history = await interestRateApi.getInterestRateHistory(account.id);
+      setSelectedRateHistory(history);
+    } catch (error) {
+      console.error("Failed to load rate history", error);
+      setSelectedRateHistory([]);
+    }
+  };
+
+
   const getAccountTypeLabel = (type: string) => {
     switch (type) {
       case 'cash':
@@ -255,6 +278,20 @@ export default function Accounts() {
           </Button>
         </Link>
       </div>
+
+      <Dialog open={scheduleDialogOpen} onOpenChange={setScheduleDialogOpen}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Loan Amortization Schedule - {selectedLoanAccount?.account_name}</DialogTitle>
+          </DialogHeader>
+          {selectedLoanAccount && (
+            <LoanAmortizationSchedule
+              account={selectedLoanAccount}
+              rateHistory={selectedRateHistory}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       {accounts.length === 0 ? (
         <Card>
@@ -413,7 +450,9 @@ export default function Accounts() {
                           account.id,
                           account.statement_day,
                           transactions,
-                          emis
+                          emis,
+                          new Date(),
+                          Number(account.balance)
                         );
                         return sum + Math.abs(statementCalc.statementAmount);
                       }
@@ -460,7 +499,9 @@ export default function Accounts() {
                       account.id,
                       account.statement_day,
                       transactions,
-                      emis
+                      emis,
+                      new Date(),
+                      Number(account.balance)
                     );
                     statementAmount = statementCalc.statementAmount;
 
@@ -614,6 +655,53 @@ export default function Accounts() {
                             </div>
                           </div>
                         )}
+
+                        {/* Pay Bill Action */}
+                        {dueAmount > 0 && (
+                          <div className="pt-2">
+                            <Button
+                              className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+                              onClick={() => navigate('/transactions/new', {
+                                state: {
+                                  prefill: {
+                                    transaction_type: 'credit_card_repayment',
+                                    to_account_id: account.id,
+                                    amount: dueAmount, // Full Statement Amount
+                                    description: `Payment for statement ending ${dueDate
+                                      ? new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate() - 20).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                                      : 'recent'
+                                      }`
+                                  }
+                                }
+                              })}
+                            >
+                              Pay Bill
+                            </Button>
+                            <div className="flex justify-between items-center mt-1 px-1">
+                              <p className="text-[10px] text-muted-foreground">
+                                Min Due: {formatCurrency(calculateMinimumDue(dueAmount, account.currency), account.currency)}
+                              </p>
+                              <button
+                                className="text-[10px] text-purple-600 underline hover:text-purple-800"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate('/transactions/new', {
+                                    state: {
+                                      prefill: {
+                                        transaction_type: 'credit_card_repayment',
+                                        to_account_id: account.id,
+                                        amount: calculateMinimumDue(dueAmount, account.currency),
+                                        description: `Minimum payment for ${account.account_name}`
+                                      }
+                                    }
+                                  });
+                                }}
+                              >
+                                Pay Minimum
+                              </button>
+                            </div>
+                          </div>
+                        )}
                         {!showDueAmount && account.statement_day && (
                           <div className="space-y-2 pt-2 border-t">
                             <div className="text-sm text-muted-foreground text-center">
@@ -723,6 +811,16 @@ export default function Accounts() {
                           onRateUpdated={loadAccounts}
                         />
                       )}
+
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="w-full mt-2"
+                        onClick={() => handleViewSchedule(account)}
+                      >
+                        <TrendingDown className="h-4 w-4 mr-2" />
+                        View Amortization Schedule
+                      </Button>
 
                       {/* Payment History Section */}
                       {accountTransactions[account.id] && accountTransactions[account.id].length > 0 && (
