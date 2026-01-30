@@ -206,42 +206,36 @@ function calculateInterestForPeriod(
   const sortedRates = [...rateHistory].sort(
     (a, b) => new Date(a.effective_date).getTime() - new Date(b.effective_date).getTime()
   );
-
   let totalInterest = 0;
   let periodStartDate = startDate;
-
+  let currentRate = defaultRate;
+  for (let i = sortedRates.length - 1; i >= 0; i--) {
+    const d = new Date(sortedRates[i].effective_date);
+    if (d <= periodStartDate) {
+      currentRate = sortedRates[i].interest_rate;
+      break;
+    }
+  }
   for (let i = 0; i < sortedRates.length; i++) {
     const rateEntry = sortedRates[i];
     const rateEffectiveDate = new Date(rateEntry.effective_date);
-
     if (rateEffectiveDate <= periodStartDate) {
       continue;
     }
-
     if (rateEffectiveDate >= endDate) {
       break;
     }
-
-    const periodEndDate = rateEffectiveDate;
-    const days = Math.floor((periodEndDate.getTime() - periodStartDate.getTime()) / (1000 * 60 * 60 * 24));
-
-    const applicableRate = i > 0 ? sortedRates[i - 1].interest_rate : sortedRates[0].interest_rate;
-    const periodInterest = (principal * applicableRate * days) / (365 * 100);
-    totalInterest += periodInterest;
-
-    periodStartDate = periodEndDate;
+    const days = Math.floor((rateEffectiveDate.getTime() - periodStartDate.getTime()) / (1000 * 60 * 60 * 24));
+    if (days > 0) {
+      totalInterest += (principal * currentRate * days) / (365 * 100);
+    }
+    currentRate = rateEntry.interest_rate;
+    periodStartDate = rateEffectiveDate;
   }
-
   const remainingDays = Math.floor((endDate.getTime() - periodStartDate.getTime()) / (1000 * 60 * 60 * 24));
   if (remainingDays > 0) {
-    // Use the last known rate from history, or fall back to defaultRate (opening rate)
-    const lastRate = sortedRates.length > 0
-      ? sortedRates[sortedRates.length - 1].interest_rate
-      : defaultRate;
-    const remainingInterest = (principal * lastRate * remainingDays) / (365 * 100);
-    totalInterest += remainingInterest;
+    totalInterest += (principal * currentRate * remainingDays) / (365 * 100);
   }
-
   return totalInterest;
 }
 
@@ -379,6 +373,48 @@ export function calculateAllEMIBreakdowns(
 
     outstandingPrincipal = breakdown.newOutstandingPrincipal;
     previousPaymentDate = payment.payment_date;
+  }
+
+  return results;
+}
+
+/**
+ * Calculate EMI breakdowns for the amortization schedule using a fixed opening rate
+ * Interest per month = openingAnnualRate / 12, applied on reducing balance
+ */
+export function calculateAllEMIBreakdownsFixedRate(
+  loanPrincipal: number,
+  payments: Array<{ payment_date: string; emi_amount: number }>,
+  openingAnnualRate: number
+): Array<{
+  payment_date: string;
+  emi_amount: number;
+  principal_component: number;
+  interest_component: number;
+  outstanding_principal: number;
+  payment_number: number;
+}> {
+  const results = [];
+  let outstandingPrincipal = loanPrincipal;
+
+  for (let i = 0; i < payments.length; i++) {
+    const payment = payments[i];
+    const breakdown = calculateEMIBreakdown(
+      outstandingPrincipal,
+      payment.emi_amount,
+      openingAnnualRate
+    );
+
+    results.push({
+      payment_date: payment.payment_date,
+      emi_amount: payment.emi_amount,
+      principal_component: breakdown.principalComponent,
+      interest_component: breakdown.interestComponent,
+      outstanding_principal: breakdown.newOutstandingPrincipal,
+      payment_number: i + 1
+    });
+
+    outstandingPrincipal = breakdown.newOutstandingPrincipal;
   }
 
   return results;

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useHybridAuth as useAuth } from '@/contexts/HybridAuthContext';
-import { accountApi, interestRateApi, emiApi, transactionApi } from '@/db/api';
-import type { Account, EMITransaction, Transaction } from '@/types/types';
+import { accountApi, interestRateApi, emiApi, transactionApi, loanEMIPaymentApi } from '@/db/api';
+import type { Account, EMITransaction, Transaction, LoanEMIPayment } from '@/types/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -23,6 +23,7 @@ import { useToast } from '@/hooks/use-toast';
 import InterestRateManager from '@/components/InterestRateManager';
 import { calculateEMI, calculateAccruedInterest } from '@/utils/loanCalculations';
 import LoanAmortizationSchedule from '@/components/LoanAmortizationSchedule';
+import LoanScheduleComparison from '@/components/LoanScheduleComparison';
 import {
   Dialog,
   DialogContent,
@@ -42,6 +43,7 @@ import {
 import { calculateCreditCardStatementAmount, shouldDisplayDueAmount, getStatementDueDate, calculateMinimumDue } from '@/utils/statementCalculations';
 import BankLogo from '@/components/BankLogo';
 import { cache } from '@/utils/cache';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -71,6 +73,7 @@ export default function Accounts() {
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
   const [selectedLoanAccount, setSelectedLoanAccount] = useState<Account | null>(null);
   const [selectedRateHistory, setSelectedRateHistory] = useState<InterestRateHistory[]>([]);
+  const [selectedActualPayments, setSelectedActualPayments] = useState<LoanEMIPayment[]>([]);
 
   const currency = profile?.default_currency || 'INR';
 
@@ -93,29 +96,37 @@ export default function Accounts() {
 
       for (const account of data) {
         if (account.account_type === 'loan' && account.loan_principal && account.current_interest_rate && account.loan_tenure_months) {
-          // Calculate EMI
-          const emi = calculateEMI(
-            Number(account.loan_principal),
-            Number(account.current_interest_rate),
-            Number(account.loan_tenure_months)
-          );
-
-          // Calculate accrued interest
+          let emi = 0;
           let accruedInterest = 0;
-          if (account.loan_start_date) {
-            try {
-              const history = await interestRateApi.getInterestRateHistory(account.id);
+          try {
+            const history = account.id ? await interestRateApi.getInterestRateHistory(account.id) : [];
+            const sortedHistory = [...history].sort(
+              (a, b) => new Date(a.effective_date).getTime() - new Date(b.effective_date).getTime()
+            );
+            const openingRate = sortedHistory.length > 0
+              ? Number(sortedHistory[0].interest_rate)
+              : Number(account.current_interest_rate);
+            emi = calculateEMI(
+              Number(account.loan_principal),
+              openingRate,
+              Number(account.loan_tenure_months)
+            );
+            if (account.loan_start_date) {
               accruedInterest = calculateAccruedInterest(
                 account.loan_start_date,
                 Number(account.balance),
                 history,
                 Number(account.current_interest_rate)
               );
-            } catch (error) {
-              console.error('Error calculating accrued interest:', error);
             }
+          } catch (error) {
+            console.error('Error calculating loan metrics:', error);
+            emi = calculateEMI(
+              Number(account.loan_principal),
+              Number(account.current_interest_rate),
+              Number(account.loan_tenure_months)
+            );
           }
-
           calculations[account.id] = { emi, accruedInterest };
         }
       }
@@ -198,11 +209,16 @@ export default function Accounts() {
     setSelectedLoanAccount(account);
     setScheduleDialogOpen(true);
     try {
-      const history = await interestRateApi.getInterestRateHistory(account.id);
+      const [history, payments] = await Promise.all([
+        interestRateApi.getInterestRateHistory(account.id),
+        loanEMIPaymentApi.getPaymentsByAccount(account.id)
+      ]);
       setSelectedRateHistory(history);
+      setSelectedActualPayments(payments);
     } catch (error) {
-      console.error("Failed to load rate history", error);
+      console.error("Failed to load rate history or payments", error);
       setSelectedRateHistory([]);
+      setSelectedActualPayments([]);
     }
   };
 
@@ -280,15 +296,30 @@ export default function Accounts() {
       </div>
 
       <Dialog open={scheduleDialogOpen} onOpenChange={setScheduleDialogOpen}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Loan Amortization Schedule - {selectedLoanAccount?.account_name}</DialogTitle>
+            <DialogTitle>Loan Schedule - {selectedLoanAccount?.account_name}</DialogTitle>
           </DialogHeader>
           {selectedLoanAccount && (
-            <LoanAmortizationSchedule
-              account={selectedLoanAccount}
-              rateHistory={selectedRateHistory}
-            />
+            <Tabs defaultValue="schedule" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="schedule">Amortization Schedule</TabsTrigger>
+                <TabsTrigger value="comparison">Schedule vs Actual</TabsTrigger>
+              </TabsList>
+              <TabsContent value="schedule" className="mt-4">
+                <LoanAmortizationSchedule
+                  account={selectedLoanAccount}
+                  rateHistory={selectedRateHistory}
+                />
+              </TabsContent>
+              <TabsContent value="comparison" className="mt-4">
+                <LoanScheduleComparison
+                  account={selectedLoanAccount}
+                  rateHistory={selectedRateHistory}
+                  actualPayments={selectedActualPayments}
+                />
+              </TabsContent>
+            </Tabs>
           )}
         </DialogContent>
       </Dialog>

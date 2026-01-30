@@ -170,29 +170,37 @@ export default function Dashboard() {
           return { accountId: account.id, data: null };
         }
 
-        const emi = calculateEMI(
-          Number(account.loan_principal),
-          Number(account.current_interest_rate),
-          Number(account.loan_tenure_months)
-        );
-
+        let emi = 0;
         let accruedInterest = 0;
-        if (account.loan_start_date) {
-          try {
-            const reference = await getAccruedInterestReference(account);
-            const history = await interestRateApi.getInterestRateHistory(account.id);
-
-            if (reference) {
-              accruedInterest = calculateAccruedInterest(
-                reference.referenceDate,
-                reference.referenceBalance,
-                history,
-                Number(account.current_interest_rate)
-              );
-            }
-          } catch (error) {
-            console.error('Error calculating accrued interest:', error);
+        try {
+          const reference = await getAccruedInterestReference(account);
+          const history = await interestRateApi.getInterestRateHistory(account.id);
+          const sortedHistory = [...history].sort(
+            (a, b) => new Date(a.effective_date).getTime() - new Date(b.effective_date).getTime()
+          );
+          const openingRate = sortedHistory.length > 0
+            ? Number(sortedHistory[0].interest_rate)
+            : Number(account.current_interest_rate);
+          emi = calculateEMI(
+            Number(account.loan_principal),
+            openingRate,
+            Number(account.loan_tenure_months)
+          );
+          if (reference) {
+            accruedInterest = calculateAccruedInterest(
+              reference.referenceDate,
+              reference.referenceBalance,
+              history,
+              Number(account.current_interest_rate)
+            );
           }
+        } catch (error) {
+          console.error('Error calculating loan metrics:', error);
+          emi = calculateEMI(
+            Number(account.loan_principal),
+            Number(account.current_interest_rate),
+            Number(account.loan_tenure_months)
+          );
         }
 
         return { accountId: account.id, data: { emi, accruedInterest } };

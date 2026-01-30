@@ -6,8 +6,10 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Download } from "lucide-react";
 import { formatCurrency } from "@/utils/format";
-import { calculateAllEMIBreakdowns, calculateEMI } from "@/utils/loanCalculations";
+import { calculateAllEMIBreakdownsFixedRate, calculateEMI } from "@/utils/loanCalculations";
 import type { Account, InterestRateHistory } from "@/types/types";
 import { useMemo } from "react";
 
@@ -64,23 +66,11 @@ export default function LoanAmortizationSchedule({
             });
         }
 
-        // Calculate breakdown
-        // Note: rateHistory should be passed. If empty, create a synthetic one from current rate
-        const effectiveHistory = rateHistory.length > 0 ? rateHistory : [{
-            effective_date: start,
-            interest_rate: currentRate,
-            id: 'default',
-            account_id: account.id,
-            created_at: start // dummy
-        }];
-
-        return calculateAllEMIBreakdowns(
-            start,
+        // Calculate schedule using fixed opening rate per month
+        return calculateAllEMIBreakdownsFixedRate(
             principal,
             payments,
-            effectiveHistory,
-            account.due_date || undefined,
-            currentRate  // Pass opening rate as fallback
+            openingRate
         );
 
     }, [account, rateHistory, startDate]);
@@ -89,8 +79,41 @@ export default function LoanAmortizationSchedule({
         return <div className="text-center text-muted-foreground p-4">Unable to generate schedule. Missing loan details.</div>;
     }
 
+    const exportToExcelCSV = () => {
+        const headers = ["Payment #", "Date", "EMI", "Principal", "Interest", "Balance"];
+        const rows = schedule.map((row) => {
+            const date = new Date(row.payment_date).toISOString().split("T")[0];
+            return [
+                row.payment_number,
+                date,
+                row.emi_amount.toFixed(2),
+                row.principal_component.toFixed(2),
+                row.interest_component.toFixed(2),
+                row.outstanding_principal.toFixed(2),
+            ];
+        });
+        const csvContent = [
+            headers.join(","),
+            ...rows.map(r => r.join(",")),
+        ].join("\n");
+        const blob = new Blob([`\uFEFF${csvContent}`], { type: "text/csv;charset=utf-8;" });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `loan_amortization_${account.account_name || account.id}.csv`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+    };
+
     return (
-        <div className="rounded-md border max-h-[400px] overflow-y-auto">
+        <div className="space-y-2">
+            <div className="flex justify-end">
+                <Button onClick={exportToExcelCSV} variant="outline">
+                    <Download className="mr-2 h-4 w-4" />
+                    Download Excel
+                </Button>
+            </div>
+            <div className="rounded-md border max-h-[400px] overflow-y-auto">
             <Table>
                 <TableHeader>
                     <TableRow>
@@ -128,6 +151,7 @@ export default function LoanAmortizationSchedule({
                     ))}
                 </TableBody>
             </Table>
+            </div>
         </div>
     );
 }

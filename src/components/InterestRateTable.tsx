@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { interestRateApi } from '@/db/api';
-import type { InterestRateHistory } from '@/types/types';
+import { interestRateApi, loanEMIPaymentApi } from '@/db/api';
+import type { InterestRateHistory, LoanEMIPayment } from '@/types/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format, differenceInDays } from 'date-fns';
@@ -23,12 +23,12 @@ interface RatePeriod {
   accruedInterest: number;
 }
 
-export default function InterestRateTable({ 
-  accountId, 
-  accountName, 
-  loanPrincipal, 
+export default function InterestRateTable({
+  accountId,
+  accountName,
+  loanPrincipal,
   loanStartDate,
-  currency 
+  currency
 }: InterestRateTableProps) {
   const [history, setHistory] = useState<InterestRateHistory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,9 +41,12 @@ export default function InterestRateTable({
   const loadHistory = async () => {
     setLoading(true);
     try {
-      const data = await interestRateApi.getInterestRateHistory(accountId);
-      setHistory(data);
-      calculateRatePeriods(data);
+      const [rateData, paymentData] = await Promise.all([
+        interestRateApi.getInterestRateHistory(accountId),
+        loanEMIPaymentApi.getPaymentsByAccount(accountId)
+      ]);
+      setHistory(rateData);
+      calculateRatePeriods(rateData, paymentData);
     } catch (error) {
       console.error('Error loading interest rate history:', error);
     } finally {
@@ -51,7 +54,7 @@ export default function InterestRateTable({
     }
   };
 
-  const calculateRatePeriods = (historyData: InterestRateHistory[]) => {
+  const calculateRatePeriods = (historyData: InterestRateHistory[], paymentData: LoanEMIPayment[]) => {
     if (historyData.length === 0) {
       setRatePeriods([]);
       return;
@@ -60,6 +63,11 @@ export default function InterestRateTable({
     // Sort by effective date
     const sortedHistory = [...historyData].sort(
       (a, b) => new Date(a.effective_date).getTime() - new Date(b.effective_date).getTime()
+    );
+
+    // Sort payments by date
+    const sortedPayments = [...paymentData].sort(
+      (a, b) => new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime()
     );
 
     const periods: RatePeriod[] = [];
@@ -72,16 +80,67 @@ export default function InterestRateTable({
       const startDate = new Date(currentRate.effective_date);
       // Use the earlier of: loan start date or rate effective date
       const effectiveStartDate = new Date(Math.max(startDate.getTime(), new Date(loanStartDate).getTime()));
-      
+
       // End date is either the next rate's effective date or today
       const endDate = nextRate ? new Date(nextRate.effective_date) : today;
-      
+
       // Calculate days in this period
       const days = differenceInDays(endDate, effectiveStartDate);
-      
-      // Calculate accrued interest for this period
-      // Formula: (Principal × Rate × Days) / (365 × 100)
-      const accruedInterest = (loanPrincipal * Number(currentRate.interest_rate) * days) / (365 * 100);
+
+      // Calculate accrued interest considering payment history
+      // Interest accrues on the OUTSTANDING principal, which reduces after each payment
+      let accruedInterest = 0;
+
+      if (sortedPayments.length === 0) {
+        // No payments made yet, use full principal
+        accruedInterest = (loanPrincipal * Number(currentRate.interest_rate) * days) / (365 * 100);
+      } else {
+        // Calculate interest considering principal reductions from payments
+        // We need to find the outstanding principal during each sub-period within this rate period
+
+        // Get payments within this rate period
+        const periodPayments = sortedPayments.filter(p => {
+          const pDate = new Date(p.payment_date);
+          return pDate >= effectiveStartDate && pDate < endDate;
+        });
+
+        // Find the principal at the START of this period
+        // It's the outstanding_principal from the last payment before this period
+        const lastPaymentBeforePeriod = sortedPayments
+          .filter(p => new Date(p.payment_date) < effectiveStartDate)
+          .pop();
+
+        let currentPrincipal = lastPaymentBeforePeriod
+          ? lastPaymentBeforePeriod.outstanding_principal
+          : loanPrincipal;
+
+        if (periodPayments.length === 0) {
+          // No payments in this period, interest on constant principal
+          accruedInterest = (currentPrincipal * Number(currentRate.interest_rate) * days) / (365 * 100);
+        } else {
+          // Calculate interest for sub-periods between payments
+          let subPeriodStart = effectiveStartDate;
+
+          for (const payment of periodPayments) {
+            const paymentDate = new Date(payment.payment_date);
+            const subDays = differenceInDays(paymentDate, subPeriodStart);
+
+            if (subDays > 0) {
+              accruedInterest += (currentPrincipal * Number(currentRate.interest_rate) * subDays) / (365 * 100);
+            }
+
+            // After payment, principal reduces
+            currentPrincipal = payment.outstanding_principal;
+            subPeriodStart = paymentDate;
+          }
+
+          // Calculate interest from last payment to end of period
+          const remainingDays = differenceInDays(endDate, subPeriodStart);
+          if (remainingDays > 0) {
+            accruedInterest += (currentPrincipal * Number(currentRate.interest_rate) * remainingDays) / (365 * 100);
+          }
+        }
+      }
 
       periods.push({
         rate: Number(currentRate.interest_rate),
