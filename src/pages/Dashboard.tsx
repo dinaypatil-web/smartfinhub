@@ -488,6 +488,7 @@ export default function Dashboard() {
         <div className="space-y-1">
           <h1 className="text-3xl md:text-4xl font-bold gradient-text">Dashboard</h1>
           <p className="text-sm md:text-base text-muted-foreground">Welcome back, {profile?.email || 'User'}</p>
+          <p className="text-xs text-muted-foreground">Today: {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <Link to="/accounts/new">
