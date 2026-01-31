@@ -862,12 +862,12 @@ export default function Accounts() {
                           onRateUpdated={loadAccounts}
                         />
                       )}
-
                       <Button
                         variant="secondary"
                         size="sm"
                         className="w-full mt-2"
                         onClick={() => handleViewSchedule(account)}
+                        data-testid={`view-amortization-${account.id}`}
                       >
                         <TrendingDown className="h-4 w-4 mr-2" />
                         View Amortization Schedule

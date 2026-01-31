@@ -1,1 +1,0 @@
-const o=[{key:"salaries",name:"Salaries",icon:"💼",color:"#10B981"},{key:"allowances",name:"Allowances",icon:"💰",color:"#F59E0B"},{key:"family_income",name:"Family Income",icon:"👨‍👩‍👧‍👦",color:"#8B5CF6"},{key:"others",name:"Others",icon:"📊",color:"#6B7280"}];export{o as I};
