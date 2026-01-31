@@ -1,19 +1,33 @@
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { formatCurrency } from "@/utils/format";
-import { calculateAllEMIBreakdowns, calculateEMI } from "@/utils/loanCalculations";
-import type { Account, InterestRateHistory, LoanEMIPayment } from "@/types/types";
-import { useMemo } from "react";
 import { format } from "date-fns";
-import { TrendingUp, TrendingDown, Minus, CheckCircle2, Clock } from "lucide-react";
+import {
+	CheckCircle2,
+	Clock,
+	Minus,
+	TrendingDown,
+	TrendingUp,
+} from "lucide-react";
+import { useMemo } from "react";
+
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/components/ui/table";
+import type {
+	Account,
+	InterestRateHistory,
+	LoanEMIPayment,
+} from "@/types/types";
+import { formatCurrency } from "@/utils/format";
+import {
+	calculateAllEMIBreakdowns,
+	calculateEMI,
+} from "@/utils/loanCalculations";
 
 interface LoanScheduleComparisonProps {
     account: Account;

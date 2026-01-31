@@ -1,59 +1,79 @@
-import { useEffect, useState } from 'react';
-import { useHybridAuth as useAuth } from '@/contexts/HybridAuthContext';
-import { accountApi, interestRateApi, emiApi, transactionApi, loanEMIPaymentApi } from '@/db/api';
-import type { Account, EMITransaction, Transaction, LoanEMIPayment } from '@/types/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { formatCurrency, formatAccountNumber } from '@/utils/format';
 import {
-  Plus, Edit, Trash2, Wallet,
-  CreditCard,
-  Building2,
-  AlertCircle,
-  ChevronDown,
-  ChevronUp,
-  History as HistoryIcon,
-  TrendingDown
-} from 'lucide-react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { useToast } from '@/hooks/use-toast';
-import InterestRateManager from '@/components/InterestRateManager';
-import { calculateEMI, calculateAccruedInterest } from '@/utils/loanCalculations';
-import LoanAmortizationSchedule from '@/components/LoanAmortizationSchedule';
-import LoanScheduleComparison from '@/components/LoanScheduleComparison';
+	AlertCircle,
+	Building2,
+	ChevronDown,
+	ChevronUp,
+	CreditCard,
+	Edit,
+	History as HistoryIcon,
+	Plus,
+	Trash2,
+	TrendingDown,
+	Wallet,
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+
+import BankLogo from "@/components/BankLogo";
+import InterestRateManager from "@/components/InterestRateManager";
+import LoanAmortizationSchedule from "@/components/LoanAmortizationSchedule";
+import LoanScheduleComparison from "@/components/LoanScheduleComparison";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
 } from "@/components/ui/dialog";
-import type { InterestRateHistory } from '@/types/types';
+import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useHybridAuth as useAuth } from "@/contexts/HybridAuthContext";
 import {
-  calculateAvailableCredit,
-  calculateCreditUtilization,
-  getCreditLimitWarningLevel,
-  calculateStatementAmount
-} from '@/utils/emiCalculations';
+	accountApi,
+	emiApi,
+	interestRateApi,
+	loanEMIPaymentApi,
+	transactionApi,
+} from "@/db/api";
+import { useToast } from "@/hooks/use-toast";
+import type {
+	Account,
+	EMITransaction,
+	InterestRateHistory,
+	LoanEMIPayment,
+	Transaction,
+} from "@/types/types";
 import {
-  getBillingCycleInfo
-} from '@/utils/billingCycleCalculations';
-import { calculateCreditCardStatementAmount, shouldDisplayDueAmount, getStatementDueDate, calculateMinimumDue } from '@/utils/statementCalculations';
-import BankLogo from '@/components/BankLogo';
-import { cache } from '@/utils/cache';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+	getBillingCycleInfo,
+} from "@/utils/billingCycleCalculations";
+import { cache } from "@/utils/cache";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+	calculateAvailableCredit,
+	calculateCreditUtilization,
+	calculateStatementAmount,
+	getCreditLimitWarningLevel,
+} from "@/utils/emiCalculations";
+import { formatAccountNumber, formatCurrency } from "@/utils/format";
+import { calculateAccruedInterest, calculateEMI } from "@/utils/loanCalculations";
+import {
+	calculateCreditCardStatementAmount,
+	calculateMinimumDue,
+	getStatementDueDate,
+	shouldDisplayDueAmount,
+} from "@/utils/statementCalculations";
 
 export default function Accounts() {
   const { user, profile } = useAuth();
