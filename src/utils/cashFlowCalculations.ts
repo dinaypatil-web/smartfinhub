@@ -450,8 +450,12 @@ export function calculateMonthlyCashFlow(
   // Formula: Opening Balance + Income Received - Expenses (Cash/Bank) - Credit Card Repayments
   const expectedBalance = openingBalance + incomeReceived - expensesIncurred - creditCardRepayments;
 
-  // Formula: Expected Balance - Remaining Expense Budget + Remaining Income Budget - Credit Card Dues
-  const netAvailable = expectedBalance - remainingBudget + remainingIncomeBudget - creditCardDues;
+  // Formula: Opening Balance + Income Received - Actual Expenses - Remaining Expense Budget + Remaining Income Budget - Credit Card Dues
+  // Note: We do NOT subtract creditCardRepayments here because:
+  // 1. creditCardRepayments are actual cash outflows already in expensesIncurred
+  // 2. creditCardDues represent future obligations (not yet paid)
+  // 3. The net available position = cash available after actual spending - future obligations
+  const netAvailable = openingBalance + incomeReceived - expensesIncurred - remainingBudget + remainingIncomeBudget - creditCardDues;
 
   return {
     openingBalance,
