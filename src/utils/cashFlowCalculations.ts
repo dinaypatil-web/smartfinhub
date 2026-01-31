@@ -83,6 +83,7 @@ export function calculateMonthExpenses(
       transactionDate >= monthStart &&
       transactionDate <= today &&
       isCashOrBank &&
+      t.transaction_type !== 'interest_charge' &&
       (t.transaction_type === 'expense' ||
         t.transaction_type === 'withdrawal' ||
         t.transaction_type === 'loan_payment' ||
