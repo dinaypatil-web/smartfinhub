@@ -1,0 +1,35 @@
+# Vercel Ignore File
+# Files that should not be included in Vercel deployments
+
+.git
+.gitignore
+.env
+.env.local
+.env.*.local
+README.md
+*.md
+node_modules
+.DS_Store
+*.log
+.rules/
+.sync/
+.version
+server.log
+docs/
+supabase/
+
+# Build artifacts (they'll be rebuilt)
+dist/
+.next/
+out/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test files
+*.test.ts
+*.spec.ts
+coverage/
