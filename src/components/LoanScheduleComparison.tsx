@@ -174,11 +174,16 @@ export default function LoanScheduleComparison({
     // Calculate summary stats
     const paidCount = comparison.filter(r => r.status === 'paid').length;
     const overdueCount = comparison.filter(r => r.status === 'overdue').length;
+    
+    // Only calculate interest savings from PAID EMIs
+    // Interest Saved = (Projected Interest for paid EMIs) - (Actual Interest paid)
+    const paidRows = comparison.filter(r => r.status === 'paid');
+    const totalProjectedInterestPaid = paidRows.reduce((sum, r) => sum + r.projectedInterest, 0);
+    const totalActualInterestPaid = paidRows.reduce((sum, r) => sum + (r.actualInterest || 0), 0);
+    const interestSavings = totalProjectedInterestPaid - totalActualInterestPaid;
+    
+    // Total projected for entire loan (for reference)
     const totalProjectedInterest = comparison.reduce((sum, r) => sum + r.projectedInterest, 0);
-    const totalActualInterest = comparison
-        .filter(r => r.actualInterest !== null)
-        .reduce((sum, r) => sum + (r.actualInterest || 0), 0);
-    const interestSavings = totalProjectedInterest - totalActualInterest;
 
     const getStatusBadge = (status: 'paid' | 'pending' | 'overdue') => {
         switch (status) {
