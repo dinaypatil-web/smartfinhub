@@ -249,66 +249,87 @@ export default function LoanScheduleComparison({
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {comparison.map((row) => (
-                            <TableRow key={row.paymentNumber} className={row.status === 'overdue' ? 'bg-red-50 dark:bg-red-950/20' : ''}>
-                                <TableCell>{row.paymentNumber}</TableCell>
-                                <TableCell>{getStatusBadge(row.status)}</TableCell>
-                                <TableCell>
-                                    {format(new Date(row.projectedDate), "MMM dd, yyyy")}
-                                </TableCell>
-                                <TableCell>
-                                    {row.actualDate
-                                        ? format(new Date(row.actualDate), "MMM dd, yyyy")
-                                        : <span className="text-muted-foreground">-</span>
-                                    }
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    {formatCurrency(row.projectedEMI, account.currency)}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    <div className="flex items-center justify-end gap-1">
-                                        {row.actualEMI !== null
-                                            ? formatCurrency(row.actualEMI, account.currency)
+                        {comparison.map((row) => {
+                            // For pending rows, show projected EMI as actual EMI in blue until balance is 0
+                            const isPendingWithProjection = row.status === 'pending' && row.actualEMI === null;
+                            
+                            return (
+                                <TableRow 
+                                    key={row.paymentNumber} 
+                                    className={`${row.status === 'overdue' ? 'bg-red-50 dark:bg-red-950/20' : ''} ${isPendingWithProjection ? 'bg-blue-50 dark:bg-blue-950/20' : ''}`}
+                                >
+                                    <TableCell>{row.paymentNumber}</TableCell>
+                                    <TableCell>{getStatusBadge(row.status)}</TableCell>
+                                    <TableCell>
+                                        {format(new Date(row.projectedDate), "MMM dd, yyyy")}
+                                    </TableCell>
+                                    <TableCell>
+                                        {row.actualDate
+                                            ? format(new Date(row.actualDate), "MMM dd, yyyy")
                                             : <span className="text-muted-foreground">-</span>
                                         }
-                                        {getVarianceIndicator(row.emiVariance)}
-                                    </div>
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    <div className="flex flex-col items-end text-xs">
-                                        <span className="text-emerald-600">{formatCurrency(row.projectedPrincipal, account.currency)}</span>
-                                        <span className={row.actualPrincipal !== null ? 'text-emerald-800 font-medium' : 'text-muted-foreground'}>
-                                            {row.actualPrincipal !== null
-                                                ? formatCurrency(row.actualPrincipal, account.currency)
-                                                : '-'
-                                            }
-                                        </span>
-                                    </div>
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    <div className="flex flex-col items-end text-xs">
-                                        <span className="text-red-600">{formatCurrency(row.projectedInterest, account.currency)}</span>
-                                        <span className={row.actualInterest !== null ? 'text-red-800 font-medium' : 'text-muted-foreground'}>
-                                            {row.actualInterest !== null
-                                                ? formatCurrency(row.actualInterest, account.currency)
-                                                : '-'
-                                            }
-                                        </span>
-                                    </div>
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    <div className="flex flex-col items-end text-xs">
-                                        <span>{formatCurrency(row.projectedBalance, account.currency)}</span>
-                                        <span className={row.actualBalance !== null ? 'font-medium' : 'text-muted-foreground'}>
-                                            {row.actualBalance !== null
-                                                ? formatCurrency(row.actualBalance, account.currency)
-                                                : '-'
-                                            }
-                                        </span>
-                                    </div>
-                                </TableCell>
-                            </TableRow>
-                        ))}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        {formatCurrency(row.projectedEMI, account.currency)}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <div className="flex items-center justify-end gap-1">
+                                            {row.actualEMI !== null ? (
+                                                <>
+                                                    {formatCurrency(row.actualEMI, account.currency)}
+                                                    {getVarianceIndicator(row.emiVariance)}
+                                                </>
+                                            ) : isPendingWithProjection ? (
+                                                <span className="text-blue-600 font-semibold">
+                                                    {formatCurrency(row.projectedEMI, account.currency)}
+                                                </span>
+                                            ) : (
+                                                <span className="text-muted-foreground">-</span>
+                                            )}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <div className="flex flex-col items-end text-xs">
+                                            <span className="text-emerald-600">{formatCurrency(row.projectedPrincipal, account.currency)}</span>
+                                            <span className={isPendingWithProjection ? 'text-blue-600 font-semibold' : row.actualPrincipal !== null ? 'text-emerald-800 font-medium' : 'text-muted-foreground'}>
+                                                {row.actualPrincipal !== null
+                                                    ? formatCurrency(row.actualPrincipal, account.currency)
+                                                    : isPendingWithProjection
+                                                    ? formatCurrency(row.projectedPrincipal, account.currency)
+                                                    : '-'
+                                                }
+                                            </span>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <div className="flex flex-col items-end text-xs">
+                                            <span className="text-red-600">{formatCurrency(row.projectedInterest, account.currency)}</span>
+                                            <span className={isPendingWithProjection ? 'text-blue-600 font-semibold' : row.actualInterest !== null ? 'text-red-800 font-medium' : 'text-muted-foreground'}>
+                                                {row.actualInterest !== null
+                                                    ? formatCurrency(row.actualInterest, account.currency)
+                                                    : isPendingWithProjection
+                                                    ? formatCurrency(row.projectedInterest, account.currency)
+                                                    : '-'
+                                                }
+                                            </span>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <div className="flex flex-col items-end text-xs">
+                                            <span>{formatCurrency(row.projectedBalance, account.currency)}</span>
+                                            <span className={isPendingWithProjection ? 'text-blue-600 font-semibold' : row.actualBalance !== null ? 'font-medium' : 'text-muted-foreground'}>
+                                                {row.actualBalance !== null
+                                                    ? formatCurrency(row.actualBalance, account.currency)
+                                                    : isPendingWithProjection
+                                                    ? formatCurrency(row.projectedBalance, account.currency)
+                                                    : '-'
+                                                }
+                                            </span>
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            );
+                        })}
                     </TableBody>
                 </Table>
             </div>
@@ -317,6 +338,7 @@ export default function LoanScheduleComparison({
             <div className="text-xs text-muted-foreground space-y-1">
                 <p>• <strong>P/A</strong> = Projected / Actual</p>
                 <p>• <TrendingUp className="h-3 w-3 inline text-red-500" /> Paid more than projected | <TrendingDown className="h-3 w-3 inline text-green-500" /> Paid less than projected</p>
+                <p>• <span className="text-blue-600 font-semibold">Blue text</span> in pending rows shows projected values as a forecast (useful for analyzing early repayment scenarios)</p>
                 <p>• Interest Saved/Extra is calculated based on actual payments vs projected schedule</p>
             </div>
         </div>
