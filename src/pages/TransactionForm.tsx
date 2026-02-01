@@ -199,13 +199,15 @@ export default function TransactionForm() {
             // Fetch rate history
             const rateHistory = await interestRateApi.getInterestRateHistory(account.id);
 
-            // We need the last payment date to calculate interest accurately. 
-            // For now, we'll estimate using monthly interest if no specialized calculation is available.
-            // But wait, I can use calculateEMIBreakdownWithHistory if I have the start date.
+            // Get the last EMI payment date for this loan
+            const emiPayments = await loanEMIPaymentApi.getPaymentsByAccount(account.id);
+            const lastPaymentDate = emiPayments.length > 0
+              ? emiPayments[0].payment_date // Most recent payment (already sorted descending)
+              : null;
 
             const breakdown = calculateEMIBreakdownWithHistory(
-              account.loan_start_date || new Date().toISOString(), // Fallback
-              null, // Previous payment date - ideal would be to fetch last transaction
+              account.loan_start_date || new Date().toISOString(),
+              lastPaymentDate, // Use actual last payment date, not loan start
               formData.transaction_date,
               Number(account.balance), // Outstanding principal
               amount,
