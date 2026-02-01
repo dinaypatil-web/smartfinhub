@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useHybridAuth as useAuth } from '@/contexts/HybridAuthContext';
-import { transactionApi, accountApi, categoryApi, budgetApi, emiApi, interestRateApi, loanEMIPaymentApi } from '@/db/api';
-import type { TransactionType, Account } from '@/types/types';
+import { transactionApi, accountApi, categoryApi, budgetApi, emiApi, interestRateApi, loanEMIPaymentApi, creditCardStatementApi } from '@/db/api';
+import type { TransactionType, Account, CreditCardPaymentAllocation } from '@/types/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, ArrowLeft, TrendingDown, AlertCircle, CreditCard } from 'lucide-react';
 import { formatCurrency } from '@/utils/format';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { CreditCardStatementSelector } from '@/components/CreditCardStatementSelector';
 import {
   calculateMonthlyEMI,
   calculateEMIDetails,
@@ -76,6 +77,10 @@ export default function TransactionForm() {
     interest: number;
   } | null>(null);
   const [isManualBreakdown, setIsManualBreakdown] = useState(false);
+
+  // Credit Card Statement and Payment Management
+  const [ccAllocations, setCCAllocations] = useState<CreditCardPaymentAllocation[]>([]);
+  const [ccAdvanceAmount, setCCAdvanceAmount] = useState(0);
 
   useEffect(() => {
     if (user) {
@@ -579,6 +584,51 @@ export default function TransactionForm() {
           }
         }
 
+        // Handle Credit Card Repayment with Statement Allocations
+        if (formData.transaction_type === 'credit_card_repayment' && createdTransaction) {
+          try {
+            // Create allocations if user selected specific items
+            if (ccAllocations.length > 0) {
+              await creditCardStatementApi.allocateRepayment(createdTransaction.id, ccAllocations);
+
+              // Mark selected items as paid
+              for (const allocation of ccAllocations) {
+                await creditCardStatementApi.updateStatementLineStatus(
+                  allocation.statement_line_id,
+                  'paid',
+                  allocation.amount_paid
+                );
+
+                // Call payEMIInstallment if it's an EMI item
+                if (allocation.emi_id) {
+                  try {
+                    await emiApi.payEMIInstallment(allocation.emi_id, allocation.amount_paid);
+                  } catch (err) {
+                    console.error('Error updating EMI installment:', err);
+                  }
+                }
+              }
+            }
+
+            // Record advance payment if there's an excess
+            if (ccAdvanceAmount > 0) {
+              const creditCard = accounts.find(a => a.id === formData.to_account_id);
+              if (creditCard) {
+                await creditCardStatementApi.createAdvancePayment(
+                  user.id,
+                  formData.to_account_id,
+                  ccAdvanceAmount,
+                  formData.currency,
+                  `Advance payment from repayment on ${formData.transaction_date}`
+                );
+              }
+            }
+          } catch (error) {
+            console.error('Error processing credit card statement allocations:', error);
+            // Don't block the transaction creation if allocation fails
+          }
+        }
+
         // Clear dashboard cache to reflect new transaction
         cache.clearPattern('dashboard-');
 
@@ -891,6 +941,17 @@ export default function TransactionForm() {
                   </div>
                 )}
               </div>
+            )}
+
+            {/* Credit Card Statement Selector for Repayment */}
+            {formData.transaction_type === 'credit_card_repayment' && formData.to_account_id && (
+              <CreditCardStatementSelector
+                creditCardId={formData.to_account_id}
+                repaymentAmount={parseFloat(formData.amount) || 0}
+                onAllocationsChange={setCCAllocations}
+                onAdvanceAmountChange={setCCAdvanceAmount}
+                currency={formData.currency}
+              />
             )}
 
             {/* Loan Payment Principal/Interest Breakdown */}
