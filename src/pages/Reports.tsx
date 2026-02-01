@@ -21,6 +21,11 @@ interface CashFlowStatement {
   operatingActivities: {
     totalIncome: number;
     totalExpenses: number;
+    expenseBreakdown: {
+      regularExpenses: number;
+      loanPayments: number;
+      creditCardRepayments: number;
+    };
     netOperatingCashFlow: number;
   };
   investingActivities: {
@@ -28,8 +33,6 @@ interface CashFlowStatement {
     netInvestingCashFlow: number;
   };
   financingActivities: {
-    loanPayments: number;
-    creditCardRepayments: number;
     withdrawals: number;
     netFinancingCashFlow: number;
   };
@@ -311,9 +314,20 @@ export default function Reports() {
       .filter(t => t.transaction_type === 'income')
       .reduce((sum, t) => sum + parseAmount(t.amount), 0);
 
-    const totalExpenses = monthlyTransactions
+    const expenses = monthlyTransactions
       .filter(t => t.transaction_type === 'expense')
       .reduce((sum, t) => sum + parseAmount(t.amount), 0);
+
+    const loanPayments = monthlyTransactions
+      .filter(t => t.transaction_type === 'loan_payment')
+      .reduce((sum, t) => sum + parseAmount(t.amount), 0);
+
+    const creditCardRepayments = monthlyTransactions
+      .filter(t => t.transaction_type === 'credit_card_repayment')
+      .reduce((sum, t) => sum + parseAmount(t.amount), 0);
+
+    // Loan and CC payments are treated as expenses (monthly obligations)
+    const totalExpenses = expenses + loanPayments + creditCardRepayments;
 
     const netOperatingCashFlow = totalIncome - totalExpenses;
 
@@ -324,19 +338,12 @@ export default function Reports() {
     const netInvestingCashFlow = 0;
 
     // Financing Activities
-    const loanPayments = monthlyTransactions
-      .filter(t => t.transaction_type === 'loan_payment')
-      .reduce((sum, t) => sum + parseAmount(t.amount), 0);
-
-    const creditCardRepayments = monthlyTransactions
-      .filter(t => t.transaction_type === 'credit_card_repayment')
-      .reduce((sum, t) => sum + parseAmount(t.amount), 0);
-
+    // Note: Loan and CC payments are now treated as operating expenses (monthly obligations)
     const withdrawals = monthlyTransactions
       .filter(t => t.transaction_type === 'withdrawal')
       .reduce((sum, t) => sum + parseAmount(t.amount), 0);
 
-    const netFinancingCashFlow = -(loanPayments + creditCardRepayments + withdrawals);
+    const netFinancingCashFlow = -withdrawals;
 
     // Calculate net cash flow
     const netCashFlow = netOperatingCashFlow + netInvestingCashFlow + netFinancingCashFlow;
@@ -349,6 +356,11 @@ export default function Reports() {
       operatingActivities: {
         totalIncome,
         totalExpenses,
+        expenseBreakdown: {
+          regularExpenses: expenses,
+          loanPayments,
+          creditCardRepayments,
+        },
         netOperatingCashFlow,
       },
       investingActivities: {
@@ -356,8 +368,6 @@ export default function Reports() {
         netInvestingCashFlow,
       },
       financingActivities: {
-        loanPayments,
-        creditCardRepayments,
         withdrawals,
         netFinancingCashFlow,
       },
@@ -798,11 +808,32 @@ export default function Reports() {
                           +{formatCurrency(cashFlowStatement.operatingActivities.totalIncome, currency)}
                         </span>
                       </div>
-                      <div className="flex justify-between items-center pl-4 border-l-4 border-danger">
-                        <span className="text-sm">Cash Outflows (Expenses)</span>
-                        <span className="font-semibold text-danger">
-                          -{formatCurrency(cashFlowStatement.operatingActivities.totalExpenses, currency)}
-                        </span>
+                      <div className="space-y-2 pl-4 py-2 bg-red-50 dark:bg-red-900/10 rounded">
+                        <div className="text-sm font-medium text-muted-foreground">Cash Outflows (Expenses)</div>
+                        <div className="flex justify-between text-sm">
+                          <span className="ml-2">Regular Expenses</span>
+                          <span>
+                            {formatCurrency(cashFlowStatement.operatingActivities.expenseBreakdown.regularExpenses, currency)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="ml-2">Loan Payments</span>
+                          <span>
+                            {formatCurrency(cashFlowStatement.operatingActivities.expenseBreakdown.loanPayments, currency)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="ml-2">Credit Card Repayments</span>
+                          <span>
+                            {formatCurrency(cashFlowStatement.operatingActivities.expenseBreakdown.creditCardRepayments, currency)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-sm font-semibold border-t pt-2 mt-2">
+                          <span className="ml-2">Total Outflows</span>
+                          <span className="text-danger">
+                            -{formatCurrency(cashFlowStatement.operatingActivities.totalExpenses, currency)}
+                          </span>
+                        </div>
                       </div>
                       <div className="flex justify-between items-center pt-3 mt-3 border-t font-semibold bg-blue-50 dark:bg-blue-900/20 p-3 rounded">
                         <span>Net Operating Cash Flow</span>
@@ -840,19 +871,7 @@ export default function Reports() {
                     </CardHeader>
                     <CardContent className="space-y-3">
                       <div className="flex justify-between items-center pl-4 border-l-4 border-danger">
-                        <span className="text-sm">Loan Payments</span>
-                        <span className="font-semibold">
-                          -{formatCurrency(cashFlowStatement.financingActivities.loanPayments, currency)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center pl-4 border-l-4 border-danger">
-                        <span className="text-sm">Credit Card Repayments</span>
-                        <span className="font-semibold">
-                          -{formatCurrency(cashFlowStatement.financingActivities.creditCardRepayments, currency)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center pl-4 border-l-4 border-danger">
-                        <span className="text-sm">Withdrawals</span>
+                        <span className="text-sm">Cash Withdrawals</span>
                         <span className="font-semibold">
                           -{formatCurrency(cashFlowStatement.financingActivities.withdrawals, currency)}
                         </span>
