@@ -1,15 +1,15 @@
 import {
-	AlertCircle,
-	Building2,
-	ChevronDown,
-	ChevronUp,
-	CreditCard,
-	Edit,
-	History as HistoryIcon,
-	Plus,
-	Trash2,
-	TrendingDown,
-	Wallet,
+  AlertCircle,
+  Building2,
+  ChevronDown,
+  ChevronUp,
+  CreditCard,
+  Edit,
+  History as HistoryIcon,
+  Plus,
+  Trash2,
+  TrendingDown,
+  Wallet,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -19,60 +19,61 @@ import InterestRateManager from "@/components/InterestRateManager";
 import LoanAmortizationSchedule from "@/components/LoanAmortizationSchedule";
 import LoanScheduleComparison from "@/components/LoanScheduleComparison";
 import {
-	AlertDialog,
-	AlertDialogAction,
-	AlertDialogCancel,
-	AlertDialogContent,
-	AlertDialogDescription,
-	AlertDialogFooter,
-	AlertDialogHeader,
-	AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useHybridAuth as useAuth } from "@/contexts/HybridAuthContext";
 import {
-	accountApi,
-	emiApi,
-	interestRateApi,
-	loanEMIPaymentApi,
-	transactionApi,
+  accountApi,
+  emiApi,
+  interestRateApi,
+  loanEMIPaymentApi,
+  transactionApi,
+  creditCardStatementApi,
 } from "@/db/api";
 import { useToast } from "@/hooks/use-toast";
 import type {
-	Account,
-	EMITransaction,
-	InterestRateHistory,
-	LoanEMIPayment,
-	Transaction,
+  Account,
+  EMITransaction,
+  InterestRateHistory,
+  LoanEMIPayment,
+  Transaction,
 } from "@/types/types";
 import {
-	getBillingCycleInfo,
+  getBillingCycleInfo,
 } from "@/utils/billingCycleCalculations";
 import { cache } from "@/utils/cache";
 import {
-	calculateAvailableCredit,
-	calculateCreditUtilization,
-	calculateStatementAmount,
-	getCreditLimitWarningLevel,
+  calculateAvailableCredit,
+  calculateCreditUtilization,
+  calculateStatementAmount,
+  getCreditLimitWarningLevel,
 } from "@/utils/emiCalculations";
 import { formatAccountNumber, formatCurrency } from "@/utils/format";
 import { calculateAccruedInterest, calculateEMI } from "@/utils/loanCalculations";
 import {
-	calculateCreditCardStatementAmount,
-	calculateMinimumDue,
-	getStatementDueDate,
-	shouldDisplayDueAmount,
+  calculateCreditCardStatementAmount,
+  calculateMinimumDue,
+  getStatementDueDate,
+  shouldDisplayDueAmount,
 } from "@/utils/statementCalculations";
 
 export default function Accounts() {
@@ -88,6 +89,7 @@ export default function Accounts() {
   const [accountEMIs, setAccountEMIs] = useState<Record<string, EMITransaction[]>>({});
   const [accountTransactions, setAccountTransactions] = useState<Record<string, Transaction[]>>({});
   const [expandedLoanHistory, setExpandedLoanHistory] = useState<Record<string, boolean>>({});
+  const [accountAdvanceBalances, setAccountAdvanceBalances] = useState<Record<string, number>>({});
 
   // Schedule Dialog State
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
@@ -185,6 +187,20 @@ export default function Accounts() {
       }
       setAccountEMIs(emis);
       setAccountTransactions(accountTxs);
+
+      // Load advance balances for credit cards
+      const advanceBalances: Record<string, number> = {};
+      for (const account of data) {
+        if (account.account_type === 'credit_card') {
+          try {
+            const balance = await creditCardStatementApi.getAdvanceBalance(account.id);
+            advanceBalances[account.id] = balance;
+          } catch (error) {
+            console.error(`Error loading advance balance for account ${account.id}:`, error);
+          }
+        }
+      }
+      setAccountAdvanceBalances(advanceBalances);
     } catch (error) {
       console.error('Error loading accounts:', error);
       toast({
@@ -497,15 +513,18 @@ export default function Accounts() {
                       if (shouldDisplayDueAmount(account.statement_day)) {
                         const transactions = accountTransactions[account.id] || [];
                         const emis = accountEMIs[account.id] || [];
+                        const advanceBal = accountAdvanceBalances[account.id] || 0;
                         const statementCalc = calculateCreditCardStatementAmount(
                           account.id,
                           account.statement_day,
                           transactions,
                           emis,
                           new Date(),
-                          Number(account.balance)
+                          Number(account.balance),
+                          account.due_day,
+                          advanceBal
                         );
-                        return sum + Math.abs(statementCalc.statementAmount);
+                        return sum + Math.abs(statementCalc.netStatementAmount);
                       }
                       return sum;
                     }
@@ -552,15 +571,18 @@ export default function Accounts() {
                       transactions,
                       emis,
                       new Date(),
-                      Number(account.balance)
+                      Number(account.balance),
+                      account.due_day,
+                      accountAdvanceBalances[account.id] || 0
                     );
                     statementAmount = statementCalc.statementAmount;
+                    const netDueAmount = statementCalc.netStatementAmount;
 
                     // Only show due amount after statement date
                     showDueAmount = shouldDisplayDueAmount(account.statement_day);
                     if (showDueAmount) {
                       // Use calculated statement amount (only includes transactions up to statement date)
-                      dueAmount = Math.abs(statementAmount);
+                      dueAmount = Math.abs(netDueAmount);
                       if (account.due_day) {
                         dueDate = getStatementDueDate(account.statement_day, account.due_day);
                         billingInfo = getBillingCycleInfo(account.statement_day, account.due_day);
@@ -682,9 +704,16 @@ export default function Accounts() {
                             </div>
                             <div className="flex items-center justify-between pt-2 border-t">
                               <p className="text-sm font-semibold">Total Statement Amount</p>
-                              <p className="text-lg font-bold text-purple-600 dark:text-purple-400">
-                                {formatCurrency(statementAmount, account.currency)}
-                              </p>
+                              <div className="text-right">
+                                <p className="text-lg font-bold text-purple-600 dark:text-purple-400">
+                                  {formatCurrency(statementAmount, account.currency)}
+                                </p>
+                                {accountAdvanceBalances[account.id] > 0 && (
+                                  <p className="text-[10px] text-blue-600 font-medium">
+                                    - {formatCurrency(accountAdvanceBalances[account.id], account.currency)} advance applied
+                                  </p>
+                                )}
+                              </div>
                             </div>
                           </div>
                         )}

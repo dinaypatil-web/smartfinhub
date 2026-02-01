@@ -12,7 +12,8 @@ interface CreditCardStatementSelectorProps {
   creditCardId: string;
   repaymentAmount: number;
   onAllocationsChange: (allocations: CreditCardPaymentAllocation[]) => void;
-  onAdvanceAmountChange: (amount: number) => void;
+  onAdvanceCreatedChange: (amount: number) => void;
+  onAdvanceUsedChange: (amount: number) => void;
   currency: string;
 }
 
@@ -20,7 +21,8 @@ export const CreditCardStatementSelector: React.FC<CreditCardStatementSelectorPr
   creditCardId,
   repaymentAmount,
   onAllocationsChange,
-  onAdvanceAmountChange,
+  onAdvanceCreatedChange,
+  onAdvanceUsedChange,
   currency
 }) => {
   const [statementItems, setStatementItems] = useState<StatementItem[]>([]);
@@ -39,7 +41,7 @@ export const CreditCardStatementSelector: React.FC<CreditCardStatementSelectorPr
 
         // Get unpaid statement lines
         const items = await creditCardStatementApi.getUnpaidStatementLines(creditCardId);
-        
+
         // Get advance balance
         const balance = await creditCardStatementApi.getAdvanceBalance(creditCardId);
         setAdvanceBalance(balance);
@@ -83,7 +85,16 @@ export const CreditCardStatementSelector: React.FC<CreditCardStatementSelectorPr
     ).filter(Boolean) as StatementItem[];
 
     const totalSelected = selectedItemsList.reduce((sum, item) => sum + parseFloat(item.amount.toString()), 0);
-    const advanceAmount = Math.max(0, repaymentAmount - totalSelected);
+    const diff = repaymentAmount - totalSelected;
+
+    let created = 0;
+    let used = 0;
+
+    if (diff > 0) {
+      created = diff;
+    } else if (diff < 0) {
+      used = Math.min(advanceBalance, Math.abs(diff));
+    }
 
     // Build allocations
     const allocations: CreditCardPaymentAllocation[] = selectedItemsList.map(item => ({
@@ -95,8 +106,9 @@ export const CreditCardStatementSelector: React.FC<CreditCardStatementSelectorPr
     }));
 
     onAllocationsChange(allocations);
-    onAdvanceAmountChange(advanceAmount);
-  }, [selectedItems, statementItems, repaymentAmount, onAllocationsChange, onAdvanceAmountChange]);
+    onAdvanceCreatedChange(created);
+    onAdvanceUsedChange(used);
+  }, [selectedItems, statementItems, repaymentAmount, advanceBalance, onAllocationsChange, onAdvanceCreatedChange, onAdvanceUsedChange]);
 
   const toggleItemSelection = (itemId: string) => {
     const newSelected = new Set(selectedItems);
@@ -123,7 +135,10 @@ export const CreditCardStatementSelector: React.FC<CreditCardStatementSelectorPr
   ).filter(Boolean) as StatementItem[];
 
   const totalSelected = selectedItemsList.reduce((sum, item) => sum + parseFloat(item.amount.toString()), 0);
-  const advanceAmount = Math.max(0, repaymentAmount - totalSelected);
+  const diff = repaymentAmount - totalSelected;
+  const advanceCreated = diff > 0 ? diff : 0;
+  const advanceUsed = diff < 0 ? Math.min(advanceBalance, Math.abs(diff)) : 0;
+  const shortFall = diff < 0 ? Math.max(0, Math.abs(diff) - advanceBalance) : 0;
 
   if (loading) {
     return (
@@ -222,37 +237,58 @@ export const CreditCardStatementSelector: React.FC<CreditCardStatementSelectorPr
       {/* Payment Summary */}
       <div className="bg-gray-50 rounded-lg p-4 space-y-2">
         <div className="flex justify-between text-sm">
-          <span className="text-gray-600">Selected Items:</span>
-          <span className="font-semibold">{selectedItems.size}</span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600">Total Selected:</span>
+          <span className="text-gray-600">Total Selection:</span>
           <span className="font-semibold">{currency} {totalSelected.toFixed(2)}</span>
         </div>
-        <div className="h-px bg-gray-200"></div>
+
+        <div className="h-px bg-gray-200 my-1"></div>
+
         <div className="flex justify-between text-sm">
-          <span className="text-gray-600">Repayment Amount:</span>
-          <span className="font-semibold">{currency} {repaymentAmount.toFixed(2)}</span>
+          <span className="text-gray-600">Covered by Repayment:</span>
+          <span className="font-semibold">{currency} {Math.min(repaymentAmount, totalSelected).toFixed(2)}</span>
         </div>
-        
-        {advanceAmount > 0 && (
-          <div className="flex justify-between text-sm pt-2 border-t border-gray-200">
-            <span className="text-gray-600">Advance/Credit Balance:</span>
-            <span className="font-semibold text-green-600">{currency} {advanceAmount.toFixed(2)}</span>
+
+        {advanceUsed > 0 && (
+          <div className="flex justify-between text-sm text-blue-600 font-medium font-medium">
+            <span>Covered by Advance Balance:</span>
+            <span>{currency} {advanceUsed.toFixed(2)}</span>
+          </div>
+        )}
+
+        {advanceCreated > 0 && (
+          <div className="flex justify-between text-sm text-green-600 font-medium">
+            <span>New Advance Created:</span>
+            <span>{currency} {advanceCreated.toFixed(2)}</span>
+          </div>
+        )}
+
+        {shortFall > 0 && (
+          <div className="flex justify-between text-sm text-red-600 font-bold">
+            <span>Shortfall (Need more funds):</span>
+            <span>{currency} {shortFall.toFixed(2)}</span>
           </div>
         )}
       </div>
 
       {/* Warning if selection doesn't match repayment */}
-      {selectedItems.size > 0 && Math.abs(advanceAmount) > 0.01 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex gap-2">
-          <AlertCircle className="text-amber-600 flex-shrink-0 mt-0.5" size={16} />
-          <p className="text-sm text-amber-800">
-            {advanceAmount > 0
-              ? `₹${advanceAmount.toFixed(2)} will be recorded as advance credit for next statement.`
-              : `You need to select more items worth ₹${Math.abs(advanceAmount).toFixed(2)} to match repayment amount.`
-            }
-          </p>
+      {(advanceCreated > 0 || advanceUsed > 0 || shortFall > 0) && (
+        <div className={`border rounded-lg p-3 flex gap-2 ${shortFall > 0 ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'}`}>
+          <AlertCircle className={shortFall > 0 ? 'text-red-600 mt-0.5' : 'text-amber-600 mt-0.5'} size={16} />
+          <div className="text-sm">
+            {shortFall > 0 ? (
+              <p className="text-red-800 font-semibold">
+                You have selected items worth more than your Repayment + Advance Balance. Amount needed: {currency} {shortFall.toFixed(2)}
+              </p>
+            ) : advanceCreated > 0 ? (
+              <p className="text-amber-800">
+                {currency} {advanceCreated.toFixed(2)} will be recorded as advance credit for next statement.
+              </p>
+            ) : (
+              <p className="text-blue-800">
+                {currency} {advanceUsed.toFixed(2)} from your existing advance balance will be consumed.
+              </p>
+            )}
+          </div>
         </div>
       )}
 

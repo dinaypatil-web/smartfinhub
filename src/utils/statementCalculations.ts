@@ -64,12 +64,15 @@ export function calculateCreditCardStatementAmount(
   transactions: Transaction[],
   emis: EMITransaction[],
   referenceDate: Date = new Date(),
-  currentBalance?: number
+  currentBalance?: number,
+  dueDay: number | null = null,
+  advanceBalance: number = 0
 ): {
   statementAmount: number;
   transactionsAmount: number;
   emisAmount: number;
   dueDate: Date | null;
+  netStatementAmount: number;
 } {
   const { lastStatementDate, currentStatementDate, isAfterStatementDate } = getStatementPeriod(statementDay, referenceDate);
 
@@ -199,22 +202,29 @@ export function calculateCreditCardStatementAmount(
     // statementAmount can be negative (credit).
   }
 
+  const netStatementAmount = Math.max(0, statementAmount - advanceBalance);
+
   // Calculate due date (typically 20-25 days after statement date)
   // Using the due_day from account if available, otherwise null
-  const dueDate = null; // Will be calculated separately using account.due_day
+  const dueDate = getStatementDueDate(statementDay, dueDay, referenceDate);
 
   return {
     statementAmount: Math.round(statementAmount * 100) / 100,
     transactionsAmount: Math.round(transactionsAmount * 100) / 100,
     emisAmount: Math.round(emisAmount * 100) / 100,
-    dueDate
+    dueDate,
+    netStatementAmount: Math.round(netStatementAmount * 100) / 100
   };
 }
 
 /**
  * Get the due date for a credit card statement
  */
-export function getStatementDueDate(statementDay: number, dueDay: number, referenceDate: Date = new Date()): Date | null {
+export function getStatementDueDate(
+  statementDay: number | null,
+  dueDay: number | null,
+  referenceDate: Date = new Date()
+): Date | null {
   if (!statementDay || !dueDay) return null;
 
   const { currentStatementDate, isAfterStatementDate } = getStatementPeriod(statementDay, referenceDate);

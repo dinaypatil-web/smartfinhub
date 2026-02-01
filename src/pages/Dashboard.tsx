@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useHybridAuth as useAuth } from '@/contexts/HybridAuthContext';
-import { accountApi, transactionApi, interestRateApi, emiApi, loanEMIPaymentApi, budgetApi } from '@/db/api';
+import { accountApi, transactionApi, interestRateApi, emiApi, loanEMIPaymentApi, budgetApi, creditCardStatementApi } from '@/db/api';
 import type { Account, Transaction, FinancialSummary, EMITransaction } from '@/types/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatCurrency, formatAccountNumber } from '@/utils/format';
-import { Plus, Wallet, CreditCard, TrendingUp, TrendingDown, Building2, AlertCircle, Calculator, DollarSign, ExternalLink } from 'lucide-react';
+import { Plus, Wallet, CreditCard, TrendingUp, TrendingDown, Building2, AlertCircle, Calculator, DollarSign, ExternalLink, ArrowRightLeft, Calendar, Building } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { calculateEMI, calculateAccruedInterest } from '@/utils/loanCalculations';
@@ -71,6 +71,7 @@ export default function Dashboard() {
     nextStatementDate: Date | null;
     nextDueDate: Date | null;
   }>>([]);
+  const [accountAdvanceBalances, setAccountAdvanceBalances] = useState<Record<string, number>>({});
 
   const currency = profile?.default_currency || 'INR';
 
@@ -151,132 +152,86 @@ export default function Dashboard() {
 
   const loadHeavyCalculations = async (summaryData: FinancialSummary) => {
     if (!user) return;
-
     try {
-      // Get current month date range
       const now = new Date();
+      const currentMonth = now.getMonth() + 1;
+      const currentYear = now.getFullYear();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
 
-      // Fetch both month transactions and all transactions for proper calculations
       const [monthExpenses, allTransactions] = await Promise.all([
         transactionApi.getTransactionsByDateRange(user.id, startOfMonth, endOfMonth),
-        transactionApi.getTransactions(user.id) // Get all transactions without limit
+        transactionApi.getTransactions(user.id)
       ]);
 
-      // Parallel processing for loan accounts
       const loanPromises = (summaryData?.accounts_by_type.loan || []).map(async (account) => {
         if (!account.loan_principal || !account.current_interest_rate || !account.loan_tenure_months) {
           return { accountId: account.id, data: null };
         }
-
-        let emi = 0;
-        let accruedInterest = 0;
+        let emi = 0, accruedInterest = 0;
         try {
           const reference = await getAccruedInterestReference(account);
           const history = await interestRateApi.getInterestRateHistory(account.id);
-          const sortedHistory = [...history].sort(
-            (a, b) => new Date(a.effective_date).getTime() - new Date(b.effective_date).getTime()
-          );
-          const openingRate = sortedHistory.length > 0
-            ? Number(sortedHistory[0].interest_rate)
-            : Number(account.current_interest_rate);
-          emi = calculateEMI(
-            Number(account.loan_principal),
-            openingRate,
-            Number(account.loan_tenure_months)
-          );
+          const sortedHistory = [...history].sort((a, b) => new Date(a.effective_date).getTime() - new Date(b.effective_date).getTime());
+          const openingRate = sortedHistory.length > 0 ? Number(sortedHistory[0].interest_rate) : Number(account.current_interest_rate);
+          emi = calculateEMI(Number(account.loan_principal), openingRate, Number(account.loan_tenure_months));
           if (reference) {
-            accruedInterest = calculateAccruedInterest(
-              reference.referenceDate,
-              reference.referenceBalance,
-              history,
-              Number(account.current_interest_rate)
-            );
+            accruedInterest = calculateAccruedInterest(reference.referenceDate, reference.referenceBalance, history, Number(account.current_interest_rate));
           }
         } catch (error) {
-          console.error('Error calculating loan metrics:', error);
-          emi = calculateEMI(
-            Number(account.loan_principal),
-            Number(account.current_interest_rate),
-            Number(account.loan_tenure_months)
-          );
+          emi = calculateEMI(Number(account.loan_principal), Number(account.current_interest_rate), Number(account.loan_tenure_months));
         }
-
         return { accountId: account.id, data: { emi, accruedInterest } };
       });
 
       const loanResults = await Promise.all(loanPromises);
       const calculations: Record<string, { emi: number; accruedInterest: number }> = {};
-      loanResults.forEach(result => {
-        if (result.data) {
-          calculations[result.accountId] = result.data;
-        }
-      });
+      loanResults.forEach(r => { if (r.data) calculations[r.accountId] = r.data; });
       setLoanCalculations(calculations);
 
-      // Parallel processing for credit card accounts
       const creditCardPromises = (summaryData?.accounts_by_type.credit_card || []).map(async (account) => {
         try {
-          const [accountEMIs, txs] = await Promise.all([
+          const [accountEMIs, txs, balance] = await Promise.all([
             emiApi.getActiveEMIsByAccount(account.id),
-            transactionApi.getTransactionsByAccount(user.id, account.id)
+            transactionApi.getTransactionsByAccount(user.id, account.id),
+            creditCardStatementApi.getAdvanceBalance(account.id)
           ]);
-
-          return {
-            accountId: account.id,
-            emis: accountEMIs.length > 0 ? accountEMIs : null,
-            transactions: txs
-          };
+          return { accountId: account.id, emis: accountEMIs.length > 0 ? accountEMIs : null, transactions: txs, advanceBalance: balance };
         } catch (error) {
-          console.error(`Error loading data for account ${account.id}:`, error);
-          return { accountId: account.id, emis: null, transactions: [] };
+          return { accountId: account.id, emis: null, transactions: [], advanceBalance: 0 };
         }
       });
 
       const creditCardResults = await Promise.all(creditCardPromises);
       const emis: Record<string, EMITransaction[]> = {};
       const accountTxs: Record<string, Transaction[]> = {};
+      const advanceMap: Record<string, number> = {};
 
-      creditCardResults.forEach(result => {
-        if (result.emis) {
-          emis[result.accountId] = result.emis;
-        }
-        accountTxs[result.accountId] = result.transactions;
+      creditCardResults.forEach(r => {
+        if (r.emis) emis[r.accountId] = r.emis;
+        accountTxs[r.accountId] = r.transactions;
+        advanceMap[r.accountId] = r.advanceBalance;
       });
 
       setAccountEMIs(emis);
       setAccountTransactions(accountTxs);
-
-      // Calculate monthly cash flow with limited transaction data
-      const today = new Date();
-      const currentMonth = today.getMonth() + 1;
-      const currentYear = today.getFullYear();
+      setAccountAdvanceBalances(advanceMap);
 
       const allAccounts = [
-        ...(summaryData.accounts_by_type.cash || []),
-        ...(summaryData.accounts_by_type.bank || []),
-        ...(summaryData.accounts_by_type.credit_card || []),
-        ...(summaryData.accounts_by_type.loan || [])
+        ...(summaryData?.accounts_by_type.cash || []),
+        ...(summaryData?.accounts_by_type.bank || []),
+        ...(summaryData?.accounts_by_type.credit_card || []),
+        ...(summaryData?.accounts_by_type.loan || [])
       ];
 
-      // Use month transactions instead of all transactions for better performance
       const budget = await budgetApi.getBudget(user.id, currentMonth, currentYear);
-      const cashFlowData = calculateMonthlyCashFlow(
-        allAccounts,
-        allTransactions, // Use all transactions for proper opening balance calculation
-        accountTxs,      // Pass account transactions for statement calculations
-        emis,            // Pass EMIs for statement calculations
-        budget,
-        currentMonth,
-        currentYear
-      );
+      const cashFlowData = calculateMonthlyCashFlow(allAccounts, allTransactions, accountTxs, emis, budget || null, currentMonth, currentYear, advanceMap);
       setCashFlow(cashFlowData);
 
-      const creditCardDetails = getCreditCardDuesDetails(allAccounts, accountTxs, emis);
-      setCreditCardDuesDetails(creditCardDetails);
+      const details = getCreditCardDuesDetails(allAccounts, accountTxs, emis, advanceMap);
+      setCreditCardDuesDetails(details);
     } catch (error) {
-      console.error('Error loading heavy calculations:', error);
+      console.error('Error:', error);
     }
   };
 

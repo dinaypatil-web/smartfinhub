@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useHybridAuth as useAuth } from '@/contexts/HybridAuthContext';
-import { transactionApi, accountApi, categoryApi, budgetApi, emiApi, interestRateApi, loanEMIPaymentApi, creditCardStatementApi } from '@/db/api';
+import { transactionApi, accountApi, categoryApi, budgetApi, emiApi, loanEMIPaymentApi, creditCardStatementApi } from '@/db/api';
 import type { TransactionType, Account, CreditCardPaymentAllocation } from '@/types/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, ArrowLeft, TrendingDown, AlertCircle, CreditCard } from 'lucide-react';
+import { Loader2, ArrowLeft, TrendingDown, ArrowRightLeft, Calendar, CreditCard, Building } from 'lucide-react';
 import { formatCurrency } from '@/utils/format';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CreditCardStatementSelector } from '@/components/CreditCardStatementSelector';
@@ -21,7 +21,7 @@ import {
   validateCreditLimit,
   getCreditLimitWarningMessage
 } from '@/utils/emiCalculations';
-import { calculateEMIBreakdownWithHistory, calculateEMIBreakdown } from '@/utils/loanCalculations';
+import { calculateEMIBreakdown } from '@/utils/loanCalculations';
 import { getTransactionStatementInfo } from '@/utils/statementCalculations';
 import { INCOME_CATEGORIES } from '@/constants/incomeCategories';
 import { cache } from '@/utils/cache';
@@ -80,7 +80,8 @@ export default function TransactionForm() {
 
   // Credit Card Statement and Payment Management
   const [ccAllocations, setCCAllocations] = useState<CreditCardPaymentAllocation[]>([]);
-  const [ccAdvanceAmount, setCCAdvanceAmount] = useState(0);
+  const [ccAdvanceCreated, setCCAdvanceCreated] = useState(0);
+  const [ccAdvanceUsed, setCCAdvanceUsed] = useState(0);
 
   useEffect(() => {
     if (user) {
@@ -208,16 +209,16 @@ export default function TransactionForm() {
               try {
                 const allTransactions = await transactionApi.getTransactions(user.id);
                 const currentTransaction = allTransactions.find(t => t.id === id);
-                
+
                 if (currentTransaction) {
                   // Start with initial loan amount
                   let principalBeforeTransaction = Number(account.initial_balance || account.balance);
-                  
+
                   // Apply all transactions that occurred BEFORE this one (by date and creation)
                   const relevantTransactions = allTransactions
-                    .filter(t => 
-                      t.to_account_id === formData.to_account_id && 
-                      t.type === 'loan_payment' &&
+                    .filter(t =>
+                      t.to_account_id === formData.to_account_id &&
+                      ((t as any).transaction_type === 'loan_payment' || (t as any).type === 'loan_payment') &&
                       t.id !== id // Exclude current transaction
                     )
                     .sort((a, b) => {
@@ -230,13 +231,13 @@ export default function TransactionForm() {
                   for (const txn of relevantTransactions) {
                     const txnDate = new Date(txn.transaction_date);
                     const currentDate = new Date(formData.transaction_date);
-                    
+
                     // Only include transactions that occurred before this one
                     if (txnDate < currentDate || (txnDate.getTime() === currentDate.getTime() && txn.created_at && currentTransaction.created_at && new Date(txn.created_at) < new Date(currentTransaction.created_at))) {
                       principalBeforeTransaction -= Number(txn.amount);
                     }
                   }
-                  
+
                   outstandingPrincipal = Math.max(0, principalBeforeTransaction);
                 }
               } catch (error) {
@@ -511,21 +512,89 @@ export default function TransactionForm() {
             await emiApi.createEMI(emiData);
           }
         } else if (existingEMI) {
-          // If was EMI but now turned off, delete the EMI record
           await emiApi.deleteEMI(existingEMI.id);
         }
-
-        // Clear dashboard cache to reflect updated transaction
-        cache.clearPattern('dashboard-');
 
         toast({
           title: 'Success',
           description: 'Transaction updated successfully',
         });
       } else {
+        // Create new transaction
         createdTransaction = await transactionApi.createTransaction(transactionData);
 
-        // Create EMI transaction if EMI option is selected
+        if (formData.transaction_type === 'credit_card_repayment' && createdTransaction) {
+          try {
+            if (ccAllocations.length > 0) {
+              const mappedAllocations = ccAllocations.map(a => ({
+                line_id: a.statement_line_id,
+                amount: a.amount_paid,
+                emi_id: a.emi_id
+              }));
+              await creditCardStatementApi.allocateRepayment(createdTransaction.id, mappedAllocations);
+
+              for (const allocation of ccAllocations) {
+                await creditCardStatementApi.updateStatementLineStatus(
+                  allocation.statement_line_id,
+                  'paid',
+                  allocation.amount_paid
+                );
+
+                if (allocation.emi_id) {
+                  try {
+                    await emiApi.payEMIInstallment(allocation.emi_id);
+                  } catch (err) {
+                    console.error('Error updating EMI installment:', err);
+                  }
+                }
+              }
+            }
+
+            if (ccAdvanceCreated > 0) {
+              await creditCardStatementApi.createAdvancePayment(
+                user.id,
+                formData.to_account_id!,
+                ccAdvanceCreated,
+                formData.currency,
+                `Advance payment from transaction ${createdTransaction.id}`
+              );
+            }
+
+            if (ccAdvanceUsed > 0) {
+              await creditCardStatementApi.consumeAdvanceBalance(
+                user.id,
+                formData.to_account_id!,
+                ccAdvanceUsed
+              );
+            }
+          } catch (error) {
+            console.error('Error processing CC repayment:', error);
+          }
+        }
+
+        if (formData.transaction_type === 'loan_payment' && formData.to_account_id && loanBreakdown) {
+          const loanAccount = accounts.find(a => a.id === formData.to_account_id);
+          if (loanAccount) {
+            const existingPayments = await loanEMIPaymentApi.getPaymentsByAccount(formData.to_account_id);
+            await loanEMIPaymentApi.createLoanEMIPayment({
+              user_id: user.id,
+              account_id: formData.to_account_id,
+              payment_date: formData.transaction_date,
+              emi_amount: parseFloat(formData.amount),
+              principal_component: loanBreakdown.principal,
+              interest_component: loanBreakdown.interest,
+              outstanding_principal: Math.max(0, Number(loanAccount.balance) - loanBreakdown.principal),
+              interest_rate: Number(loanAccount.current_interest_rate || 0),
+              payment_number: existingPayments.length + 1,
+              notes: formData.description
+            });
+
+            if (loanBreakdown.interest > 0) {
+              await accountApi.adjustBalance(formData.to_account_id, loanBreakdown.interest);
+            }
+          }
+        }
+
         if (formData.is_emi && createdTransaction) {
           const purchaseAmount = parseFloat(formData.amount);
           const bankCharges = parseFloat(formData.bank_charges);
@@ -533,9 +602,9 @@ export default function TransactionForm() {
           const monthlyEMI = calculateMonthlyEMI(purchaseAmount, bankCharges, emiMonths);
           const totalAmount = purchaseAmount + bankCharges;
 
-          const emiData = {
+          await emiApi.createEMI({
             user_id: user.id,
-            account_id: formData.from_account_id,
+            account_id: formData.from_account_id!,
             transaction_id: createdTransaction.id,
             purchase_amount: purchaseAmount,
             bank_charges: bankCharges,
@@ -547,99 +616,16 @@ export default function TransactionForm() {
             next_due_date: formData.transaction_date,
             description: formData.description || `EMI for ${formData.category || 'purchase'}`,
             status: 'active' as const,
-          };
-
-          await emiApi.createEMI(emiData);
+          });
         }
-
-        // Handle Smart Loan Payment (Principal/Interest Split)
-        if (formData.transaction_type === 'loan_payment' && formData.to_account_id && loanBreakdown) {
-          const loanAccount = accounts.find(a => a.id === formData.to_account_id);
-
-          if (loanAccount) {
-            // Get existing payment count to calculate next payment number
-            const existingPayments = await loanEMIPaymentApi.getPaymentsByAccount(formData.to_account_id);
-            const nextPaymentNumber = existingPayments.length + 1;
-
-            // 1. Create the detailed EMI payment record
-            await loanEMIPaymentApi.createPayment({
-              user_id: user.id,
-              account_id: formData.to_account_id,
-              payment_date: formData.transaction_date,
-              emi_amount: parseFloat(formData.amount),
-              principal_component: loanBreakdown.principal,
-              interest_component: loanBreakdown.interest,
-              outstanding_principal: Math.max(0, Number(loanAccount.balance) - loanBreakdown.principal),
-              interest_rate: Number(loanAccount.current_interest_rate || 0),
-              payment_number: nextPaymentNumber,
-              notes: formData.description
-            });
-
-            // 2. Correct the account balance
-            // transactionApi already reduced the balance by the FULL amount.
-            // We need to ADD BACK the interest component, because only Principal reduces the loan balance.
-            if (loanBreakdown.interest > 0) {
-              await accountApi.adjustBalance(formData.to_account_id, loanBreakdown.interest);
-            }
-          }
-        }
-
-        // Handle Credit Card Repayment with Statement Allocations
-        if (formData.transaction_type === 'credit_card_repayment' && createdTransaction) {
-          try {
-            // Create allocations if user selected specific items
-            if (ccAllocations.length > 0) {
-              await creditCardStatementApi.allocateRepayment(createdTransaction.id, ccAllocations);
-
-              // Mark selected items as paid
-              for (const allocation of ccAllocations) {
-                await creditCardStatementApi.updateStatementLineStatus(
-                  allocation.statement_line_id,
-                  'paid',
-                  allocation.amount_paid
-                );
-
-                // Call payEMIInstallment if it's an EMI item
-                if (allocation.emi_id) {
-                  try {
-                    await emiApi.payEMIInstallment(allocation.emi_id);
-                  } catch (err) {
-                    console.error('Error updating EMI installment:', err);
-                  }
-                }
-              }
-            }
-
-            // Record advance payment if there's an excess
-            if (ccAdvanceAmount > 0) {
-              const creditCard = accounts.find(a => a.id === formData.to_account_id);
-              if (creditCard) {
-                await creditCardStatementApi.createAdvancePayment(
-                  user.id,
-                  formData.to_account_id,
-                  ccAdvanceAmount,
-                  formData.currency,
-                  `Advance payment from repayment on ${formData.transaction_date}`
-                );
-              }
-            }
-          } catch (error) {
-            console.error('Error processing credit card statement allocations:', error);
-            // Don't block the transaction creation if allocation fails
-          }
-        }
-
-        // Clear dashboard cache to reflect new transaction
-        cache.clearPattern('dashboard-');
 
         toast({
           title: 'Success',
-          description: formData.is_emi
-            ? 'Transaction and EMI created successfully'
-            : 'Transaction created successfully',
+          description: 'Transaction created successfully',
         });
       }
 
+      cache.clearPattern('dashboard-');
       navigate('/transactions');
     } catch (error: any) {
       console.error('Error saving transaction:', error);
@@ -949,7 +935,8 @@ export default function TransactionForm() {
                 creditCardId={formData.to_account_id}
                 repaymentAmount={parseFloat(formData.amount) || 0}
                 onAllocationsChange={setCCAllocations}
-                onAdvanceAmountChange={setCCAdvanceAmount}
+                onAdvanceCreatedChange={setCCAdvanceCreated}
+                onAdvanceUsedChange={setCCAdvanceUsed}
                 currency={formData.currency}
               />
             )}
@@ -968,7 +955,7 @@ export default function TransactionForm() {
                       {isManualBreakdown ? 'Use Auto' : 'Manual Adjust'}
                     </button>
                   </div>
-                  
+
                   {/* EMI Amount Breakdown Display */}
                   <div className="grid grid-cols-3 gap-3">
                     <div className="bg-white dark:bg-slate-900 rounded p-3 border border-blue-200 dark:border-blue-800">
@@ -980,7 +967,7 @@ export default function TransactionForm() {
                         ({((loanBreakdown.principal / parseFloat(formData.amount)) * 100).toFixed(1)}%)
                       </div>
                     </div>
-                    
+
                     <div className="bg-white dark:bg-slate-900 rounded p-3 border border-blue-200 dark:border-blue-800">
                       <div className="text-xs text-muted-foreground mb-1">Interest</div>
                       <div className="text-lg font-bold text-orange-600 dark:text-orange-400">
@@ -990,7 +977,7 @@ export default function TransactionForm() {
                         ({((loanBreakdown.interest / parseFloat(formData.amount)) * 100).toFixed(1)}%)
                       </div>
                     </div>
-                    
+
                     <div className="bg-white dark:bg-slate-900 rounded p-3 border border-blue-200 dark:border-blue-800">
                       <div className="text-xs text-muted-foreground mb-1">Total EMI</div>
                       <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
@@ -1092,6 +1079,71 @@ export default function TransactionForm() {
                 </div>
               </div>
             )}
+
+            {/* Credit Card Repayment Summary UI */}
+            {formData.transaction_type === 'credit_card_repayment' && formData.to_account_id && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 border rounded-lg bg-purple-50/50 dark:bg-purple-950/10">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <CreditCard className="h-3 w-3 text-purple-600" />
+                      Allocated to Statement
+                    </div>
+                    <div className="text-lg font-bold text-purple-600">
+                      {formatCurrency(ccAllocations.reduce((sum, a) => sum + a.amount_paid, 0), formData.currency)}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">
+                      {ccAllocations.length} items selected
+                    </div>
+                  </div>
+
+                  <div className="space-y-1 border-l pl-4 border-purple-100 dark:border-purple-900/30">
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      {ccAdvanceCreated > 0 ? (
+                        <>
+                          <Plus className="h-3 w-3 text-emerald-600" />
+                          Advance Created
+                        </>
+                      ) : (
+                        <>
+                          <TrendingDown className="h-3 w-3 text-blue-600" />
+                          Advance Consumed
+                        </>
+                      )}
+                    </div>
+                    <div className={`text-lg font-bold ${ccAdvanceCreated > 0 ? 'text-emerald-600' : 'text-blue-600'}`}>
+                      {formatCurrency(ccAdvanceCreated > 0 ? ccAdvanceCreated : ccAdvanceUsed, formData.currency)}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">
+                      {ccAdvanceCreated > 0 ? 'Recorded for future' : 'Adjusted from existing'}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1 border-l pl-4 border-purple-100 dark:border-purple-900/30">
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Info className="h-3 w-3 text-blue-600" />
+                      Current Outstanding
+                    </div>
+                    {(() => {
+                      const account = accounts.find((a: Account) => a.id === formData.to_account_id);
+                      const currentBalance = account ? Math.abs(Number(account.balance)) : 0;
+                      const newBalance = Math.max(0, currentBalance - (parseFloat(formData.amount) || 0));
+                      return (
+                        <>
+                          <div className="text-lg font-bold text-blue-600">
+                            {formatCurrency(newBalance, formData.currency)}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+                            Before: {formatCurrency(currentBalance, formData.currency)}
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+            )}
+
 
             {/* Credit Limit Warning */}
             {creditLimitWarning && (
@@ -1249,67 +1301,6 @@ export default function TransactionForm() {
                 </Alert>
               )}
 
-            {/* Loan Payment Breakdown Section */}
-            {formData.transaction_type === 'loan_payment' && formData.to_account_id && (
-              <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold flex items-center gap-2">
-                    <TrendingDown className="h-4 w-4" />
-                    Payment Breakdown
-                  </h3>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="manual_breakdown"
-                      checked={isManualBreakdown}
-                      onCheckedChange={(checked) => setIsManualBreakdown(checked as boolean)}
-                    />
-                    <Label htmlFor="manual_breakdown" className="text-xs">Manual Entry</Label>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="principal_component" className="text-xs">Principal Component</Label>
-                    <Input
-                      id="principal_component"
-                      type="number"
-                      value={loanBreakdown?.principal || 0}
-                      onChange={(e) => {
-                        const val = parseFloat(e.target.value) || 0;
-                        setLoanBreakdown({
-                          principal: val,
-                          interest: parseFloat(formData.amount || '0') - val
-                        });
-                      }}
-                      disabled={!isManualBreakdown}
-                      className="bg-background"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="interest_component" className="text-xs">Interest Component</Label>
-                    <Input
-                      id="interest_component"
-                      type="number"
-                      value={loanBreakdown?.interest || 0}
-                      onChange={(e) => {
-                        const val = parseFloat(e.target.value) || 0;
-                        setLoanBreakdown({
-                          interest: val,
-                          principal: parseFloat(formData.amount || '0') - val
-                        });
-                      }}
-                      disabled={!isManualBreakdown}
-                      className="bg-background"
-                    />
-                  </div>
-                </div>
-                {loanBreakdown && (
-                  <p className="text-xs text-muted-foreground text-center">
-                    Principal reduces balance. Interest is an expense.
-                  </p>
-                )}
-              </div>
-            )}
 
             <div className="space-y-2">
               <Label htmlFor="description">Description</Label>

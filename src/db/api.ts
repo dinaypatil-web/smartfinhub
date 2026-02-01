@@ -2,25 +2,19 @@ import { supabase } from './supabase';
 import type {
   Profile,
   Account,
-  LoanAccountWithCalculations,
-  InterestRateHistory,
   Transaction,
+  InterestRateHistory,
   Budget,
-  ExpenseCategory,
+  EMIStatus,
   EMITransaction,
   LoanEMIPayment,
   AccountWithInterestHistory,
-  TransactionWithAccounts,
   FinancialSummary,
   BudgetAnalysis,
-  CustomBankLink,
   IncomeCategoryKey,
+  ExpenseCategory,
   BankLink,
-  UserCustomBankLink,
-  CreditCardStatement,
-  CreditCardStatementLine,
-  CreditCardAdvancePayment,
-  CreditCardRepaymentDetail
+  UserCustomBankLink
 } from '@/types/types';
 
 export const profileApi = {
@@ -854,6 +848,17 @@ export const emiApi = {
     return Array.isArray(data) ? data : [];
   },
 
+  async getEMIById(id: string): Promise<EMITransaction | null> {
+    const { data, error } = await supabase
+      .from('emi_transactions')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data;
+  },
+
   async getEMIByTransactionId(transactionId: string): Promise<EMITransaction | null> {
     const { data, error } = await supabase
       .from('emi_transactions')
@@ -1051,6 +1056,16 @@ export const loanEMIPaymentApi = {
       .from('loan_emi_payments')
       .delete()
       .eq('account_id', accountId);
+
+    if (error) throw error;
+  },
+
+  async deletePaymentsByDate(accountId: string, date: string): Promise<void> {
+    const { error } = await supabase
+      .from('loan_emi_payments')
+      .delete()
+      .eq('account_id', accountId)
+      .eq('payment_date', date);
 
     if (error) throw error;
   },
@@ -1305,7 +1320,7 @@ export const creditCardStatementApi = {
     statementMonth?: string // YYYY-MM format, defaults to current month
   ): Promise<any[]> {
     const targetMonth = statementMonth || new Date().toISOString().slice(0, 7);
-    
+
     // Get all transactions and EMIs for this credit card from the statement month
     const { data: transactions, error: txError } = await supabase
       .from('transactions')
@@ -1394,6 +1409,34 @@ export const creditCardStatementApi = {
     return data?.remaining_balance || 0;
   },
 
+  // Consume advance balance (decrement from latest record)
+  async consumeAdvanceBalance(userId: string, creditCardId: string, amountToConsume: number): Promise<void> {
+    const { data: latestRecord, error: fetchError } = await supabase
+      .from('credit_card_advance_payments')
+      .select('id, remaining_balance')
+      .eq('credit_card_id', creditCardId)
+      .eq('user_id', userId)
+      .gt('remaining_balance', 0)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (fetchError) throw fetchError;
+    if (!latestRecord) return;
+
+    const newBalance = Math.max(0, latestRecord.remaining_balance - amountToConsume);
+
+    const { error: updateError } = await supabase
+      .from('credit_card_advance_payments')
+      .update({
+        remaining_balance: newBalance,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', latestRecord.id);
+
+    if (updateError) throw updateError;
+  },
+
   // Record advance payment
   async createAdvancePayment(
     userId: string,
@@ -1435,6 +1478,16 @@ export const creditCardStatementApi = {
       .eq('credit_card_id', creditCardId)
       .order('created_at', { ascending: false })
       .limit(1);
+
+    if (error) throw error;
+  },
+
+  // Delete allocations for a specific repayment
+  async deleteAllocations(repaymentId: string): Promise<void> {
+    const { error } = await supabase
+      .from('credit_card_repayment_allocations')
+      .delete()
+      .eq('repayment_id', repaymentId);
 
     if (error) throw error;
   },

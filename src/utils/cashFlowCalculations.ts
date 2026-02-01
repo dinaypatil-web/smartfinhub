@@ -251,7 +251,8 @@ export function calculateCreditCardDues(
   accountTransactions: Record<string, Transaction[]>,
   accountEMIs: Record<string, EMITransaction[]>,
   month?: number,
-  year?: number
+  year?: number,
+  advanceBalances: Record<string, number> = {}
 ): number {
   const creditCardAccounts = accounts.filter(
     acc => acc.account_type === 'credit_card'
@@ -278,9 +279,11 @@ export function calculateCreditCardDues(
             transactions,
             emis,
             new Date(),
-            Number(acc.balance)
+            Number(acc.balance),
+            acc.due_day,
+            advanceBalances[acc.id] || 0
           );
-          return sum + Math.abs(statementCalc.statementAmount);
+          return sum + Math.abs(statementCalc.netStatementAmount);
         }
         // If statement not generated yet, dues are 0 for this month
         return sum;
@@ -306,9 +309,11 @@ export function calculateCreditCardDues(
           transactions,
           emis,
           new Date(),
-          Number(acc.balance)
+          Number(acc.balance),
+          acc.due_day,
+          advanceBalances[acc.id] || 0
         );
-        return sum + Math.abs(statementCalc.statementAmount);
+        return sum + Math.abs(statementCalc.netStatementAmount);
       }
       // If statement not generated yet, dues are 0 for this month
       return sum;
@@ -329,7 +334,8 @@ export function calculateCreditCardDues(
 export function getCreditCardDuesDetails(
   accounts: Account[],
   accountTransactions: Record<string, Transaction[]>,
-  accountEMIs: Record<string, EMITransaction[]>
+  accountEMIs: Record<string, EMITransaction[]>,
+  advanceBalances: Record<string, number> = {}
 ): Array<{
   account: Account;
   dueAmount: number;
@@ -360,9 +366,11 @@ export function getCreditCardDuesDetails(
           transactions,
           emis,
           new Date(),
-          Number(acc.balance)
+          Number(acc.balance),
+          acc.due_day,
+          advanceBalances[acc.id] || 0
         );
-        dueAmount = Math.abs(statementCalc.statementAmount);
+        dueAmount = Math.abs(statementCalc.netStatementAmount);
       } else {
         // If statement not generated yet, dues are 0 for this month
         dueAmount = 0;
@@ -428,7 +436,8 @@ export function calculateMonthlyCashFlow(
   accountEMIs: Record<string, EMITransaction[]>,
   budget: Budget | null,
   month: number,
-  year: number
+  year: number,
+  advanceBalances: Record<string, number> = {}
 ): {
   openingBalance: number;
   incomeReceived: number;
@@ -446,7 +455,7 @@ export function calculateMonthlyCashFlow(
   const creditCardRepayments = calculateCreditCardRepayments(transactions, month, year);
   const remainingBudget = calculateRemainingBudget(budget, expensesIncurred);
   const remainingIncomeBudget = calculateRemainingIncomeBudget(budget, incomeReceived);
-  const creditCardDues = calculateCreditCardDues(accounts, accountTransactions, accountEMIs, month, year);
+  const creditCardDues = calculateCreditCardDues(accounts, accountTransactions, accountEMIs, month, year, advanceBalances);
 
   // Formula: Opening Balance + Income Received - Expenses (Cash/Bank) - Credit Card Repayments
   const expectedBalance = openingBalance + incomeReceived - expensesIncurred - creditCardRepayments;
