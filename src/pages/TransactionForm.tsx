@@ -20,7 +20,7 @@ import {
   validateCreditLimit,
   getCreditLimitWarningMessage
 } from '@/utils/emiCalculations';
-import { calculateEMIBreakdownWithHistory } from '@/utils/loanCalculations';
+import { calculateEMIBreakdownWithHistory, calculateEMIBreakdown } from '@/utils/loanCalculations';
 import { getTransactionStatementInfo } from '@/utils/statementCalculations';
 import { INCOME_CATEGORIES } from '@/constants/incomeCategories';
 import { cache } from '@/utils/cache';
@@ -188,7 +188,7 @@ export default function TransactionForm() {
 
   // Calculate Loan Breakdown (Principal vs Interest)
   useEffect(() => {
-    const calculateLoanSplit = async () => {
+    const calculateLoanSplit = () => {
       if (formData.transaction_type === 'loan_payment' && formData.to_account_id && formData.amount && !isManualBreakdown) {
         const amount = parseFloat(formData.amount);
         if (isNaN(amount) || amount <= 0) return;
@@ -196,22 +196,12 @@ export default function TransactionForm() {
         const account = accounts.find((a: Account) => a.id === formData.to_account_id);
         if (account && account.account_type === 'loan') {
           try {
-            // Fetch rate history
-            const rateHistory = await interestRateApi.getInterestRateHistory(account.id);
-
-            // Get the last EMI payment date for this loan
-            const emiPayments = await loanEMIPaymentApi.getPaymentsByAccount(account.id);
-            const lastPaymentDate = emiPayments.length > 0
-              ? emiPayments[0].payment_date // Most recent payment (already sorted descending)
-              : null;
-
-            const breakdown = calculateEMIBreakdownWithHistory(
-              account.loan_start_date || new Date().toISOString(),
-              lastPaymentDate, // Use actual last payment date, not loan start
-              formData.transaction_date,
-              Number(account.balance), // Outstanding principal
-              amount,
-              rateHistory.map(r => ({ effective_date: r.effective_date, interest_rate: r.interest_rate }))
+            // Simple calculation: Interest = Outstanding Principal × Annual Rate / 12 / 100
+            // Principal = Payment Amount - Interest
+            const breakdown = calculateEMIBreakdown(
+              Number(account.balance), // Current outstanding principal
+              amount, // Current payment amount
+              Number(account.current_interest_rate || 0) // Annual interest rate
             );
 
             setLoanBreakdown({
@@ -220,6 +210,7 @@ export default function TransactionForm() {
             });
           } catch (error) {
             console.error("Error calculating loan breakdown", error);
+            setLoanBreakdown(null);
           }
         }
       } else if (formData.transaction_type !== 'loan_payment') {
@@ -228,7 +219,7 @@ export default function TransactionForm() {
     };
 
     calculateLoanSplit();
-  }, [formData.transaction_type, formData.to_account_id, formData.amount, formData.transaction_date, accounts, isManualBreakdown]);
+  }, [formData.transaction_type, formData.to_account_id, formData.amount, accounts, isManualBreakdown]);
 
   const loadBudgetInfo = async () => {
     if (!user || !formData.category || formData.transaction_type !== 'expense') return;
