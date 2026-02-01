@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useHybridAuth as useAuth } from '@/contexts/HybridAuthContext';
-import { accountApi, transactionApi, interestRateApi, emiApi, loanEMIPaymentApi, budgetApi, creditCardStatementApi } from '@/db/api';
+import { accountApi, transactionApi, interestRateApi, emiApi, budgetApi, creditCardStatementApi } from '@/db/api';
 import type { Account, Transaction, FinancialSummary, EMITransaction } from '@/types/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatCurrency, formatAccountNumber } from '@/utils/format';
-import { Plus, Wallet, CreditCard, TrendingUp, TrendingDown, Building2, AlertCircle, Calculator, DollarSign, ExternalLink, ArrowRightLeft, Calendar, Building } from 'lucide-react';
+import { Plus, Wallet, CreditCard, TrendingUp, TrendingDown, Building2, AlertCircle, Calculator, DollarSign, ExternalLink } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { calculateEMI, calculateAccruedInterest } from '@/utils/loanCalculations';
@@ -141,9 +141,15 @@ export default function Dashboard() {
       loadHeavyCalculations(summaryData);
     } catch (error) {
       console.error('Error loading dashboard:', error);
+      let errorMessage = 'Failed to load dashboard data';
+      if (error instanceof Error) {
+        errorMessage = `Failed to load dashboard data: ${error.message}`;
+      } else if (typeof error === 'object' && error !== null && 'message' in error) {
+        errorMessage = `Failed to load dashboard data: ${(error as any).message}`;
+      }
       toast({
         title: 'Error',
-        description: 'Failed to load dashboard data',
+        description: errorMessage,
         variant: 'destructive',
       });
       setLoading(false);
@@ -756,7 +762,7 @@ export default function Dashboard() {
           </div>
 
           {/* Interest Rate Charts for Floating Rate Loans */}
-          {summary?.accounts_by_type.loan.filter(account => account.interest_rate_type === 'floating').length > 0 && (
+          {summary?.accounts_by_type?.loan && summary.accounts_by_type.loan.filter(account => account.interest_rate_type === 'floating').length > 0 && (
             <div className="space-y-6">
               <h2 className="text-2xl font-bold">Floating Interest Rate Trends</h2>
               <div className="grid gap-6 xl:grid-cols-1">
@@ -774,7 +780,7 @@ export default function Dashboard() {
           )}
 
           {/* Interest Rate History Tables for All Loans */}
-          {summary?.accounts_by_type.loan.length > 0 && (
+          {summary?.accounts_by_type?.loan && summary.accounts_by_type.loan.length > 0 && (
             <div className="space-y-6">
               <h2 className="text-2xl font-bold">Interest Rate History & Accrued Interest</h2>
               <div className="grid gap-6 xl:grid-cols-1">
