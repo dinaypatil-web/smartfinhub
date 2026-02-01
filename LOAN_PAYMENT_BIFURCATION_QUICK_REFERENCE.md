@@ -16,12 +16,17 @@ SmartFinHub automatically calculates this split for you.
 - Enter amount and date
 - The app automatically shows the breakdown
 
-### 2. See the Breakdown
+### See the Breakdown (Current Payment Only)
+The breakdown shows ONLY the current payment being entered:
 ```
 Amount: ₹10,000
-├─ Principal: ₹9,589 (95.9%)
-└─ Interest: ₹411 (4.1%)
+├─ Principal: ₹9,589 (95.9%)  ← reduces loan balance
+└─ Interest: ₹411 (4.1%)      ← charged as interest
+
+Outstanding Before: ₹50,000
+Outstanding After: ₹40,411
 ```
+*Does NOT include data from past EMI payments*
 
 ### 3. Adjust if Needed
 - Click "Manual Adjust" button

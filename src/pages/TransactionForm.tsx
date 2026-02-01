@@ -985,7 +985,7 @@ export default function TransactionForm() {
                   )}
 
                   <div className="text-xs text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/30 p-2 rounded">
-                    💡 This breakdown will be saved to the Loan's EMI Payment History and adjusted during monthly interest posting.
+                    💡 EMI Breakdown for this payment only: Principal reduces loan balance, Interest is charged. Shows current outstanding principal before and after this payment.
                   </div>
                 </div>
               </div>
