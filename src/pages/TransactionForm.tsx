@@ -852,6 +852,145 @@ export default function TransactionForm() {
               </div>
             )}
 
+            {/* Loan Payment Principal/Interest Breakdown */}
+            {formData.transaction_type === 'loan_payment' && loanBreakdown && (
+              <div className="border rounded-lg p-4 bg-blue-50 dark:bg-blue-950/20">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-200">EMI Breakdown</h3>
+                    <button
+                      type="button"
+                      onClick={() => setIsManualBreakdown(!isManualBreakdown)}
+                      className="text-xs px-2 py-1 rounded bg-blue-200 dark:bg-blue-900 text-blue-800 dark:text-blue-200 hover:bg-blue-300 dark:hover:bg-blue-800 transition-colors"
+                    >
+                      {isManualBreakdown ? 'Use Auto' : 'Manual Adjust'}
+                    </button>
+                  </div>
+                  
+                  {/* EMI Amount Breakdown Display */}
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="bg-white dark:bg-slate-900 rounded p-3 border border-blue-200 dark:border-blue-800">
+                      <div className="text-xs text-muted-foreground mb-1">Principal</div>
+                      <div className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                        {formatCurrency(loanBreakdown.principal, formData.currency)}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        ({((loanBreakdown.principal / parseFloat(formData.amount)) * 100).toFixed(1)}%)
+                      </div>
+                    </div>
+                    
+                    <div className="bg-white dark:bg-slate-900 rounded p-3 border border-blue-200 dark:border-blue-800">
+                      <div className="text-xs text-muted-foreground mb-1">Interest</div>
+                      <div className="text-lg font-bold text-orange-600 dark:text-orange-400">
+                        {formatCurrency(loanBreakdown.interest, formData.currency)}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        ({((loanBreakdown.interest / parseFloat(formData.amount)) * 100).toFixed(1)}%)
+                      </div>
+                    </div>
+                    
+                    <div className="bg-white dark:bg-slate-900 rounded p-3 border border-blue-200 dark:border-blue-800">
+                      <div className="text-xs text-muted-foreground mb-1">Total EMI</div>
+                      <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                        {formatCurrency(parseFloat(formData.amount), formData.currency)}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">Paid to Loan</div>
+                    </div>
+                  </div>
+
+                  {/* Outstanding Principal Display */}
+                  {formData.to_account_id && (
+                    <div className="bg-white dark:bg-slate-900 rounded p-3 border border-blue-200 dark:border-blue-800">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <div className="text-xs text-muted-foreground">Current Outstanding Principal</div>
+                          <div className="text-sm font-semibold mt-1">
+                            {formatCurrency(
+                              Math.max(0, Number(accounts.find(a => a.id === formData.to_account_id)?.balance || 0)),
+                              formData.currency
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-xs text-muted-foreground">After this payment</div>
+                          <div className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 mt-1">
+                            {formatCurrency(
+                              Math.max(0, Number(accounts.find(a => a.id === formData.to_account_id)?.balance || 0) - loanBreakdown.principal),
+                              formData.currency
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Manual Breakdown Input */}
+                  {isManualBreakdown && (
+                    <div className="space-y-2 border-t border-blue-200 dark:border-blue-800 pt-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label htmlFor="manual_principal" className="text-xs">Principal Amount</Label>
+                          <Input
+                            id="manual_principal"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max={parseFloat(formData.amount) || 0}
+                            value={loanBreakdown.principal}
+                            onChange={(e) => {
+                              const principal = parseFloat(e.target.value) || 0;
+                              const total = parseFloat(formData.amount) || 0;
+                              setLoanBreakdown({
+                                principal,
+                                interest: Math.max(0, total - principal)
+                              });
+                            }}
+                            placeholder="0.00"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="manual_interest" className="text-xs">Interest Amount</Label>
+                          <Input
+                            id="manual_interest"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max={parseFloat(formData.amount) || 0}
+                            value={loanBreakdown.interest}
+                            onChange={(e) => {
+                              const interest = parseFloat(e.target.value) || 0;
+                              const total = parseFloat(formData.amount) || 0;
+                              setLoanBreakdown({
+                                interest,
+                                principal: Math.max(0, total - interest)
+                              });
+                            }}
+                            placeholder="0.00"
+                          />
+                        </div>
+                      </div>
+                      {loanBreakdown.principal < 0 && (
+                        <div className="flex items-center gap-1 text-red-600 dark:text-red-400 text-xs">
+                          <AlertCircle className="h-3 w-3" />
+                          <span>Principal cannot be negative</span>
+                        </div>
+                      )}
+                      {Math.abs((loanBreakdown.principal + loanBreakdown.interest) - (parseFloat(formData.amount) || 0)) > 0.01 && (
+                        <div className="flex items-center gap-1 text-amber-600 dark:text-amber-400 text-xs">
+                          <AlertCircle className="h-3 w-3" />
+                          <span>Principal + Interest must equal EMI amount</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="text-xs text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/30 p-2 rounded">
+                    💡 This breakdown will be saved to the Loan's EMI Payment History and adjusted during monthly interest posting.
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Credit Limit Warning */}
             {creditLimitWarning && (
               <Alert className="border-amber-500 bg-amber-50 dark:bg-amber-950/20">

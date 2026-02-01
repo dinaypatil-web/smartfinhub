@@ -265,6 +265,56 @@ export async function postMonthlyInterest(account: Account, userId: string): Pro
       };
     }
 
+    // ===== ADJUST EMI PAYMENT RECORDS WITH ACTUAL INTEREST =====
+    // Get all EMI payments in the current month (from last posting to today)
+    const emiPaymentsInMonth = await loanEMIPaymentApi.getPaymentsByAccount(account.id);
+    const paymentsToAdjust = emiPaymentsInMonth.filter(payment => {
+      const paymentDate = new Date(payment.payment_date);
+      return paymentDate >= lastPostingDate && paymentDate <= today;
+    });
+
+    // If there are EMI payments in this month, adjust their interest based on actual calculation
+    if (paymentsToAdjust.length > 0) {
+      // Calculate the actual interest that should be charged based on daily balance
+      const dayCount = Math.ceil((today.getTime() - lastPostingDate.getTime()) / (1000 * 60 * 60 * 24));
+      
+      // Distribute the calculated interest proportionally across EMI payments
+      // Prioritize payments that happened earlier in the month (they should have higher interest)
+      const sortedPayments = paymentsToAdjust.sort((a, b) => 
+        new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime()
+      );
+
+      let remainingInterest = interestAmount;
+      for (let i = 0; i < sortedPayments.length; i++) {
+        const payment = sortedPayments[i];
+        const isLastPayment = i === sortedPayments.length - 1;
+
+        let adjustedInterest: number;
+        if (isLastPayment) {
+          // Assign remaining interest to last payment (to account for rounding)
+          adjustedInterest = Math.max(0, remainingInterest);
+        } else {
+          // Distribute interest proportionally based on payment amount
+          const proportionOfTotal = payment.emi_amount / paymentsToAdjust.reduce((sum, p) => sum + p.emi_amount, 0);
+          adjustedInterest = Math.round(interestAmount * proportionOfTotal * 100) / 100;
+        }
+
+        // Update principal if needed (to maintain EMI amount)
+        const adjustedPrincipal = Math.max(0, payment.emi_amount - adjustedInterest);
+
+        // Only update if there's a significant difference from original breakdown
+        if (Math.abs(adjustedInterest - payment.interest_component) > 0.01) {
+          await loanEMIPaymentApi.updatePayment(payment.id, {
+            principal_component: adjustedPrincipal,
+            interest_component: adjustedInterest
+          });
+        }
+
+        remainingInterest -= adjustedInterest;
+      }
+    }
+    // ===== END EMI ADJUSTMENT =====
+
     // Create interest charge transaction
     const transaction: Omit<Transaction, 'id' | 'created_at' | 'updated_at'> = {
       user_id: userId,
@@ -288,7 +338,7 @@ export async function postMonthlyInterest(account: Account, userId: string): Pro
     return {
       success: true,
       interestAmount,
-      message: `Interest of ${interestAmount} posted successfully`
+      message: `Interest of ${interestAmount} posted successfully. EMI payment records adjusted.`
     };
   } catch (error) {
     console.error('Error posting monthly interest:', error);

@@ -13,6 +13,7 @@ const Reports = lazy(() => import('./pages/Reports'));
 const Settings = lazy(() => import('./pages/Settings'));
 const BackupRestore = lazy(() => import('./pages/BackupRestore'));
 const AIAnalysisPage = lazy(() => import('./pages/AIAnalysisPage'));
+const LoanEMIHistory = lazy(() => import('./pages/LoanEMIHistory'));
 
 // Auth pages loaded immediately for faster initial access
 import Login from './pages/Login';
@@ -71,6 +72,13 @@ const routes: RouteConfig[] = [
     name: 'Accounts',
     path: '/accounts',
     element: <ProtectedRoute><Accounts /></ProtectedRoute>,
+    visible: true,
+    protected: true,
+  },
+  {
+    name: 'Loan EMI History',
+    path: '/loan-emi-history',
+    element: <ProtectedRoute><LoanEMIHistory /></ProtectedRoute>,
     visible: true,
     protected: true,
   },
