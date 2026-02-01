@@ -602,7 +602,7 @@ export default function TransactionForm() {
                 // Call payEMIInstallment if it's an EMI item
                 if (allocation.emi_id) {
                   try {
-                    await emiApi.payEMIInstallment(allocation.emi_id, allocation.amount_paid);
+                    await emiApi.payEMIInstallment(allocation.emi_id);
                   } catch (err) {
                     console.error('Error updating EMI installment:', err);
                   }
