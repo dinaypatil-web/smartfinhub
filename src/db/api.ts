@@ -334,7 +334,7 @@ export const transactionApi = {
       .from('transactions')
       .select('*')
       .eq('user_id', userId)
-      .eq('account_id', accountId)
+      .or(`from_account_id.eq.${accountId},to_account_id.eq.${accountId}`)
       .order('transaction_date', { ascending: false });
 
     if (error) throw error;
@@ -1345,14 +1345,14 @@ export const creditCardStatementApi = {
   ): Promise<any[]> {
     const targetMonth = statementMonth || new Date().toISOString().slice(0, 7);
 
-    // Get all transactions and EMIs for this credit card from the statement month
+    // Get all transactions for this credit card from the statement month
     const { data: transactions, error: txError } = await supabase
       .from('transactions')
       .select('*')
-      .eq('account_id', creditCardId)
+      .or(`from_account_id.eq.${creditCardId},to_account_id.eq.${creditCardId}`)
       .gte('transaction_date', `${targetMonth}-01`)
       .lte('transaction_date', `${targetMonth}-31`)
-      .eq('type', 'credit_card_purchase');
+      .eq('transaction_type', 'expense'); // Using 'expense' as types are income/expense/etc. in TransactionType enum
 
     if (txError) throw txError;
 

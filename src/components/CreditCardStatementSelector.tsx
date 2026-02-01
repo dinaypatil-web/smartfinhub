@@ -68,7 +68,13 @@ export const CreditCardStatementSelector: React.FC<CreditCardStatementSelectorPr
 
         setStatementItems(itemsWithDetails);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load statement items');
+        let errorMessage = 'Failed to load statement items';
+        if (err instanceof Error) {
+          errorMessage = err.message;
+        } else if (typeof err === 'object' && err !== null && 'message' in err) {
+          errorMessage = (err as any).message;
+        }
+        setError(errorMessage);
         console.error('Error loading statement items:', err);
       } finally {
         setLoading(false);

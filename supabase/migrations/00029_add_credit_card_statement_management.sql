@@ -102,9 +102,11 @@ CREATE POLICY "Users can view allocations for their repayments"
   USING (
     repayment_id IN (
       SELECT id FROM transactions 
-      WHERE account_id IN (
+      WHERE (from_account_id IN (
         SELECT id FROM accounts WHERE user_id = auth.uid()
-      )
+      ) OR to_account_id IN (
+        SELECT id FROM accounts WHERE user_id = auth.uid()
+      ))
     )
   );
 
@@ -113,9 +115,11 @@ CREATE POLICY "Users can insert allocations for their repayments"
   WITH CHECK (
     repayment_id IN (
       SELECT id FROM transactions 
-      WHERE account_id IN (
+      WHERE (from_account_id IN (
         SELECT id FROM accounts WHERE user_id = auth.uid()
-      )
+      ) OR to_account_id IN (
+        SELECT id FROM accounts WHERE user_id = auth.uid()
+      ))
     )
   );
 
@@ -124,8 +128,10 @@ CREATE POLICY "Users can delete allocations for their repayments"
   USING (
     repayment_id IN (
       SELECT id FROM transactions 
-      WHERE account_id IN (
+      WHERE (from_account_id IN (
         SELECT id FROM accounts WHERE user_id = auth.uid()
-      )
+      ) OR to_account_id IN (
+        SELECT id FROM accounts WHERE user_id = auth.uid()
+      ))
     )
   );
