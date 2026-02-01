@@ -188,18 +188,62 @@ export default function TransactionForm() {
 
   // Calculate Loan Breakdown (Principal vs Interest)
   useEffect(() => {
-    const calculateLoanSplit = () => {
+    const calculateLoanSplit = async () => {
       if (formData.transaction_type === 'loan_payment' && formData.to_account_id && formData.amount && !isManualBreakdown) {
         const amount = parseFloat(formData.amount);
         if (isNaN(amount) || amount <= 0) return;
 
         const account = accounts.find((a: Account) => a.id === formData.to_account_id);
-        if (account && account.account_type === 'loan') {
+        if (account && account.account_type === 'loan' && user) {
           try {
+            let outstandingPrincipal = Number(account.balance);
+
+            // If editing an existing transaction, recalculate the balance BEFORE this transaction
+            if (id) {
+              try {
+                const allTransactions = await transactionApi.getTransactions(user.id);
+                const currentTransaction = allTransactions.find(t => t.id === id);
+                
+                if (currentTransaction) {
+                  // Start with initial loan amount
+                  let principalBeforeTransaction = Number(account.initial_balance || account.balance);
+                  
+                  // Apply all transactions that occurred BEFORE this one (by date and creation)
+                  const relevantTransactions = allTransactions
+                    .filter(t => 
+                      t.to_account_id === formData.to_account_id && 
+                      t.type === 'loan_payment' &&
+                      t.id !== id // Exclude current transaction
+                    )
+                    .sort((a, b) => {
+                      const dateCompare = new Date(a.transaction_date).getTime() - new Date(b.transaction_date).getTime();
+                      if (dateCompare !== 0) return dateCompare;
+                      return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
+                    });
+
+                  // Calculate balance before this transaction
+                  for (const txn of relevantTransactions) {
+                    const txnDate = new Date(txn.transaction_date);
+                    const currentDate = new Date(formData.transaction_date);
+                    
+                    // Only include transactions that occurred before this one
+                    if (txnDate < currentDate || (txnDate.getTime() === currentDate.getTime() && txn.created_at && currentTransaction.created_at && new Date(txn.created_at) < new Date(currentTransaction.created_at))) {
+                      principalBeforeTransaction -= Number(txn.amount);
+                    }
+                  }
+                  
+                  outstandingPrincipal = Math.max(0, principalBeforeTransaction);
+                }
+              } catch (error) {
+                console.error("Error recalculating principal for edit:", error);
+                // Fall back to current balance if there's an error
+              }
+            }
+
             // Simple calculation: Interest = Outstanding Principal × Annual Rate / 12 / 100
             // Principal = Payment Amount - Interest
             const breakdown = calculateEMIBreakdown(
-              Number(account.balance), // Current outstanding principal
+              outstandingPrincipal, // Outstanding principal BEFORE this payment
               amount, // Current payment amount
               Number(account.current_interest_rate || 0) // Annual interest rate
             );
@@ -219,7 +263,7 @@ export default function TransactionForm() {
     };
 
     calculateLoanSplit();
-  }, [formData.transaction_type, formData.to_account_id, formData.amount, accounts, isManualBreakdown]);
+  }, [formData.transaction_type, formData.to_account_id, formData.amount, formData.transaction_date, accounts, isManualBreakdown, id, user]);
 
   const loadBudgetInfo = async () => {
     if (!user || !formData.category || formData.transaction_type !== 'expense') return;
@@ -900,10 +944,10 @@ export default function TransactionForm() {
                     <div className="bg-white dark:bg-slate-900 rounded p-3 border border-blue-200 dark:border-blue-800">
                       <div className="flex justify-between items-center">
                         <div>
-                          <div className="text-xs text-muted-foreground">Current Outstanding Principal</div>
+                          <div className="text-xs text-muted-foreground">Outstanding Principal Before This Payment</div>
                           <div className="text-sm font-semibold mt-1">
                             {formatCurrency(
-                              Math.max(0, Number(accounts.find(a => a.id === formData.to_account_id)?.balance || 0)),
+                              Math.max(0, Number(accounts.find(a => a.id === formData.to_account_id)?.balance || 0) + (originalAmount || 0)),
                               formData.currency
                             )}
                           </div>
@@ -912,7 +956,7 @@ export default function TransactionForm() {
                           <div className="text-xs text-muted-foreground">After this payment</div>
                           <div className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 mt-1">
                             {formatCurrency(
-                              Math.max(0, Number(accounts.find(a => a.id === formData.to_account_id)?.balance || 0) - loanBreakdown.principal),
+                              Math.max(0, Number(accounts.find(a => a.id === formData.to_account_id)?.balance || 0) + (originalAmount || 0) - loanBreakdown.principal),
                               formData.currency
                             )}
                           </div>
@@ -982,7 +1026,7 @@ export default function TransactionForm() {
                   )}
 
                   <div className="text-xs text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/30 p-2 rounded">
-                    💡 EMI Breakdown for this payment only: Principal reduces loan balance, Interest is charged. Shows current outstanding principal before and after this payment.
+                    💡 EMI Breakdown for this payment only: Principal reduces loan balance, Interest is charged. Shows outstanding principal at the time of this payment.
                   </div>
                 </div>
               </div>
