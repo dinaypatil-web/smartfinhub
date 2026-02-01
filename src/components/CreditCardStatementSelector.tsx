@@ -15,6 +15,7 @@ interface CreditCardStatementSelectorProps {
   onAdvanceCreatedChange: (amount: number) => void;
   onAdvanceUsedChange: (amount: number) => void;
   currency: string;
+  initialAllocations?: CreditCardPaymentAllocation[];
 }
 
 export const CreditCardStatementSelector: React.FC<CreditCardStatementSelectorProps> = ({
@@ -23,7 +24,8 @@ export const CreditCardStatementSelector: React.FC<CreditCardStatementSelectorPr
   onAllocationsChange,
   onAdvanceCreatedChange,
   onAdvanceUsedChange,
-  currency
+  currency,
+  initialAllocations = []
 }) => {
   const [statementItems, setStatementItems] = useState<StatementItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,7 +42,20 @@ export const CreditCardStatementSelector: React.FC<CreditCardStatementSelectorPr
         setError(null);
 
         // Get unpaid statement lines
-        const items = await creditCardStatementApi.getUnpaidStatementLines(creditCardId);
+        const unpaidItems = await creditCardStatementApi.getUnpaidStatementLines(creditCardId);
+
+        // If we have initial allocations, fetch those specific lines too (as they might be marked "paid" already)
+        let allocatedItems: any[] = [];
+        if (initialAllocations.length > 0) {
+          const lineIds = initialAllocations.map(a => a.statement_line_id);
+          allocatedItems = await creditCardStatementApi.getStatementLinesByIds(lineIds);
+        }
+
+        // Combine and unique items
+        const allItemsMap = new Map();
+        unpaidItems.forEach(item => allItemsMap.set(item.id, item));
+        allocatedItems.forEach(item => allItemsMap.set(item.id, item));
+        const items = Array.from(allItemsMap.values());
 
         // Get advance balance
         const balance = await creditCardStatementApi.getAdvanceBalance(creditCardId);
@@ -67,6 +82,12 @@ export const CreditCardStatementSelector: React.FC<CreditCardStatementSelectorPr
         );
 
         setStatementItems(itemsWithDetails);
+
+        // Auto-select initial allocations
+        if (initialAllocations.length > 0) {
+          const initialSet = new Set(initialAllocations.map(a => a.statement_line_id));
+          setSelectedItems(initialSet);
+        }
       } catch (err) {
         let errorMessage = 'Failed to load statement items';
         if (err instanceof Error) {
@@ -82,7 +103,7 @@ export const CreditCardStatementSelector: React.FC<CreditCardStatementSelectorPr
     };
 
     loadData();
-  }, [creditCardId]);
+  }, [creditCardId, initialAllocations.length]);
 
   // Calculate totals and allocations
   useEffect(() => {

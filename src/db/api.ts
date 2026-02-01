@@ -360,6 +360,56 @@ export const transactionApi = {
 
     await this.updateAccountBalances(transaction);
 
+    // Phase 1: Support Credit Card Statement Lines (Added in previous task)
+    if (transaction.transaction_type === 'expense' && transaction.from_account_id) {
+      const fromAccount = await accountApi.getAccountById(transaction.from_account_id);
+      if (fromAccount?.account_type === 'credit_card') {
+        const statementMonth = transaction.transaction_date.slice(0, 7);
+        await creditCardStatementApi.createStatementLine({
+          credit_card_id: transaction.from_account_id,
+          user_id: transaction.user_id,
+          transaction_id: data.id,
+          description: transaction.description || 'Credit Card Transaction',
+          amount: transaction.amount,
+          transaction_date: transaction.transaction_date,
+          statement_month: statementMonth,
+          status: 'pending'
+        });
+      }
+    }
+
+    // Phase 2: Support Loan EMI Payments (Automatic Bifurcation)
+    if (transaction.transaction_type === 'loan_payment' && transaction.to_account_id) {
+      const loanAccount = await accountApi.getAccountById(transaction.to_account_id);
+      if (loanAccount && loanAccount.account_type === 'loan') {
+        const amount = Number(transaction.amount);
+        const interestRate = Number(loanAccount.current_interest_rate || 0);
+        const currentBalance = Number(loanAccount.balance);
+
+        // Calculate components
+        const monthlyRate = (interestRate / 100) / 12;
+        const interestComponent = Number((currentBalance * monthlyRate).toFixed(2));
+        const principalComponent = Number((amount - interestComponent).toFixed(2));
+        const outstandingPrincipal = Number((currentBalance - principalComponent).toFixed(2));
+
+        const nextPaymentNumber = await loanEMIPaymentApi.getNextPaymentNumber(transaction.to_account_id);
+
+        await loanEMIPaymentApi.createPayment({
+          user_id: transaction.user_id,
+          account_id: transaction.to_account_id,
+          payment_date: transaction.transaction_date,
+          emi_amount: amount,
+          principal_component: principalComponent,
+          interest_component: interestComponent,
+          outstanding_principal: outstandingPrincipal,
+          interest_rate: interestRate,
+          payment_number: nextPaymentNumber,
+          transaction_id: data.id,
+          notes: transaction.description
+        });
+      }
+    }
+
     return data;
   },
 
@@ -388,6 +438,60 @@ export const transactionApi = {
     if (oldTransaction) {
       await this.reverseAccountBalances(oldTransaction);
       await this.updateAccountBalances(data);
+
+      // Update associated records
+      if (data.transaction_type === 'loan_payment' && data.to_account_id) {
+        // Delete old
+        await supabase.from('loan_emi_payments').delete().eq('transaction_id', transactionId);
+
+        // Create new
+        const loanAccount = await accountApi.getAccountById(data.to_account_id);
+        if (loanAccount && loanAccount.account_type === 'loan') {
+          const amount = Number(data.amount);
+          const interestRate = Number(loanAccount.current_interest_rate || 0);
+          const currentBalance = Number(loanAccount.balance);
+          const monthlyRate = (interestRate / 100) / 12;
+          const interestComponent = Number((currentBalance * monthlyRate).toFixed(2));
+          const principalComponent = Number((amount - interestComponent).toFixed(2));
+          const outstandingPrincipal = Number((currentBalance - principalComponent).toFixed(2));
+          const nextPaymentNumber = await loanEMIPaymentApi.getNextPaymentNumber(data.to_account_id);
+
+          await loanEMIPaymentApi.createPayment({
+            user_id: data.user_id,
+            account_id: data.to_account_id,
+            payment_date: data.transaction_date,
+            emi_amount: amount,
+            principal_component: principalComponent,
+            interest_component: interestComponent,
+            outstanding_principal: outstandingPrincipal,
+            interest_rate: interestRate,
+            payment_number: nextPaymentNumber,
+            transaction_id: data.id,
+            notes: data.description
+          });
+        }
+      }
+
+      if (data.transaction_type === 'expense' && data.from_account_id) {
+        const fromAccount = await accountApi.getAccountById(data.from_account_id);
+        if (fromAccount?.account_type === 'credit_card') {
+          // Delete old
+          await supabase.from('credit_card_statement_lines').delete().eq('transaction_id', transactionId);
+
+          // Create new
+          const statementMonth = data.transaction_date.slice(0, 7);
+          await creditCardStatementApi.createStatementLine({
+            credit_card_id: data.from_account_id,
+            user_id: data.user_id,
+            transaction_id: data.id,
+            description: data.description || 'Credit Card Transaction',
+            amount: data.amount,
+            transaction_date: data.transaction_date,
+            statement_month: statementMonth,
+            status: 'pending'
+          });
+        }
+      }
     }
 
     return data;
@@ -409,6 +513,22 @@ export const transactionApi = {
 
     if (transaction) {
       await this.reverseAccountBalances(transaction);
+
+      // If it's a credit card expense, delete the associated statement line
+      if (transaction.transaction_type === 'expense' && transaction.from_account_id) {
+        await supabase
+          .from('credit_card_statement_lines')
+          .delete()
+          .eq('transaction_id', transactionId);
+      }
+
+      // If it's a loan payment, delete the associated EMI record
+      if (transaction.transaction_type === 'loan_payment' && transaction.to_account_id) {
+        await supabase
+          .from('loan_emi_payments')
+          .delete()
+          .eq('transaction_id', transactionId);
+      }
     }
   },
 
@@ -481,7 +601,19 @@ export const transactionApi = {
           await this.adjustBalance(transaction.from_account_id, -amount);
         }
         if (transaction.to_account_id) {
-          await this.adjustBalance(transaction.to_account_id, -amount);
+          const loanAccount = await accountApi.getAccountById(transaction.to_account_id);
+          if (loanAccount && loanAccount.account_type === 'loan') {
+            const interestRate = Number(loanAccount.current_interest_rate || 0);
+            const currentBalance = Number(loanAccount.balance);
+            const monthlyRate = (interestRate / 100) / 12;
+            const interest = Number((currentBalance * monthlyRate).toFixed(2));
+            const principal = amount - interest;
+            // Subtract only the principal component from the loan balance
+            await this.adjustBalance(transaction.to_account_id, -principal);
+          } else {
+            // Default fallback if account not found or not a loan
+            await this.adjustBalance(transaction.to_account_id, -amount);
+          }
         }
         break;
 
@@ -567,7 +699,18 @@ export const transactionApi = {
           await this.adjustBalance(transaction.from_account_id, amount);
         }
         if (transaction.to_account_id) {
-          await this.adjustBalance(transaction.to_account_id, amount);
+          const loanAccount = await accountApi.getAccountById(transaction.to_account_id);
+          if (loanAccount && loanAccount.account_type === 'loan') {
+            const interestRate = Number(loanAccount.current_interest_rate || 0);
+            const currentBalance = Number(loanAccount.balance);
+            const monthlyRate = (interestRate / 100) / 12;
+            const interest = Number((currentBalance * monthlyRate).toFixed(2));
+            const principal = amount - interest;
+            // Add back only the principal component
+            await this.adjustBalance(transaction.to_account_id, principal);
+          } else {
+            await this.adjustBalance(transaction.to_account_id, amount);
+          }
         }
         break;
 
@@ -956,6 +1099,36 @@ export const emiApi = {
 
     if (error) throw error;
     if (!data) throw new Error('Failed to update EMI installment');
+    return data;
+  },
+
+  async unpayEMIInstallment(emiId: string): Promise<EMITransaction> {
+    const { data: emi, error: fetchError } = await supabase
+      .from('emi_transactions')
+      .select('*')
+      .eq('id', emiId)
+      .maybeSingle();
+
+    if (fetchError) throw fetchError;
+    if (!emi) throw new Error('EMI transaction not found');
+
+    const remainingInstallments = emi.remaining_installments + 1;
+    const status = 'active';
+    const nextDueDate = new Date(new Date(emi.next_due_date).setMonth(new Date(emi.next_due_date).getMonth() - 1)).toISOString().split('T')[0];
+
+    const { data, error } = await supabase
+      .from('emi_transactions')
+      .update({
+        remaining_installments: remainingInstallments,
+        next_due_date: nextDueDate,
+        status
+      })
+      .eq('id', emiId)
+      .select()
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) throw new Error('Failed to revert EMI installment');
     return data;
   },
 
@@ -1351,16 +1524,15 @@ export const creditCardStatementApi = {
       .select('*')
       .or(`from_account_id.eq.${creditCardId},to_account_id.eq.${creditCardId}`)
       .gte('transaction_date', `${targetMonth}-01`)
-      .lte('transaction_date', `${targetMonth}-31`)
-      .eq('transaction_type', 'expense'); // Using 'expense' as types are income/expense/etc. in TransactionType enum
+      .lte('transaction_date', `${targetMonth}-31`);
 
     if (txError) throw txError;
 
     const { data: emis, error: emiError } = await supabase
       .from('emi_transactions')
       .select('*')
-      .eq('credit_card_id', creditCardId)
-      .in('status', ['active', 'paused']); // Only unpaid EMIs
+      .eq('account_id', creditCardId) // Fixed: was credit_card_id
+      .in('status', ['active', 'paused']);
 
     if (emiError) throw emiError;
 
@@ -1562,12 +1734,23 @@ export const creditCardStatementApi = {
     if (error) throw error;
   },
 
-  // Get all allocations for a user (for backup)
-  async getAllRepaymentAllocations(userId: string): Promise<any[]> {
+  // Get allocations for a specific repayment transaction
+  async getRepaymentAllocations(repaymentId: string): Promise<any[]> {
     const { data, error } = await supabase
       .from('credit_card_repayment_allocations')
-      .select('*, transactions!inner(user_id)')
-      .eq('transactions.user_id', userId);
+      .select('*')
+      .eq('repayment_id', repaymentId);
+
+    if (error) throw error;
+    return Array.isArray(data) ? data : [];
+  },
+
+  // Get statement lines by their IDs
+  async getStatementLinesByIds(lineIds: string[]): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('credit_card_statement_lines')
+      .select('*')
+      .in('id', lineIds);
 
     if (error) throw error;
     return Array.isArray(data) ? data : [];

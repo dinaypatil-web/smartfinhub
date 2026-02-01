@@ -303,6 +303,17 @@ export default function TransactionForm() {
           setExistingEMI(emiData);
           setOriginalAmount(Number(transaction.amount));
           setOriginalAccountId(transaction.from_account_id);
+
+          // Fetch credit card repayment allocations if applicable
+          if (transaction.transaction_type === 'credit_card_repayment') {
+            try {
+              const allocations = await creditCardStatementApi.getRepaymentAllocations(transaction.id);
+              setCCAllocations(allocations);
+            } catch (error) {
+              console.error('Error fetching CC repayment allocations:', error);
+            }
+          }
+
           setFormData({
             transaction_type: transaction.transaction_type,
             from_account_id: transaction.from_account_id || '',
@@ -461,10 +472,10 @@ export default function TransactionForm() {
         transaction_date: formData.transaction_date,
       };
 
-      let createdTransaction = null;
 
       if (id) {
-        await transactionApi.updateTransaction(id, transactionData);
+        const transactionId = id as string;
+        await transactionApi.updateTransaction(transactionId, transactionData);
 
         // Handle EMI update
         if (formData.is_emi) {
@@ -477,7 +488,7 @@ export default function TransactionForm() {
           const emiData = {
             user_id: user.id,
             account_id: formData.from_account_id,
-            transaction_id: id,
+            transaction_id: transactionId,
             purchase_amount: purchaseAmount,
             bank_charges: bankCharges,
             total_amount: totalAmount,
@@ -503,9 +514,9 @@ export default function TransactionForm() {
         if (formData.transaction_type === 'loan_payment' && formData.to_account_id && loanBreakdown) {
           const loanAccount = accounts.find(a => a.id === formData.to_account_id);
           if (loanAccount) {
-            const currentPayment = await loanEMIPaymentApi.getPaymentByTransactionId(id);
+            const currentPayment = await loanEMIPaymentApi.getPaymentByTransactionId(transactionId);
             if (currentPayment) {
-              await loanEMIPaymentApi.updatePaymentByTransactionId(id, {
+              await loanEMIPaymentApi.updatePaymentByTransactionId(transactionId, {
                 payment_date: formData.transaction_date,
                 emi_amount: parseFloat(formData.amount),
                 principal_component: loanBreakdown.principal,
@@ -518,15 +529,78 @@ export default function TransactionForm() {
           }
         }
 
+        // Handle Credit Card Repayment update
+        if (formData.transaction_type === 'credit_card_repayment' && formData.to_account_id) {
+          try {
+            // 1. Revert old allocations
+            const oldAllocations = await creditCardStatementApi.getRepaymentAllocations(transactionId);
+            for (const alloc of oldAllocations) {
+              await creditCardStatementApi.updateStatementLineStatus(alloc.statement_line_id, 'pending', 0);
+              if (alloc.emi_id) {
+                await emiApi.unpayEMIInstallment(alloc.emi_id);
+              }
+            }
+
+            await creditCardStatementApi.deleteAllocations(transactionId);
+
+            // 2. Apply new allocations
+            if (ccAllocations.length > 0) {
+              const mappedAllocations = ccAllocations.map(a => ({
+                line_id: a.statement_line_id,
+                amount: a.amount_paid,
+                emi_id: a.emi_id
+              }));
+              await creditCardStatementApi.allocateRepayment(transactionId, mappedAllocations);
+
+              for (const allocation of ccAllocations) {
+                await creditCardStatementApi.updateStatementLineStatus(
+                  allocation.statement_line_id,
+                  'paid',
+                  allocation.amount_paid
+                );
+
+                if (allocation.emi_id) {
+                  try {
+                    await emiApi.payEMIInstallment(allocation.emi_id);
+                  } catch (err) {
+                    console.error('Error updating EMI installment:', err);
+                  }
+                }
+              }
+            }
+
+            // Handle Advance Payments (Created/Used)
+            if (ccAdvanceCreated > 0) {
+              await creditCardStatementApi.createAdvancePayment(
+                user.id,
+                formData.to_account_id as string,
+                ccAdvanceCreated,
+                formData.currency,
+                `Advance payment from transaction ${transactionId} (Updated)`
+              );
+            }
+
+            if (ccAdvanceUsed > 0) {
+              await creditCardStatementApi.consumeAdvanceBalance(
+                user.id,
+                formData.to_account_id as string,
+                ccAdvanceUsed
+              );
+            }
+          } catch (error) {
+            console.error('Error processing CC repayment update:', error);
+          }
+        }
+
         toast({
           title: 'Success',
           description: 'Transaction updated successfully',
         });
       } else {
         // Create new transaction
-        createdTransaction = await transactionApi.createTransaction(transactionData);
+        const created = await transactionApi.createTransaction(transactionData);
 
-        if (formData.transaction_type === 'credit_card_repayment' && createdTransaction) {
+        if (formData.transaction_type === 'credit_card_repayment' && created && formData.to_account_id) {
           try {
             if (ccAllocations.length > 0) {
               const mappedAllocations = ccAllocations.map(a => ({
@@ -534,7 +608,7 @@ export default function TransactionForm() {
                 amount: a.amount_paid,
                 emi_id: a.emi_id
               }));
-              await creditCardStatementApi.allocateRepayment(createdTransaction.id, mappedAllocations);
+              await creditCardStatementApi.allocateRepayment(created.id, mappedAllocations);
 
               for (const allocation of ccAllocations) {
                 await creditCardStatementApi.updateStatementLineStatus(
@@ -556,17 +630,17 @@ export default function TransactionForm() {
             if (ccAdvanceCreated > 0) {
               await creditCardStatementApi.createAdvancePayment(
                 user.id,
-                formData.to_account_id!,
+                formData.to_account_id as string,
                 ccAdvanceCreated,
                 formData.currency,
-                `Advance payment from transaction ${createdTransaction.id}`
+                `Advance payment from transaction ${created.id}`
               );
             }
 
             if (ccAdvanceUsed > 0) {
               await creditCardStatementApi.consumeAdvanceBalance(
                 user.id,
-                formData.to_account_id!,
+                formData.to_account_id as string,
                 ccAdvanceUsed
               );
             }
@@ -575,13 +649,13 @@ export default function TransactionForm() {
           }
         }
 
-        if (formData.transaction_type === 'loan_payment' && formData.to_account_id && loanBreakdown && createdTransaction) {
+        if (formData.transaction_type === 'loan_payment' && formData.to_account_id && loanBreakdown && created) {
           const loanAccount = accounts.find(a => a.id === formData.to_account_id);
           if (loanAccount) {
-            const existingPayments = await loanEMIPaymentApi.getPaymentsByAccount(formData.to_account_id);
+            const existingPayments = await loanEMIPaymentApi.getPaymentsByAccount(formData.to_account_id as string);
             await loanEMIPaymentApi.createLoanEMIPayment({
               user_id: user.id,
-              account_id: formData.to_account_id,
+              account_id: formData.to_account_id as string,
               payment_date: formData.transaction_date,
               emi_amount: parseFloat(formData.amount),
               principal_component: loanBreakdown.principal,
@@ -589,29 +663,29 @@ export default function TransactionForm() {
               outstanding_principal: Math.max(0, loanOutstandingPrincipalBefore - loanBreakdown.principal),
               interest_rate: Number(loanAccount.current_interest_rate || 0),
               payment_number: existingPayments.length + 1,
-              transaction_id: createdTransaction.id,
+              transaction_id: created.id,
               notes: formData.description
             });
 
             if (loanBreakdown.interest > 0) {
-              await accountApi.adjustBalance(formData.to_account_id, loanBreakdown.interest);
+              await accountApi.adjustBalance(formData.to_account_id as string, loanBreakdown.interest);
             }
           }
         }
 
-        if (formData.is_emi && createdTransaction) {
+        if (formData.is_emi && created) {
           const purchaseAmount = parseFloat(formData.amount);
-          const bankCharges = parseFloat(formData.bank_charges);
+          const bank_charges = parseFloat(formData.bank_charges);
           const emiMonths = parseInt(formData.emi_months);
-          const monthlyEMI = calculateMonthlyEMI(purchaseAmount, bankCharges, emiMonths);
-          const totalAmount = purchaseAmount + bankCharges;
+          const monthlyEMI = calculateMonthlyEMI(purchaseAmount, bank_charges, emiMonths);
+          const totalAmount = purchaseAmount + bank_charges;
 
           await emiApi.createEMI({
             user_id: user.id,
             account_id: formData.from_account_id!,
-            transaction_id: createdTransaction.id,
+            transaction_id: created.id,
             purchase_amount: purchaseAmount,
-            bank_charges: bankCharges,
+            bank_charges,
             total_amount: totalAmount,
             emi_months: emiMonths,
             monthly_emi: monthlyEMI,
@@ -942,6 +1016,7 @@ export default function TransactionForm() {
                 onAdvanceCreatedChange={setCCAdvanceCreated}
                 onAdvanceUsedChange={setCCAdvanceUsed}
                 currency={formData.currency}
+                initialAllocations={ccAllocations}
               />
             )}
 
