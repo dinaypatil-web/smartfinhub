@@ -24,7 +24,7 @@ interface CashFlowStatement {
     netOperatingCashFlow: number;
   };
   investingActivities: {
-    transfers: number;
+    note: string; // Transfers excluded as contra entries
     netInvestingCashFlow: number;
   };
   financingActivities: {
@@ -318,11 +318,10 @@ export default function Reports() {
     const netOperatingCashFlow = totalIncome - totalExpenses;
 
     // Investing Activities
-    const transfers = monthlyTransactions
-      .filter(t => t.transaction_type === 'transfer')
-      .reduce((sum, t) => sum + parseAmount(t.amount), 0);
-
-    const netInvestingCashFlow = -transfers;
+    // Note: Transfers between own accounts are contra entries (internal movements)
+    // They are NOT included in cash flow as they don't represent actual cash inflow/outflow
+    // The closing balance already accounts for account redistribution
+    const netInvestingCashFlow = 0;
 
     // Financing Activities
     const loanPayments = monthlyTransactions
@@ -353,7 +352,7 @@ export default function Reports() {
         netOperatingCashFlow,
       },
       investingActivities: {
-        transfers,
+        note: 'Internal transfers excluded (contra entries)',
         netInvestingCashFlow,
       },
       financingActivities: {
@@ -820,16 +819,15 @@ export default function Reports() {
                       <CardTitle className="text-lg">Investing Activities</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
-                      <div className="flex justify-between items-center pl-4 border-l-4 border-warning">
-                        <span className="text-sm">Transfers</span>
-                        <span className="font-semibold">
-                          -{formatCurrency(cashFlowStatement.investingActivities.transfers, currency)}
-                        </span>
+                      <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded border border-amber-200 dark:border-amber-800">
+                        <p className="text-sm text-amber-800 dark:text-amber-200">
+                          <strong>Note:</strong> Transfers between your own accounts are treated as contra entries (internal movements) and are excluded from cash flow calculations as they do not represent actual cash inflow or outflow.
+                        </p>
                       </div>
                       <div className="flex justify-between items-center pt-3 mt-3 border-t font-semibold bg-blue-50 dark:bg-blue-900/20 p-3 rounded">
                         <span>Net Investing Cash Flow</span>
-                        <span className={cashFlowStatement.investingActivities.netInvestingCashFlow >= 0 ? 'text-success' : 'text-danger'}>
-                          {formatCurrency(cashFlowStatement.investingActivities.netInvestingCashFlow, currency)}
+                        <span className="text-success">
+                          {formatCurrency(0, currency)}
                         </span>
                       </div>
                     </CardContent>
@@ -931,9 +929,8 @@ export default function Reports() {
                           </div>
                           <div className="flex justify-between text-sm">
                             <span>Investing Cash Flow</span>
-                            <span className={cashFlowStatement.investingActivities.netInvestingCashFlow >= 0 ? 'text-success' : 'text-danger'}>
-                              {cashFlowStatement.investingActivities.netInvestingCashFlow >= 0 ? '+' : ''}
-                              {formatCurrency(Math.abs(cashFlowStatement.investingActivities.netInvestingCashFlow), currency)}
+                            <span className="text-muted-foreground">
+                              (Transfers excluded as internal movements)
                             </span>
                           </div>
                           <div className="flex justify-between text-sm">
