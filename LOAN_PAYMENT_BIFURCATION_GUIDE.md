@@ -38,7 +38,7 @@ SmartFinHub now includes an advanced loan accounting feature that automatically 
 
 ## How It Works Step-by-Step
 
-### Phase 1: Payment Entry
+### Phase 1: Payment Entry (Bifurcation Applied)
 
 ```
 User enters loan payment for ₹10,000 on a loan account
@@ -63,7 +63,7 @@ Account balance updated:
   - Interest is posted separately during monthly interest posting
 ```
 
-### Phase 2: Monthly Interest Posting
+### Phase 2: Monthly Interest Posting (No Adjustment to Previous Records)
 
 ```
 User clicks "Post Monthly Interest" button
@@ -71,22 +71,17 @@ User clicks "Post Monthly Interest" button
 System calculates actual interest for the period:
   - Daily balance calculation considering all transactions
   - Floating/Fixed rate consideration
-  - Result: ₹425 actual interest (vs ₹411 estimated)
-                    ↓
-Adjusts EMI payments from that month:
-  - If payment made on 10th: adjusts its interest component
-  - If payment made on 20th: adjusts its interest component
-  - Maintains individual EMI amounts (no change to what user paid)
-  - Only the breakdown changes
+  - Result: ₹425 actual interest
                     ↓
 Creates interest charge transaction:
-  - Amount: ₹425 (actual calculated interest)
+  - Amount: ₹425 (calculated interest)
   - Posted to loan account
   - Updates account balance
                     ↓
-EMI Payment History shows:
-  - Adjusted principal/interest breakdown
-  - Final outstanding principal after adjustment
+Previous EMI Payment History:
+  - Remains unchanged (bifurcation done at entry time)
+  - New transactions bifurcated when entered
+  - All records remain accurate for audit trail
 ```
 
 ## User Interface
@@ -284,14 +279,15 @@ When EMI payment is saved:
    Balance: ₹40,000 → ₹40,411
 
 Result: Only principal (₹9,589) reduced loan balance
+        Interest is separate and posted during monthly interest posting
 ```
 
-### Monthly Reconciliation
+### Monthly Interest Posting (No Historical Adjustment)
 ```
-For all payments in month:
-- Sum of principal components = Principal paid that month
-- Sum of interest components = Interest that month
-- During interest posting: Adjust interest components to actual
+New payments bifurcated = Done at time of entry
+Previous payments = Not adjusted, remain as originally posted
+Monthly interest charge = Posted separately based on daily balance calculation
+Historical audit trail = Preserved without changes
 ```
 
 ## Error Handling

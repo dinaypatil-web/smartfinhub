@@ -151,38 +151,35 @@ const breakdown = calculateEMIBreakdownWithHistory(
 #### Enhanced: postMonthlyInterest()
 **File**: `src/utils/loanInterestPosting.ts` (lines 240-310)
 
-**New Logic Added**:
-1. After calculating interest for period
-2. Get all EMI payments made in that month
-3. For each payment:
-   - Calculate proportional interest based on actual calculation
-   - Update `interest_component` in database
-   - Recalculate `principal_component` (maintain EMI amount)
-4. Create single interest charge transaction
+**Logic**:
+1. Calculates actual interest accrued for the period
+2. Uses existing EMI payment records' breakdown values (no modifications)
+3. Creates single interest charge transaction with calculated amount
+4. Previous transactions remain unchanged - audit trail preserved
 
-**Key Code Section**:
+**Key Behavior**:
+- EMI bifurcation happens ONLY at payment entry time
+- Monthly interest posting uses breakdown from EMI records as-is
+- No retroactive adjustments to historical payments
+- All records remain accurate for audit and reconciliation
+
+**Code Section**:
 ```typescript
-// Get EMI payments in current period
-const emiPaymentsInMonth = await loanEMIPaymentApi.getPaymentsByAccount(account.id);
-const paymentsToAdjust = emiPaymentsInMonth.filter(payment => {
-  const paymentDate = new Date(payment.payment_date);
-  return paymentDate >= lastPostingDate && paymentDate <= today;
-});
+// Calculate interest for the period
+const interestAmount = await calculateLoanInterestForPeriod(account, lastPostingDate, today);
 
-// Adjust each payment's breakdown
-for (let i = 0; i < sortedPayments.length; i++) {
-  const adjustedInterest = (isLastPayment) 
-    ? remainingInterest 
-    : Math.round(interestAmount * (payment.emi_amount / totalEMI) * 100) / 100;
-  
-  // Update if significant difference
-  if (Math.abs(adjustedInterest - payment.interest_component) > 0.01) {
-    await loanEMIPaymentApi.updatePayment(payment.id, {
-      principal_component: adjustedPrincipal,
-      interest_component: adjustedInterest
-    });
-  }
-}
+// Note: EMI Payment Records are created and stored with principal/interest breakdown
+// when the payment transaction is entered. This posting only creates the interest
+// charge transaction. Previous payments are not adjusted.
+
+// Create interest charge transaction for calculated amount
+const transaction = {
+  user_id: userId,
+  transaction_type: 'interest_charge',
+  to_account_id: account.id,
+  amount: interestAmount,
+  ...
+};
 ```
 
 ### 4. Routing & Navigation
@@ -275,18 +272,15 @@ IF EMI payments exist in period:
 ELSE:
   Calculates daily balance interest
         ↓
-Get all EMI payments from that month
-        ↓
-For each payment:
-  - Calculate proportional interest
-  - Update interest_component in database
-  - Recalculate principal to maintain EMI amount
-        ↓
-Create interest_charge transaction
+Create interest_charge transaction with calculated amount
         ↓
 Update account balance
         ↓
-Show success message with adjusted breakdown
+Show success message
+        ↓
+NOTE: EMI Payment records are NOT adjusted
+      Bifurcation was done when payment was originally entered
+      Previous payments remain unchanged for audit trail
 ```
 
 ### History View Flow
