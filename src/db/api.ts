@@ -1419,6 +1419,17 @@ export const creditCardStatementApi = {
     return data;
   },
 
+  // Get all statement lines for a user (for backup)
+  async getAllStatementLines(userId: string): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('credit_card_statement_lines')
+      .select('*')
+      .eq('user_id', userId);
+
+    if (error) throw error;
+    return Array.isArray(data) ? data : [];
+  },
+
   // Get advance payment balance for a credit card
   async getAdvanceBalance(creditCardId: string): Promise<number> {
     const { data, error } = await supabase
@@ -1431,6 +1442,17 @@ export const creditCardStatementApi = {
 
     if (error) throw error;
     return data?.remaining_balance || 0;
+  },
+
+  // Get all advance payments for a user (for backup)
+  async getAllAdvancePayments(userId: string): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('credit_card_advance_payments')
+      .select('*')
+      .eq('user_id', userId);
+
+    if (error) throw error;
+    return Array.isArray(data) ? data : [];
   },
 
   // Consume advance balance (decrement from latest record)
@@ -1538,5 +1560,16 @@ export const creditCardStatementApi = {
       .insert(allocationRecords);
 
     if (error) throw error;
+  },
+
+  // Get all allocations for a user (for backup)
+  async getAllRepaymentAllocations(userId: string): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('credit_card_repayment_allocations')
+      .select('*, transactions!inner(user_id)')
+      .eq('transactions.user_id', userId);
+
+    if (error) throw error;
+    return Array.isArray(data) ? data : [];
   }
 };

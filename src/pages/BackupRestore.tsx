@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useHybridAuth as useAuth } from '@/contexts/HybridAuthContext';
-import { accountApi, transactionApi, budgetApi, interestRateApi, loanEMIPaymentApi } from '@/db/api';
+import { accountApi, transactionApi, budgetApi, interestRateApi, loanEMIPaymentApi, emiApi, creditCardStatementApi } from '@/db/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -26,6 +26,10 @@ interface BackupData {
     budgets: any[];
     interestRates: any[];
     loanEMIPayments: any[];
+    emiTransactions: any[];
+    ccStatementLines: any[];
+    ccAdvancePayments: any[];
+    ccRepaymentAllocations: any[];
   };
 }
 
@@ -44,12 +48,26 @@ export default function BackupRestore() {
     try {
       // Fetch all user data - SECURITY: All API calls filter by user.id to ensure
       // only the current user's data is included in the backup
-      const [accounts, transactions, budgets, interestRates, loanEMIPayments] = await Promise.all([
+      const [
+        accounts,
+        transactions,
+        budgets,
+        interestRates,
+        loanEMIPayments,
+        emiTransactions,
+        ccStatementLines,
+        ccAdvancePayments,
+        ccRepaymentAllocations
+      ] = await Promise.all([
         accountApi.getAccounts(user.id),
         transactionApi.getTransactions(user.id),
         budgetApi.getBudgets(user.id),
         interestRateApi.getInterestRates(user.id),
         loanEMIPaymentApi.getLoanEMIPayments(user.id),
+        emiApi.getEMIsByUser(user.id),
+        creditCardStatementApi.getAllStatementLines(user.id),
+        creditCardStatementApi.getAllAdvancePayments(user.id),
+        creditCardStatementApi.getAllRepaymentAllocations(user.id),
       ]);
 
       // Create backup object
@@ -63,6 +81,10 @@ export default function BackupRestore() {
           budgets,
           interestRates,
           loanEMIPayments,
+          emiTransactions,
+          ccStatementLines,
+          ccAdvancePayments,
+          ccRepaymentAllocations,
         },
       };
 
@@ -148,13 +170,31 @@ export default function BackupRestore() {
       const existingAccounts = await accountApi.getAccounts(user.id);
       const existingTransactions = await transactionApi.getTransactions(user.id);
       const existingBudgets = await budgetApi.getBudgets(user.id);
+      const existingEMIs = await emiApi.getEMIsByUser(user.id);
 
-      // Delete all existing records
-      await Promise.all([
-        ...existingTransactions.map(t => transactionApi.deleteTransaction(t.id)),
-        ...existingAccounts.map(a => accountApi.deleteAccount(a.id)),
-        ...existingBudgets.map(b => budgetApi.deleteBudget(b.id)),
-      ]);
+      console.log('Starting data deletion...');
+
+      // Delete EMI transactions first (they depend on accounts and transactions)
+      for (const emi of existingEMIs) {
+        await emiApi.deleteEMI(emi.id);
+      }
+
+      // Delete transactions sequentially
+      for (const t of existingTransactions) {
+        await transactionApi.deleteTransaction(t.id);
+      }
+
+      // Delete accounts sequentially
+      for (const a of existingAccounts) {
+        await accountApi.deleteAccount(a.id);
+      }
+
+      // Delete budgets sequentially
+      for (const b of existingBudgets) {
+        await budgetApi.deleteBudget(b.id);
+      }
+
+      console.log('Data deletion completed. Starting restoration...');
 
       // Restore accounts first (as transactions depend on them)
       const accountIdMap = new Map<string, string>();
@@ -168,9 +208,11 @@ export default function BackupRestore() {
       }
 
       // Restore transactions with updated account IDs
+      const transactionIdMap = new Map<string, string>();
       for (const transaction of backupFile.data.transactions) {
+        const oldId = transaction.id;
         const { id, user_id, created_at, updated_at, ...transactionData } = transaction;
-        
+
         // Update account IDs to new ones
         if (transactionData.account_id) {
           transactionData.account_id = accountIdMap.get(transactionData.account_id) || transactionData.account_id;
@@ -182,7 +224,10 @@ export default function BackupRestore() {
           transactionData.to_account_id = accountIdMap.get(transactionData.to_account_id) || transactionData.to_account_id;
         }
 
-        await transactionApi.createTransaction(transactionData);
+        const newTx = await transactionApi.createTransaction(transactionData);
+        if (newTx) {
+          transactionIdMap.set(oldId, newTx.id);
+        }
       }
 
       // Restore budgets
@@ -200,14 +245,98 @@ export default function BackupRestore() {
         await interestRateApi.createInterestRate(rateData);
       }
 
-      // Restore loan EMI payments with updated account IDs
+      // Restore EMIs with updated account and transaction IDs
+      const emiIdMap = new Map<string, string>();
+      for (const emi of backupFile.data.emiTransactions || []) {
+        const oldEmiId = emi.id;
+        const { id, user_id, created_at, updated_at, ...emiData } = emi;
+
+        if (emiData.account_id) {
+          emiData.account_id = accountIdMap.get(emiData.account_id) || emiData.account_id;
+        }
+        if (emiData.transaction_id) {
+          emiData.transaction_id = transactionIdMap.get(emiData.transaction_id) || emiData.transaction_id;
+        }
+
+        const newEmi = await emiApi.createEMI(emiData);
+        if (newEmi) {
+          emiIdMap.set(oldEmiId, newEmi.id);
+        }
+      }
+
+      // Restore loan EMI payments with updated account and transaction IDs
       for (const payment of backupFile.data.loanEMIPayments || []) {
         const { id, user_id, created_at, updated_at, ...paymentData } = payment;
         if (paymentData.account_id) {
           paymentData.account_id = accountIdMap.get(paymentData.account_id) || paymentData.account_id;
         }
+        if (paymentData.transaction_id) {
+          paymentData.transaction_id = transactionIdMap.get(paymentData.transaction_id) || paymentData.transaction_id;
+        }
         await loanEMIPaymentApi.createLoanEMIPayment(paymentData);
       }
+
+      // Restore statement lines
+      const lineIdMap = new Map<string, string>();
+      for (const line of backupFile.data.ccStatementLines || []) {
+        const oldLineId = line.id;
+        const { id, user_id, created_at, updated_at, ...lineData } = line;
+
+        if (lineData.credit_card_id) {
+          lineData.credit_card_id = accountIdMap.get(lineData.credit_card_id) || lineData.credit_card_id;
+        }
+        if (lineData.transaction_id) {
+          lineData.transaction_id = transactionIdMap.get(lineData.transaction_id) || lineData.transaction_id;
+        }
+        if (lineData.emi_id) {
+          lineData.emi_id = emiIdMap.get(lineData.emi_id) || lineData.emi_id;
+        }
+
+        const newLine = await creditCardStatementApi.createStatementLine(lineData);
+        if (newLine) {
+          lineIdMap.set(oldLineId, newLine.id);
+        }
+      }
+
+      // Restore advance payments
+      for (const adv of backupFile.data.ccAdvancePayments || []) {
+        const { id, user_id, created_at, updated_at, ...advData } = adv;
+        if (advData.credit_card_id) {
+          advData.credit_card_id = accountIdMap.get(advData.credit_card_id) || advData.credit_card_id;
+        }
+        await creditCardStatementApi.createAdvancePayment(
+          user.id,
+          advData.credit_card_id,
+          advData.payment_amount,
+          advData.currency,
+          advData.notes
+        );
+      }
+
+      // Restore allocations
+      for (const alloc of backupFile.data.ccRepaymentAllocations || []) {
+        const { id, created_at, ...allocData } = alloc;
+
+        if (allocData.repayment_id) {
+          allocData.repayment_id = transactionIdMap.get(allocData.repayment_id) || allocData.repayment_id;
+        }
+        if (allocData.statement_line_id) {
+          allocData.statement_line_id = lineIdMap.get(allocData.statement_line_id) || allocData.statement_line_id;
+        }
+        if (allocData.emi_id) {
+          allocData.emi_id = emiIdMap.get(allocData.emi_id) || allocData.emi_id;
+        }
+
+        await creditCardStatementApi.allocateRepayment(allocData.repayment_id, [
+          {
+            line_id: allocData.statement_line_id,
+            amount: allocData.allocated_amount,
+            emi_id: allocData.emi_id
+          }
+        ]);
+      }
+
+      console.log('Restoration completed successfully.');
 
       toast({
         title: 'Restore Completed Successfully',
