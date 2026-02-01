@@ -235,6 +235,7 @@ export interface LoanEMIPayment {
   outstanding_principal: number;
   interest_rate: number;
   payment_number: number;
+  transaction_id: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;

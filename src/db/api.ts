@@ -1003,6 +1003,17 @@ export const loanEMIPaymentApi = {
     return Array.isArray(data) ? data : [];
   },
 
+  async getPaymentByTransactionId(transactionId: string): Promise<LoanEMIPayment | null> {
+    const { data, error } = await supabase
+      .from('loan_emi_payments')
+      .select('*')
+      .eq('transaction_id', transactionId)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data;
+  },
+
   async createPayment(payment: Omit<LoanEMIPayment, 'id' | 'created_at' | 'updated_at'>): Promise<LoanEMIPayment> {
     const { data, error } = await supabase
       .from('loan_emi_payments')
@@ -1039,6 +1050,19 @@ export const loanEMIPaymentApi = {
 
     if (error) throw error;
     if (!data) throw new Error('Failed to update loan EMI payment');
+    return data;
+  },
+
+  async updatePaymentByTransactionId(transactionId: string, updates: Partial<LoanEMIPayment>): Promise<LoanEMIPayment> {
+    const { data, error } = await supabase
+      .from('loan_emi_payments')
+      .update(updates)
+      .eq('transaction_id', transactionId)
+      .select()
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) throw new Error('Failed to update loan EMI payment by transaction ID');
     return data;
   },
 

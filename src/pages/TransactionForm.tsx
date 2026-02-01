@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, ArrowLeft, TrendingDown, ArrowRightLeft, Calendar, CreditCard, Building } from 'lucide-react';
+import { Loader2, ArrowLeft, TrendingDown, CreditCard, AlertCircle, Plus, Info } from 'lucide-react';
 import { formatCurrency } from '@/utils/format';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CreditCardStatementSelector } from '@/components/CreditCardStatementSelector';
@@ -76,6 +76,7 @@ export default function TransactionForm() {
     principal: number;
     interest: number;
   } | null>(null);
+  const [loanOutstandingPrincipalBefore, setLoanOutstandingPrincipalBefore] = useState<number>(0);
   const [isManualBreakdown, setIsManualBreakdown] = useState(false);
 
   // Credit Card Statement and Payment Management
@@ -204,46 +205,29 @@ export default function TransactionForm() {
           try {
             let outstandingPrincipal = Number(account.balance);
 
-            // If editing an existing transaction, recalculate the balance BEFORE this transaction
+            // If editing an existing transaction, source outstanding principal from historical record
             if (id) {
               try {
-                const allTransactions = await transactionApi.getTransactions(user.id);
-                const currentTransaction = allTransactions.find(t => t.id === id);
-
-                if (currentTransaction) {
-                  // Start with initial loan amount
-                  let principalBeforeTransaction = Number(account.initial_balance || account.balance);
-
-                  // Apply all transactions that occurred BEFORE this one (by date and creation)
-                  const relevantTransactions = allTransactions
-                    .filter(t =>
-                      t.to_account_id === formData.to_account_id &&
-                      ((t as any).transaction_type === 'loan_payment' || (t as any).type === 'loan_payment') &&
-                      t.id !== id // Exclude current transaction
-                    )
-                    .sort((a, b) => {
-                      const dateCompare = new Date(a.transaction_date).getTime() - new Date(b.transaction_date).getTime();
-                      if (dateCompare !== 0) return dateCompare;
-                      return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
-                    });
-
-                  // Calculate balance before this transaction
-                  for (const txn of relevantTransactions) {
-                    const txnDate = new Date(txn.transaction_date);
-                    const currentDate = new Date(formData.transaction_date);
-
-                    // Only include transactions that occurred before this one
-                    if (txnDate < currentDate || (txnDate.getTime() === currentDate.getTime() && txn.created_at && currentTransaction.created_at && new Date(txn.created_at) < new Date(currentTransaction.created_at))) {
-                      principalBeforeTransaction -= Number(txn.amount);
+                const currentPayment = await loanEMIPaymentApi.getPaymentByTransactionId(id);
+                if (currentPayment) {
+                  const prevPaymentNumber = currentPayment.payment_number - 1;
+                  if (prevPaymentNumber >= 1) {
+                    const payments = await loanEMIPaymentApi.getPaymentsByAccount(formData.to_account_id);
+                    const prevPayment = payments.find(p => p.payment_number === prevPaymentNumber);
+                    if (prevPayment) {
+                      outstandingPrincipal = prevPayment.outstanding_principal;
                     }
+                  } else {
+                    // First payment, use initial principal
+                    outstandingPrincipal = Number(account.loan_principal || account.balance);
                   }
-
-                  outstandingPrincipal = Math.max(0, principalBeforeTransaction);
                 }
+                setLoanOutstandingPrincipalBefore(outstandingPrincipal);
               } catch (error) {
-                console.error("Error recalculating principal for edit:", error);
-                // Fall back to current balance if there's an error
+                console.error("Error sourcing historical principal for edit:", error);
               }
+            } else {
+              setLoanOutstandingPrincipalBefore(outstandingPrincipal);
             }
 
             // Simple calculation: Interest = Outstanding Principal × Annual Rate / 12 / 100
@@ -515,6 +499,25 @@ export default function TransactionForm() {
           await emiApi.deleteEMI(existingEMI.id);
         }
 
+        // Handle Loan Payment update
+        if (formData.transaction_type === 'loan_payment' && formData.to_account_id && loanBreakdown) {
+          const loanAccount = accounts.find(a => a.id === formData.to_account_id);
+          if (loanAccount) {
+            const currentPayment = await loanEMIPaymentApi.getPaymentByTransactionId(id);
+            if (currentPayment) {
+              await loanEMIPaymentApi.updatePaymentByTransactionId(id, {
+                payment_date: formData.transaction_date,
+                emi_amount: parseFloat(formData.amount),
+                principal_component: loanBreakdown.principal,
+                interest_component: loanBreakdown.interest,
+                outstanding_principal: Math.max(0, loanOutstandingPrincipalBefore - loanBreakdown.principal),
+                interest_rate: Number(loanAccount.current_interest_rate || 0),
+                notes: formData.description
+              });
+            }
+          }
+        }
+
         toast({
           title: 'Success',
           description: 'Transaction updated successfully',
@@ -572,7 +575,7 @@ export default function TransactionForm() {
           }
         }
 
-        if (formData.transaction_type === 'loan_payment' && formData.to_account_id && loanBreakdown) {
+        if (formData.transaction_type === 'loan_payment' && formData.to_account_id && loanBreakdown && createdTransaction) {
           const loanAccount = accounts.find(a => a.id === formData.to_account_id);
           if (loanAccount) {
             const existingPayments = await loanEMIPaymentApi.getPaymentsByAccount(formData.to_account_id);
@@ -583,9 +586,10 @@ export default function TransactionForm() {
               emi_amount: parseFloat(formData.amount),
               principal_component: loanBreakdown.principal,
               interest_component: loanBreakdown.interest,
-              outstanding_principal: Math.max(0, Number(loanAccount.balance) - loanBreakdown.principal),
+              outstanding_principal: Math.max(0, loanOutstandingPrincipalBefore - loanBreakdown.principal),
               interest_rate: Number(loanAccount.current_interest_rate || 0),
               payment_number: existingPayments.length + 1,
+              transaction_id: createdTransaction.id,
               notes: formData.description
             });
 
@@ -892,7 +896,7 @@ export default function TransactionForm() {
                         <AlertDescription>
                           <div className="space-y-1">
                             <div className="font-semibold text-sm">Budget Status for {formData.category}</div>
-                            <div className="grid grid-cols-3 gap-2 text-xs">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                               <div>
                                 <div className="text-muted-foreground">Budgeted</div>
                                 <div className="font-medium">{formatCurrency(budgetInfo.budgeted, formData.currency)}</div>
@@ -957,7 +961,7 @@ export default function TransactionForm() {
                   </div>
 
                   {/* EMI Amount Breakdown Display */}
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="bg-white dark:bg-slate-900 rounded p-3 border border-blue-200 dark:border-blue-800">
                       <div className="text-xs text-muted-foreground mb-1">Principal</div>
                       <div className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
@@ -990,7 +994,7 @@ export default function TransactionForm() {
                   {/* Outstanding Principal Display */}
                   {formData.to_account_id && (
                     <div className="bg-white dark:bg-slate-900 rounded p-3 border border-blue-200 dark:border-blue-800">
-                      <div className="flex justify-between items-center">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-0">
                         <div>
                           <div className="text-xs text-muted-foreground">Outstanding Principal Before This Payment</div>
                           <div className="text-sm font-semibold mt-1">
@@ -1000,7 +1004,7 @@ export default function TransactionForm() {
                             )}
                           </div>
                         </div>
-                        <div className="text-right">
+                        <div className="text-left sm:text-right border-t sm:border-0 pt-2 sm:pt-0">
                           <div className="text-xs text-muted-foreground">After this payment</div>
                           <div className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 mt-1">
                             {formatCurrency(
@@ -1015,8 +1019,8 @@ export default function TransactionForm() {
 
                   {/* Manual Breakdown Input */}
                   {isManualBreakdown && (
-                    <div className="space-y-2 border-t border-blue-200 dark:border-blue-800 pt-3">
-                      <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-4 border-t border-blue-200 dark:border-blue-800 pt-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="space-y-1">
                           <Label htmlFor="manual_principal" className="text-xs">Principal Amount</Label>
                           <Input
@@ -1224,7 +1228,7 @@ export default function TransactionForm() {
                               <div className="font-semibold text-sm text-blue-900 dark:text-blue-200">
                                 EMI Calculation Summary
                               </div>
-                              <div className="grid grid-cols-2 gap-3 text-xs">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                                 <div>
                                   <div className="text-muted-foreground">Monthly EMI</div>
                                   <div className="font-bold text-lg text-blue-600 dark:text-blue-400">
@@ -1271,7 +1275,7 @@ export default function TransactionForm() {
                       <div className="font-semibold text-sm text-purple-900 dark:text-purple-200">
                         Credit Card Billing Information
                       </div>
-                      <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                         <div>
                           <div className="text-muted-foreground">Statement Date</div>
                           <div className="font-medium text-purple-600 dark:text-purple-400">
