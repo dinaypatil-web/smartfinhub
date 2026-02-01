@@ -508,6 +508,10 @@ export default function TransactionForm() {
           const loanAccount = accounts.find(a => a.id === formData.to_account_id);
 
           if (loanAccount) {
+            // Get existing payment count to calculate next payment number
+            const existingPayments = await loanEMIPaymentApi.getPaymentsByAccount(formData.to_account_id);
+            const nextPaymentNumber = existingPayments.length + 1;
+
             // 1. Create the detailed EMI payment record
             await loanEMIPaymentApi.createPayment({
               user_id: user.id,
@@ -518,7 +522,7 @@ export default function TransactionForm() {
               interest_component: loanBreakdown.interest,
               outstanding_principal: Math.max(0, Number(loanAccount.balance) - loanBreakdown.principal),
               interest_rate: Number(loanAccount.current_interest_rate || 0),
-              payment_number: 0, // Should calculate this, but 0 for now
+              payment_number: nextPaymentNumber,
               notes: formData.description
             });
 
