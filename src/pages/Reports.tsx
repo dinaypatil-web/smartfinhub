@@ -10,11 +10,33 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Download, TrendingUp, TrendingDown, Calendar, CreditCard } from 'lucide-react';
+import { Loader2, Download, TrendingUp, TrendingDown, Calendar, CreditCard, ArrowRight } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/utils/format';
 import { calculateTotalDueAmount, getBillingCycleInfo } from '@/utils/billingCycleCalculations';
 import { INCOME_CATEGORIES } from '@/constants/incomeCategories';
 import BankLogo from '@/components/BankLogo';
+
+interface CashFlowStatement {
+  period: string;
+  operatingActivities: {
+    totalIncome: number;
+    totalExpenses: number;
+    netOperatingCashFlow: number;
+  };
+  investingActivities: {
+    transfers: number;
+    netInvestingCashFlow: number;
+  };
+  financingActivities: {
+    loanPayments: number;
+    creditCardRepayments: number;
+    withdrawals: number;
+    netFinancingCashFlow: number;
+  };
+  netCashFlow: number;
+  openingBalance: number;
+  closingBalance: number;
+}
 
 export default function Reports() {
   const { user, profile } = useAuth();
@@ -37,6 +59,11 @@ export default function Reports() {
     `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
   );
   const [creditCardEMIs, setCreditCardEMIs] = useState<EMITransaction[]>([]);
+
+  // Cash flow statement state
+  const [cashFlowMonth, setCashFlowMonth] = useState<string>(
+    `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
+  );
 
   const currency = profile?.default_currency || 'INR';
 
@@ -253,6 +280,96 @@ export default function Reports() {
 
   const creditCardStatement = getCreditCardStatement();
 
+  const calculateCashFlowStatement = (): CashFlowStatement | null => {
+    if (!cashFlowMonth) return null;
+
+    const [year, month] = cashFlowMonth.split('-').map(Number);
+    const monthStart = new Date(year, month - 1, 1);
+    const monthEnd = new Date(year, month, 0);
+    monthEnd.setHours(23, 59, 59, 999);
+
+    // Get transactions for the month
+    const monthlyTransactions = transactions.filter(t => {
+      const transactionDate = new Date(t.transaction_date);
+      return transactionDate >= monthStart && transactionDate <= monthEnd;
+    });
+
+    // Helper to safely parse amount
+    const parseAmount = (amount: any): number => {
+      if (typeof amount === 'number') return amount;
+      if (typeof amount === 'string') return parseFloat(amount) || 0;
+      return 0;
+    };
+
+    // Calculate opening balance (sum of all account balances at start of month)
+    const openingBalance = accounts
+      .filter(a => a.account_type !== 'loan')
+      .reduce((sum, a) => sum + a.balance, 0);
+
+    // Operating Activities
+    const totalIncome = monthlyTransactions
+      .filter(t => t.transaction_type === 'income')
+      .reduce((sum, t) => sum + parseAmount(t.amount), 0);
+
+    const totalExpenses = monthlyTransactions
+      .filter(t => t.transaction_type === 'expense')
+      .reduce((sum, t) => sum + parseAmount(t.amount), 0);
+
+    const netOperatingCashFlow = totalIncome - totalExpenses;
+
+    // Investing Activities
+    const transfers = monthlyTransactions
+      .filter(t => t.transaction_type === 'transfer')
+      .reduce((sum, t) => sum + parseAmount(t.amount), 0);
+
+    const netInvestingCashFlow = -transfers;
+
+    // Financing Activities
+    const loanPayments = monthlyTransactions
+      .filter(t => t.transaction_type === 'loan_payment')
+      .reduce((sum, t) => sum + parseAmount(t.amount), 0);
+
+    const creditCardRepayments = monthlyTransactions
+      .filter(t => t.transaction_type === 'credit_card_repayment')
+      .reduce((sum, t) => sum + parseAmount(t.amount), 0);
+
+    const withdrawals = monthlyTransactions
+      .filter(t => t.transaction_type === 'withdrawal')
+      .reduce((sum, t) => sum + parseAmount(t.amount), 0);
+
+    const netFinancingCashFlow = -(loanPayments + creditCardRepayments + withdrawals);
+
+    // Calculate net cash flow
+    const netCashFlow = netOperatingCashFlow + netInvestingCashFlow + netFinancingCashFlow;
+
+    // Closing balance
+    const closingBalance = openingBalance + netCashFlow;
+
+    return {
+      period: `${monthStart.toLocaleString('en-US', { month: 'long', year: 'numeric' })}`,
+      operatingActivities: {
+        totalIncome,
+        totalExpenses,
+        netOperatingCashFlow,
+      },
+      investingActivities: {
+        transfers,
+        netInvestingCashFlow,
+      },
+      financingActivities: {
+        loanPayments,
+        creditCardRepayments,
+        withdrawals,
+        netFinancingCashFlow,
+      },
+      netCashFlow,
+      openingBalance,
+      closingBalance,
+    };
+  };
+
+  const cashFlowStatement = calculateCashFlowStatement();
+
   const summary = calculateSummary();
   const filteredTransactions = getFilteredTransactions();
   const accountBalances = getAccountBalances();
@@ -387,10 +504,11 @@ export default function Reports() {
 
       <Tabs defaultValue="summary" className="space-y-6">
         <div className="overflow-x-auto">
-          <TabsList className="inline-flex w-full min-w-max xl:grid xl:grid-cols-4">
+          <TabsList className="inline-flex w-full min-w-max xl:grid xl:grid-cols-5">
             <TabsTrigger value="summary" className="flex-1 xl:flex-none whitespace-nowrap">Summary</TabsTrigger>
             <TabsTrigger value="transactions" className="flex-1 xl:flex-none whitespace-nowrap">Transaction History</TabsTrigger>
             <TabsTrigger value="balances" className="flex-1 xl:flex-none whitespace-nowrap">Account Balances</TabsTrigger>
+            <TabsTrigger value="cash-flow" className="flex-1 xl:flex-none whitespace-nowrap">Cash Flow</TabsTrigger>
             <TabsTrigger value="credit-card" className="flex-1 xl:flex-none whitespace-nowrap">Credit Card Statement</TabsTrigger>
           </TabsList>
         </div>
@@ -631,6 +749,219 @@ export default function Reports() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="cash-flow" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Cash Flow Statement</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="cashFlowMonth">Select Month</Label>
+                <Input
+                  id="cashFlowMonth"
+                  type="month"
+                  value={cashFlowMonth}
+                  onChange={(e) => setCashFlowMonth(e.target.value)}
+                />
+              </div>
+
+              {cashFlowStatement && (
+                <div className="space-y-6 mt-6">
+                  {/* Period Info */}
+                  <div className="text-center pb-4 border-b">
+                    <h3 className="text-xl font-bold">{cashFlowStatement.period}</h3>
+                    <p className="text-sm text-muted-foreground">Cash Flow Analysis</p>
+                  </div>
+
+                  {/* Opening Balance */}
+                  <Card className="bg-muted">
+                    <CardContent className="pt-6">
+                      <div className="flex justify-between items-center">
+                        <span className="font-medium">Opening Balance</span>
+                        <span className="text-lg font-semibold">
+                          {formatCurrency(cashFlowStatement.openingBalance, currency)}
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Operating Activities */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Operating Activities</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="flex justify-between items-center pl-4 border-l-4 border-success">
+                        <span className="text-sm">Cash Inflows (Income)</span>
+                        <span className="font-semibold text-success">
+                          +{formatCurrency(cashFlowStatement.operatingActivities.totalIncome, currency)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center pl-4 border-l-4 border-danger">
+                        <span className="text-sm">Cash Outflows (Expenses)</span>
+                        <span className="font-semibold text-danger">
+                          -{formatCurrency(cashFlowStatement.operatingActivities.totalExpenses, currency)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center pt-3 mt-3 border-t font-semibold bg-blue-50 dark:bg-blue-900/20 p-3 rounded">
+                        <span>Net Operating Cash Flow</span>
+                        <span className={cashFlowStatement.operatingActivities.netOperatingCashFlow >= 0 ? 'text-success' : 'text-danger'}>
+                          {formatCurrency(cashFlowStatement.operatingActivities.netOperatingCashFlow, currency)}
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Investing Activities */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Investing Activities</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="flex justify-between items-center pl-4 border-l-4 border-warning">
+                        <span className="text-sm">Transfers</span>
+                        <span className="font-semibold">
+                          -{formatCurrency(cashFlowStatement.investingActivities.transfers, currency)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center pt-3 mt-3 border-t font-semibold bg-blue-50 dark:bg-blue-900/20 p-3 rounded">
+                        <span>Net Investing Cash Flow</span>
+                        <span className={cashFlowStatement.investingActivities.netInvestingCashFlow >= 0 ? 'text-success' : 'text-danger'}>
+                          {formatCurrency(cashFlowStatement.investingActivities.netInvestingCashFlow, currency)}
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Financing Activities */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Financing Activities</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="flex justify-between items-center pl-4 border-l-4 border-danger">
+                        <span className="text-sm">Loan Payments</span>
+                        <span className="font-semibold">
+                          -{formatCurrency(cashFlowStatement.financingActivities.loanPayments, currency)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center pl-4 border-l-4 border-danger">
+                        <span className="text-sm">Credit Card Repayments</span>
+                        <span className="font-semibold">
+                          -{formatCurrency(cashFlowStatement.financingActivities.creditCardRepayments, currency)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center pl-4 border-l-4 border-danger">
+                        <span className="text-sm">Withdrawals</span>
+                        <span className="font-semibold">
+                          -{formatCurrency(cashFlowStatement.financingActivities.withdrawals, currency)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center pt-3 mt-3 border-t font-semibold bg-blue-50 dark:bg-blue-900/20 p-3 rounded">
+                        <span>Net Financing Cash Flow</span>
+                        <span className={cashFlowStatement.financingActivities.netFinancingCashFlow >= 0 ? 'text-success' : 'text-danger'}>
+                          {formatCurrency(cashFlowStatement.financingActivities.netFinancingCashFlow, currency)}
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Net Cash Flow Summary */}
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <Card className="border-2 border-blue-200 dark:border-blue-800">
+                      <CardContent className="pt-6">
+                        <div className="text-sm text-muted-foreground mb-2">Net Cash Flow</div>
+                        <div className={`text-2xl font-bold ${
+                          cashFlowStatement.netCashFlow >= 0 ? 'text-success' : 'text-danger'
+                        }`}>
+                          {cashFlowStatement.netCashFlow >= 0 ? '+' : ''}
+                          {formatCurrency(cashFlowStatement.netCashFlow, currency)}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border-2 border-purple-200 dark:border-purple-800">
+                      <CardContent className="pt-6">
+                        <div className="text-sm text-muted-foreground mb-2">Opening Balance</div>
+                        <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                          {formatCurrency(cashFlowStatement.openingBalance, currency)}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border-2 border-green-200 dark:border-green-800">
+                      <CardContent className="pt-6">
+                        <div className="text-sm text-muted-foreground mb-2">Closing Balance</div>
+                        <div className={`text-2xl font-bold ${
+                          cashFlowStatement.closingBalance >= 0 ? 'text-success' : 'text-danger'
+                        }`}>
+                          {formatCurrency(cashFlowStatement.closingBalance, currency)}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Cash Flow Reconciliation */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Reconciliation</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between p-3 bg-muted rounded">
+                          <span>Opening Balance</span>
+                          <span className="font-semibold">
+                            {formatCurrency(cashFlowStatement.openingBalance, currency)}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                          <ArrowRight className="h-4 w-4" />
+                        </div>
+
+                        <div className="space-y-2 border-l-4 border-blue-400 pl-4">
+                          <div className="flex justify-between text-sm">
+                            <span>Operating Cash Flow</span>
+                            <span className={cashFlowStatement.operatingActivities.netOperatingCashFlow >= 0 ? 'text-success' : 'text-danger'}>
+                              {cashFlowStatement.operatingActivities.netOperatingCashFlow >= 0 ? '+' : ''}
+                              {formatCurrency(Math.abs(cashFlowStatement.operatingActivities.netOperatingCashFlow), currency)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span>Investing Cash Flow</span>
+                            <span className={cashFlowStatement.investingActivities.netInvestingCashFlow >= 0 ? 'text-success' : 'text-danger'}>
+                              {cashFlowStatement.investingActivities.netInvestingCashFlow >= 0 ? '+' : ''}
+                              {formatCurrency(Math.abs(cashFlowStatement.investingActivities.netInvestingCashFlow), currency)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span>Financing Cash Flow</span>
+                            <span className={cashFlowStatement.financingActivities.netFinancingCashFlow >= 0 ? 'text-success' : 'text-danger'}>
+                              {cashFlowStatement.financingActivities.netFinancingCashFlow >= 0 ? '+' : ''}
+                              {formatCurrency(Math.abs(cashFlowStatement.financingActivities.netFinancingCashFlow), currency)}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                          <ArrowRight className="h-4 w-4" />
+                        </div>
+
+                        <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded border-2 border-green-200 dark:border-green-800 font-semibold">
+                          <span>Closing Balance</span>
+                          <span className={cashFlowStatement.closingBalance >= 0 ? 'text-success' : 'text-danger'}>
+                            {formatCurrency(cashFlowStatement.closingBalance, currency)}
+                          </span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="credit-card" className="space-y-4">
