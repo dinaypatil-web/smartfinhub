@@ -246,3 +246,62 @@ export interface LoanAccountWithPayments extends LoanAccountWithCalculations {
   total_interest_paid?: number;
   remaining_principal?: number;
 }
+
+// Credit Card Statement and Payment Management
+export interface CreditCardStatement {
+  id: string;
+  user_id: string;
+  credit_card_id: string; // account_id of credit card
+  statement_date: string; // Closing date of statement
+  due_date: string;
+  opening_balance: number;
+  total_charges: number;
+  total_payments: number;
+  closing_balance: number;
+  min_due: number;
+  currency: string;
+  status: 'open' | 'paid' | 'partial' | 'overdue';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreditCardStatementLine {
+  id: string;
+  statement_id: string;
+  transaction_id: string | null; // Can be null for EMI or other charges
+  emi_id: string | null; // If it's from an EMI
+  description: string;
+  amount: number;
+  transaction_date: string;
+  status: 'pending' | 'paid' | 'partial';
+  paid_amount: number;
+  created_at: string;
+}
+
+export interface CreditCardAdvancePayment {
+  id: string;
+  user_id: string;
+  credit_card_id: string;
+  payment_amount: number;
+  payment_date: string;
+  remaining_balance: number;
+  currency: string;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface CreditCardPaymentAllocation {
+  statement_line_id: string;
+  amount_paid: number;
+  transaction_id?: string;
+  emi_id?: string;
+  description: string;
+}
+
+export interface CreditCardRepaymentDetail {
+  total_payment_amount: number;
+  payment_date: string;
+  allocations: CreditCardPaymentAllocation[]; // Which statement lines are being paid
+  advance_amount: number; // Amount exceeding allocated items
+  notes: string;
+}

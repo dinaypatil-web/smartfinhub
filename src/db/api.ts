@@ -16,7 +16,11 @@ import type {
   CustomBankLink,
   IncomeCategoryKey,
   BankLink,
-  UserCustomBankLink
+  UserCustomBankLink,
+  CreditCardStatement,
+  CreditCardStatementLine,
+  CreditCardAdvancePayment,
+  CreditCardRepaymentDetail
 } from '@/types/types';
 
 export const profileApi = {
@@ -1289,6 +1293,172 @@ export const userCustomBankLinksApi = {
       .from('user_custom_bank_links')
       .delete()
       .eq('id', id);
+
+    if (error) throw error;
+  }
+};
+
+export const creditCardStatementApi = {
+  // Get statement items (due transactions/EMIs) for a credit card in a given month
+  async getStatementItems(
+    creditCardId: string,
+    statementMonth?: string // YYYY-MM format, defaults to current month
+  ): Promise<any[]> {
+    const targetMonth = statementMonth || new Date().toISOString().slice(0, 7);
+    
+    // Get all transactions and EMIs for this credit card from the statement month
+    const { data: transactions, error: txError } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('account_id', creditCardId)
+      .gte('transaction_date', `${targetMonth}-01`)
+      .lte('transaction_date', `${targetMonth}-31`)
+      .eq('type', 'credit_card_purchase');
+
+    if (txError) throw txError;
+
+    const { data: emis, error: emiError } = await supabase
+      .from('emi_transactions')
+      .select('*')
+      .eq('credit_card_id', creditCardId)
+      .in('status', ['active', 'paused']); // Only unpaid EMIs
+
+    if (emiError) throw emiError;
+
+    // Get statement line items if they exist
+    const { data: lines, error: lineError } = await supabase
+      .from('credit_card_statement_lines')
+      .select('*')
+      .eq('credit_card_id', creditCardId)
+      .eq('statement_month', targetMonth);
+
+    if (lineError) throw lineError;
+
+    // Merge and return statement items
+    return [...(transactions || []), ...(emis || []), ...(lines || [])];
+  },
+
+  // Get all statement lines for a credit card (for a specific month or all unpaid)
+  async getUnpaidStatementLines(creditCardId: string): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('credit_card_statement_lines')
+      .select('*')
+      .eq('credit_card_id', creditCardId)
+      .eq('status', 'pending')
+      .order('transaction_date', { ascending: false });
+
+    if (error) throw error;
+    return Array.isArray(data) ? data : [];
+  },
+
+  // Create a statement line item
+  async createStatementLine(line: any): Promise<any> {
+    const { data, error } = await supabase
+      .from('credit_card_statement_lines')
+      .insert(line)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  // Update statement line payment status
+  async updateStatementLineStatus(
+    lineId: string,
+    status: 'pending' | 'paid' | 'partial',
+    paidAmount: number
+  ): Promise<any> {
+    const { data, error } = await supabase
+      .from('credit_card_statement_lines')
+      .update({ status, paid_amount: paidAmount })
+      .eq('id', lineId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  // Get advance payment balance for a credit card
+  async getAdvanceBalance(creditCardId: string): Promise<number> {
+    const { data, error } = await supabase
+      .from('credit_card_advance_payments')
+      .select('remaining_balance')
+      .eq('credit_card_id', creditCardId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data?.remaining_balance || 0;
+  },
+
+  // Record advance payment
+  async createAdvancePayment(
+    userId: string,
+    creditCardId: string,
+    paymentAmount: number,
+    currency: string,
+    notes?: string
+  ): Promise<any> {
+    // Get current advance balance
+    const currentBalance = await this.getAdvanceBalance(creditCardId);
+    const newBalance = currentBalance + paymentAmount;
+
+    const { data, error } = await supabase
+      .from('credit_card_advance_payments')
+      .insert({
+        user_id: userId,
+        credit_card_id: creditCardId,
+        payment_amount: paymentAmount,
+        remaining_balance: newBalance,
+        payment_date: new Date().toISOString(),
+        currency,
+        notes: notes || null
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  // Update advance payment balance (e.g., when excess is used against future statement)
+  async updateAdvanceBalance(creditCardId: string, amount: number): Promise<void> {
+    const currentBalance = await this.getAdvanceBalance(creditCardId);
+    const newBalance = Math.max(0, currentBalance - amount);
+
+    const { error } = await supabase
+      .from('credit_card_advance_payments')
+      .update({ remaining_balance: newBalance })
+      .eq('credit_card_id', creditCardId)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (error) throw error;
+  },
+
+  // Allocate a repayment across multiple statement lines
+  async allocateRepayment(
+    repaymentId: string,
+    allocations: Array<{
+      line_id: string;
+      amount: number;
+      emi_id?: string;
+    }>
+  ): Promise<void> {
+    const allocationRecords = allocations.map(alloc => ({
+      repayment_id: repaymentId,
+      statement_line_id: alloc.line_id,
+      emi_id: alloc.emi_id || null,
+      allocated_amount: alloc.amount,
+      created_at: new Date().toISOString()
+    }));
+
+    const { error } = await supabase
+      .from('credit_card_repayment_allocations')
+      .insert(allocationRecords);
 
     if (error) throw error;
   }
