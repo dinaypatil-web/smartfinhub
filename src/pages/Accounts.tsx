@@ -701,6 +701,7 @@ export default function Accounts() {
                                   </div>
                                 );
                               })}
+                            </div>
                           </div>
                         )}
 

@@ -570,13 +570,44 @@ export default function TransactionForm() {
             }
 
             // Handle Advance Payments (Created/Used)
-            if (ccAdvanceCreated > 0) {
+            const existingAdvance = await creditCardStatementApi.getAdvancePaymentByTransactionId(transactionId);
+
+            if (existingAdvance) {
+              // Check if card changed
+              if (existingAdvance.credit_card_id !== formData.to_account_id) {
+                // Delete old advance payment (this will propagate balance updates to the old card)
+                await creditCardStatementApi.deleteAdvancePayment(existingAdvance.id);
+                
+                // Create new advance payment on the new card if needed
+                if (ccAdvanceCreated > 0) {
+                  await creditCardStatementApi.createAdvancePayment(
+                    user.id,
+                    formData.to_account_id as string,
+                    ccAdvanceCreated,
+                    formData.currency,
+                    `Advance payment from transaction ${transactionId} (Updated)`,
+                    transactionId
+                  );
+                }
+              } else {
+                // Same card, update or delete
+                if (ccAdvanceCreated > 0) {
+                  await creditCardStatementApi.updateAdvancePayment(existingAdvance.id, {
+                    payment_amount: ccAdvanceCreated,
+                    notes: `Advance payment from transaction ${transactionId} (Updated)`
+                  });
+                } else {
+                  await creditCardStatementApi.deleteAdvancePayment(existingAdvance.id);
+                }
+              }
+            } else if (ccAdvanceCreated > 0) {
               await creditCardStatementApi.createAdvancePayment(
                 user.id,
                 formData.to_account_id as string,
                 ccAdvanceCreated,
                 formData.currency,
-                `Advance payment from transaction ${transactionId} (Updated)`
+                `Advance payment from transaction ${transactionId} (Updated)`,
+                transactionId
               );
             }
 
@@ -633,7 +664,8 @@ export default function TransactionForm() {
                 formData.to_account_id as string,
                 ccAdvanceCreated,
                 formData.currency,
-                `Advance payment from transaction ${created.id}`
+                `Advance payment from transaction ${created.id}`,
+                created.id
               );
             }
 
