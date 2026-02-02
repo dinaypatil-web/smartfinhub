@@ -264,15 +264,40 @@ export function isDueDatePassed(statementDay: number, dueDay: number, referenceD
 
 /**
  * Check if we should display the due amount
- * Returns true after the statement date has passed (statement has been generated)
+ * Returns true if:
+ * 1. Statement has been generated (after statement date)
+ * 2. OR if we are in the "grace period" where the previous statement is still relevant
  * 
- * Example: If statement date is 13th
- * - On Dec 10: returns false (statement not yet generated)
- * - On Dec 13: returns true (statement generated, showing amount due on Dec 30)
- * - On Dec 23: returns true (statement generated, showing amount due on Dec 30)
+ * @param statementDay The day of the month when statement is generated
+ * @param dueDay Optional due day to calculate if previous bill is still relevant
+ * @param referenceDate Current date (default: now)
  */
-export function shouldDisplayDueAmount(statementDay: number, referenceDate: Date = new Date()): boolean {
+export function shouldDisplayDueAmount(
+  statementDay: number, 
+  dueDay?: number | null,
+  referenceDate: Date = new Date()
+): boolean {
   const { isAfterStatementDate } = getStatementPeriod(statementDay, referenceDate);
+  
+  // If statement is generated, always show
+  if (isAfterStatementDate) return true;
+
+  // If before statement date, check if we should still show previous statement's due
+  // We generally show it unless it's very old? 
+  // Actually, standard behavior is to always show the "Latest Bill" status.
+  // So if we are before statement date, the "Latest Bill" is the previous one.
+  // So we should probably ALWAYS return true if we have a statement day?
+  // But the original code wanted to hide it.
+  
+  // If dueDay is provided, we can be smarter.
+  // If we are before statement date (e.g. Dec 10, stmt 13), the active bill is from Nov 13.
+  // If that bill is not yet due (e.g. due Dec 12), we MUST show it.
+  // If that bill is overdue (e.g. due Nov 30), we probably still want to show it as overdue?
+  
+  // Let's change to always return true if dueDay is provided, 
+  // because there is ALWAYS a "last generated statement" (even if it was last month).
+  if (dueDay) return true;
+
   return isAfterStatementDate;
 }
 

@@ -1041,7 +1041,7 @@ export const emiApi = {
     return Array.isArray(data) ? data : [];
   },
 
-  async createEMI(emi: any): Promise<any> {
+  async createEMI(emi: Omit<EMITransaction, 'id' | 'created_at' | 'updated_at'>): Promise<EMITransaction> {
     const { data, error } = await supabase
       .from('emi_transactions')
       .insert(emi)
@@ -1049,6 +1049,7 @@ export const emiApi = {
       .maybeSingle();
 
     if (error) throw error;
+    if (!data) throw new Error('Failed to create EMI transaction');
 
     // If this EMI is linked to a transaction, remove any existing statement line for that transaction
     // to prevent double counting (purchase vs installments)

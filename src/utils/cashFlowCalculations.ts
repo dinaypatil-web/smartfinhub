@@ -270,7 +270,7 @@ export function calculateCreditCardDues(
     const totalDues = filteredAccounts.reduce((sum, acc) => {
       // Use statement amount calculation if statement day is configured
       if (acc.statement_day) {
-        if (shouldDisplayDueAmount(acc.statement_day)) {
+        if (shouldDisplayDueAmount(acc.statement_day, acc.due_day)) {
           const transactions = accountTransactions[acc.id] || [];
           const emis = accountEMIs[acc.id] || [];
           const statementCalc = calculateCreditCardStatementAmount(
@@ -300,9 +300,9 @@ export function calculateCreditCardDues(
   const totalDues = creditCardAccounts.reduce((sum, acc) => {
     // Use statement amount calculation if statement day is configured
     if (acc.statement_day) {
-      if (shouldDisplayDueAmount(acc.statement_day)) {
-        const transactions = accountTransactions[acc.id] || [];
-        const emis = accountEMIs[acc.id] || [];
+        if (shouldDisplayDueAmount(acc.statement_day, acc.due_day)) {
+          const transactions = accountTransactions[acc.id] || [];
+          const emis = accountEMIs[acc.id] || [];
         const statementCalc = calculateCreditCardStatementAmount(
           acc.id,
           acc.statement_day,
@@ -357,9 +357,9 @@ export function getCreditCardDuesDetails(
     // Use statement amount calculation if statement day is configured
     // Use statement amount calculation if statement day is configured
     if (acc.statement_day) {
-      if (shouldDisplayDueAmount(acc.statement_day)) {
-        const transactions = accountTransactions[acc.id] || [];
-        const emis = accountEMIs[acc.id] || [];
+        if (shouldDisplayDueAmount(acc.statement_day, acc.due_day)) {
+          const transactions = accountTransactions[acc.id] || [];
+          const emis = accountEMIs[acc.id] || [];
         const statementCalc = calculateCreditCardStatementAmount(
           acc.id,
           acc.statement_day,

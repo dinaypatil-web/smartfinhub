@@ -578,8 +578,8 @@ export default function Accounts() {
                     statementAmount = statementCalc.statementAmount;
                     const netDueAmount = statementCalc.netStatementAmount;
 
-                    // Only show due amount after statement date
-                    showDueAmount = shouldDisplayDueAmount(account.statement_day);
+                    // Only show due amount after statement date or if previous bill is due
+                    showDueAmount = shouldDisplayDueAmount(account.statement_day, account.due_day);
                     if (showDueAmount) {
                       // Use calculated statement amount (only includes transactions up to statement date)
                       dueAmount = Math.abs(netDueAmount);
@@ -701,20 +701,6 @@ export default function Accounts() {
                                   </div>
                                 );
                               })}
-                            </div>
-                            <div className="flex items-center justify-between pt-2 border-t">
-                              <p className="text-sm font-semibold">Total Statement Amount</p>
-                              <div className="text-right">
-                                <p className="text-lg font-bold text-purple-600 dark:text-purple-400">
-                                  {formatCurrency(statementAmount, account.currency)}
-                                </p>
-                                {accountAdvanceBalances[account.id] > 0 && (
-                                  <p className="text-[10px] text-blue-600 font-medium">
-                                    - {formatCurrency(accountAdvanceBalances[account.id], account.currency)} advance applied
-                                  </p>
-                                )}
-                              </div>
-                            </div>
                           </div>
                         )}
 
