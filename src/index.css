@@ -1,0 +1,394 @@
+/* stylelint-disable */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here.
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    --radius: 0.75rem;
+    /* ICICI Bank inspired color scheme - Orange primary with navy blue secondary */
+    /* Saffron background for light theme */
+    --background: 40 100% 97%;
+    --foreground: 210 20% 15%;
+    --card: 0 0% 100%;
+    --card-foreground: 210 20% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 210 20% 15%;
+    --primary: 18 95% 55%;
+    --primary-foreground: 0 0% 100%;
+    --primary-light: 18 95% 65%;
+    --primary-glow: 18 100% 75%;
+    --secondary: 210 100% 25%;
+    --secondary-foreground: 0 0% 100%;
+    --secondary-light: 210 100% 35%;
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --danger: 0 84% 60%;
+    --danger-foreground: 0 0% 100%;
+    --muted: 40 60% 95%;
+    --muted-foreground: 210 10% 45%;
+    --accent: 18 95% 55%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 40 40% 88%;
+    --input: 40 40% 94%;
+    --ring: 18 95% 55%;
+    --chart-1: 18 95% 55%;
+    --chart-2: 210 100% 25%;
+    --chart-3: 142 71% 45%;
+    --chart-4: 38 92% 50%;
+    --chart-5: 0 84% 60%;
+    --sidebar-background: 40 80% 98%;
+    --sidebar-foreground: 210 20% 15%;
+    --sidebar-primary: 18 95% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 40 60% 95%;
+    --sidebar-accent-foreground: 210 20% 15%;
+    --sidebar-border: 40 40% 88%;
+    --sidebar-ring: 18 95% 55%;
+    --gradient-primary: linear-gradient(135deg, hsl(18 95% 55%), hsl(18 100% 65%));
+    --gradient-secondary: linear-gradient(135deg, hsl(210 100% 25%), hsl(210 100% 35%));
+    --gradient-accent: linear-gradient(135deg, hsl(18 95% 55%), hsl(25 100% 60%));
+    --shadow-primary: 0 10px 40px -10px hsl(18 95% 55% / 0.4);
+    --shadow-glow: 0 0 30px hsl(18 100% 75% / 0.3);
+    --shadow-card: 0 4px 20px -2px hsl(210 20% 20% / 0.08);
+  }
+
+  .dark {
+    /* ICICI Bank inspired dark mode - Maintaining orange primary with dark navy backgrounds */
+    --background: 210 30% 8%;
+    --foreground: 210 10% 95%;
+    --card: 210 25% 12%;
+    --card-foreground: 210 10% 95%;
+    --popover: 210 25% 12%;
+    --popover-foreground: 210 10% 95%;
+    --primary: 18 95% 60%;
+    --primary-foreground: 0 0% 100%;
+    --primary-light: 18 95% 70%;
+    --primary-glow: 18 100% 80%;
+    --secondary: 210 100% 35%;
+    --secondary-foreground: 0 0% 100%;
+    --secondary-light: 210 100% 45%;
+    --success: 142 71% 50%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 55%;
+    --warning-foreground: 0 0% 100%;
+    --danger: 0 84% 65%;
+    --danger-foreground: 0 0% 100%;
+    --muted: 210 20% 16%;
+    --muted-foreground: 210 10% 60%;
+    --accent: 18 95% 60%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 65%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 210 20% 20%;
+    --input: 210 20% 18%;
+    --ring: 18 95% 60%;
+    --chart-1: 18 95% 60%;
+    --chart-2: 210 100% 35%;
+    --chart-3: 142 71% 50%;
+    --chart-4: 38 92% 55%;
+    --chart-5: 0 84% 65%;
+    --sidebar-background: 210 30% 10%;
+    --sidebar-foreground: 210 10% 95%;
+    --sidebar-primary: 18 95% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 20% 16%;
+    --sidebar-accent-foreground: 210 10% 95%;
+    --sidebar-border: 210 20% 20%;
+    --sidebar-ring: 18 95% 60%;
+    --gradient-primary: linear-gradient(135deg, hsl(18 95% 60%), hsl(18 100% 70%));
+    --gradient-secondary: linear-gradient(135deg, hsl(210 100% 35%), hsl(210 100% 45%));
+    --gradient-accent: linear-gradient(135deg, hsl(18 95% 60%), hsl(25 100% 65%));
+    --shadow-primary: 0 10px 40px -10px hsl(18 95% 60% / 0.5);
+    --shadow-glow: 0 0 40px hsl(18 100% 80% / 0.4);
+    --shadow-card: 0 4px 20px -2px hsl(0 0% 0% / 0.3);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .gradient-primary {
+    background: var(--gradient-primary);
+  }
+
+  .gradient-secondary {
+    background: var(--gradient-secondary);
+  }
+
+  .gradient-accent {
+    background: var(--gradient-accent);
+  }
+
+  .shadow-primary {
+    box-shadow: var(--shadow-primary);
+  }
+
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
+  }
+
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+
+  .gradient-text {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+
+  .transition-smooth {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .hover-lift {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .hover-lift:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px -8px hsl(var(--foreground) / 0.15);
+  }
+
+  .glass-effect {
+    background: hsl(var(--card) / 0.8);
+    backdrop-filter: blur(12px);
+    border: 1px solid hsl(var(--border) / 0.5);
+  }
+
+  /* Animation Classes */
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.5s ease-out;
+  }
+
+  .animate-slide-down {
+    animation: slideDown 0.5s ease-out;
+  }
+
+  .animate-slide-left {
+    animation: slideLeft 0.5s ease-out;
+  }
+
+  .animate-slide-right {
+    animation: slideRight 0.5s ease-out;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.4s ease-out;
+  }
+
+  .animate-bounce-in {
+    animation: bounceIn 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  }
+
+  .animate-glow {
+    animation: glow 2s ease-in-out infinite;
+  }
+
+  .animate-pulse-slow {
+    animation: pulseSlow 3s ease-in-out infinite;
+  }
+
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  .animate-shimmer {
+    animation: shimmer 2s linear infinite;
+  }
+
+  /* Stagger delays for list animations */
+  .animate-stagger-1 {
+    animation-delay: 0.1s;
+  }
+
+  .animate-stagger-2 {
+    animation-delay: 0.2s;
+  }
+
+  .animate-stagger-3 {
+    animation-delay: 0.3s;
+  }
+
+  .animate-stagger-4 {
+    animation-delay: 0.4s;
+  }
+}
+
+/* Keyframe Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideLeft {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideRight {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes bounceIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes glow {
+  0%, 100% {
+    box-shadow: 0 0 20px hsl(var(--primary) / 0.5);
+  }
+  50% {
+    box-shadow: 0 0 40px hsl(var(--primary) / 0.8);
+  }
+}
+
+@keyframes pulseSlow {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+/* Smooth transitions for all interactive elements */
+* {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+/* Disable transitions for elements that shouldn't animate */
+input, textarea, select {
+  transition: none;
+}
+
+/* Smooth scroll behavior */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar for dark theme */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--background));
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
