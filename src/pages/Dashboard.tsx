@@ -124,8 +124,12 @@ export default function Dashboard() {
       setSummary(summaryData);
       setRecentTransactions(transactions);
 
-      // Filter expense and loan payment transactions for the chart
-      const expenses = monthExpenses.filter(t => t.transaction_type === 'expense' || t.transaction_type === 'loan_payment');
+      // Filter expense, loan payment and credit card repayment transactions for the chart
+      const expenses = monthExpenses.filter(t =>
+        t.transaction_type === 'expense' ||
+        t.transaction_type === 'loan_payment' ||
+        t.transaction_type === 'credit_card_repayment'
+      );
       setAllExpenses(expenses);
 
       // Cache the basic data

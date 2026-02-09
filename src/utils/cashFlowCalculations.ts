@@ -87,6 +87,7 @@ export function calculateMonthExpenses(
       (t.transaction_type === 'expense' ||
         t.transaction_type === 'withdrawal' ||
         t.transaction_type === 'loan_payment' ||
+        t.transaction_type === 'credit_card_repayment' ||
         t.category === 'Expense')
     );
   });
@@ -457,8 +458,8 @@ export function calculateMonthlyCashFlow(
   const remainingIncomeBudget = calculateRemainingIncomeBudget(budget, incomeReceived);
   const creditCardDues = calculateCreditCardDues(accounts, accountTransactions, accountEMIs, month, year, advanceBalances);
 
-  // Formula: Opening Balance + Income Received - Expenses (Cash/Bank) - Credit Card Repayments
-  const expectedBalance = openingBalance + incomeReceived - expensesIncurred - creditCardRepayments;
+  // Formula: Opening Balance + Income Received - Expenses (includes Loan/CC Payments & Withdrawals)
+  const expectedBalance = openingBalance + incomeReceived - expensesIncurred;
 
   // Formula: Opening Balance + Income Received - Actual Expenses - Remaining Expense Budget + Remaining Income Budget - Credit Card Dues
   // Note: We do NOT subtract creditCardRepayments here because:

@@ -55,7 +55,7 @@ export default function Reports() {
     expenseCategory: 'all',
     incomeCategory: 'all',
   });
-  
+
   // Credit card statement state
   const [selectedCreditCard, setSelectedCreditCard] = useState<string>('');
   const [selectedMonth, setSelectedMonth] = useState<string>(
@@ -93,7 +93,7 @@ export default function Reports() {
 
   const loadCreditCardEMIs = async () => {
     if (!selectedCreditCard) return;
-    
+
     try {
       const emis = await emiApi.getEMIsByAccount(selectedCreditCard);
       setCreditCardEMIs(emis);
@@ -104,7 +104,7 @@ export default function Reports() {
 
   const loadData = async () => {
     if (!user) return;
-    
+
     setLoading(true);
     try {
       const [transactionsData, accountsData, categoriesData] = await Promise.all([
@@ -130,18 +130,18 @@ export default function Reports() {
       endDate.setHours(23, 59, 59, 999);
 
       const dateMatch = transactionDate >= startDate && transactionDate <= endDate;
-      const accountMatch = filters.accountId === 'all' || 
-        t.from_account_id === filters.accountId || 
+      const accountMatch = filters.accountId === 'all' ||
+        t.from_account_id === filters.accountId ||
         t.to_account_id === filters.accountId;
       const typeMatch = filters.transactionType === 'all' || t.transaction_type === filters.transactionType;
-      
+
       // Category filters
-      const expenseCategoryMatch = filters.expenseCategory === 'all' || 
+      const expenseCategoryMatch = filters.expenseCategory === 'all' ||
         (t.transaction_type === 'expense' && t.category === filters.expenseCategory);
-      const incomeCategoryMatch = filters.incomeCategory === 'all' || 
+      const incomeCategoryMatch = filters.incomeCategory === 'all' ||
         (t.transaction_type === 'income' && t.income_category === filters.incomeCategory);
 
-      return dateMatch && accountMatch && typeMatch && 
+      return dateMatch && accountMatch && typeMatch &&
         (filters.expenseCategory === 'all' || expenseCategoryMatch) &&
         (filters.incomeCategory === 'all' || incomeCategoryMatch);
     });
@@ -149,18 +149,18 @@ export default function Reports() {
 
   const calculateSummary = () => {
     const filtered = getFilteredTransactions();
-    
+
     // Helper function to safely parse amount as number
     const parseAmount = (amount: any): number => {
       if (typeof amount === 'number') return amount;
       if (typeof amount === 'string') return parseFloat(amount) || 0;
       return 0;
     };
-    
+
     const income = filtered
       .filter(t => t.transaction_type === 'income')
       .reduce((sum, t) => sum + parseAmount(t.amount), 0);
-    
+
     const expenses = filtered
       .filter(t => t.transaction_type === 'expense')
       .reduce((sum, t) => sum + parseAmount(t.amount), 0);
@@ -188,7 +188,7 @@ export default function Reports() {
       transfers,
       loanPayments,
       creditCardRepayments,
-      netPosition: income - expenses - loanPayments,
+      netPosition: income - expenses - loanPayments - creditCardRepayments,
       totalTransactions: filtered.length,
     };
   };
@@ -235,18 +235,18 @@ export default function Reports() {
 
     // Parse selected month (YYYY-MM)
     const [year, month] = selectedMonth.split('-').map(Number);
-    
+
     // Get billing cycle info for the selected month
     const billingInfo = getBillingCycleInfo(account.statement_day, account.due_day || account.statement_day);
-    
+
     // Calculate statement date for the selected month
     const statementDate = new Date(year, month - 1, account.statement_day);
-    
+
     // Calculate billing cycle start (day after previous statement)
     const cycleStart = new Date(statementDate);
     cycleStart.setMonth(cycleStart.getMonth() - 1);
     cycleStart.setDate(cycleStart.getDate() + 1);
-    
+
     // Billing cycle end is the statement date
     const cycleEnd = statementDate;
 
@@ -273,7 +273,7 @@ export default function Reports() {
       cycleEnd,
       statementDate,
       dueDate: new Date(billingInfo.dueDateStr),
-      transactions: accountTransactions.sort((a, b) => 
+      transactions: accountTransactions.sort((a, b) =>
         new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime()
       ),
       emis: accountEMIs,
@@ -685,13 +685,12 @@ export default function Reports() {
                         <TableCell className="capitalize">{account.account_type.replace('_', ' ')}</TableCell>
                         <TableCell>{account.institution_name || '-'}</TableCell>
                         <TableCell>{account.currency}</TableCell>
-                        <TableCell className={`text-right font-semibold ${
-                          account.account_type === 'credit_card' || account.account_type === 'loan'
+                        <TableCell className={`text-right font-semibold ${account.account_type === 'credit_card' || account.account_type === 'loan'
                             ? 'text-danger'
                             : account.balance >= 0
-                            ? 'text-success'
-                            : 'text-danger'
-                        }`}>
+                              ? 'text-success'
+                              : 'text-danger'
+                          }`}>
                           {formatCurrency(Math.abs(account.balance), account.currency)}
                           {(account.account_type === 'credit_card' || account.account_type === 'loan') && ' (Outstanding)'}
                         </TableCell>
@@ -741,12 +740,11 @@ export default function Reports() {
                 <CardTitle className="text-sm font-medium">Net Worth</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className={`text-2xl font-bold ${
-                  accountBalances.reduce((sum, a) => {
-                    if (a.account_type === 'loan') return sum;
-                    return sum + a.balance;
-                  }, 0) >= 0 ? 'text-success' : 'text-danger'
-                }`}>
+                <div className={`text-2xl font-bold ${accountBalances.reduce((sum, a) => {
+                  if (a.account_type === 'loan') return sum;
+                  return sum + a.balance;
+                }, 0) >= 0 ? 'text-success' : 'text-danger'
+                  }`}>
                   {formatCurrency(
                     accountBalances.reduce((sum, a) => {
                       if (a.account_type === 'loan') return sum;
@@ -890,9 +888,8 @@ export default function Reports() {
                     <Card className="border-2 border-blue-200 dark:border-blue-800">
                       <CardContent className="pt-6">
                         <div className="text-sm text-muted-foreground mb-2">Net Cash Flow</div>
-                        <div className={`text-2xl font-bold ${
-                          cashFlowStatement.netCashFlow >= 0 ? 'text-success' : 'text-danger'
-                        }`}>
+                        <div className={`text-2xl font-bold ${cashFlowStatement.netCashFlow >= 0 ? 'text-success' : 'text-danger'
+                          }`}>
                           {cashFlowStatement.netCashFlow >= 0 ? '+' : ''}
                           {formatCurrency(cashFlowStatement.netCashFlow, currency)}
                         </div>
@@ -911,9 +908,8 @@ export default function Reports() {
                     <Card className="border-2 border-green-200 dark:border-green-800">
                       <CardContent className="pt-6">
                         <div className="text-sm text-muted-foreground mb-2">Closing Balance</div>
-                        <div className={`text-2xl font-bold ${
-                          cashFlowStatement.closingBalance >= 0 ? 'text-success' : 'text-danger'
-                        }`}>
+                        <div className={`text-2xl font-bold ${cashFlowStatement.closingBalance >= 0 ? 'text-success' : 'text-danger'
+                          }`}>
                           {formatCurrency(cashFlowStatement.closingBalance, currency)}
                         </div>
                       </CardContent>
@@ -1058,11 +1054,11 @@ export default function Reports() {
                     <CardContent>
                       <div className="flex items-center gap-4">
                         <div className="h-12 w-12 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center shadow-md border-2 border-purple-200 dark:border-purple-800">
-                          <BankLogo 
-                            src={creditCardStatement.account.institution_logo} 
-                            alt={creditCardStatement.account.institution_name || 'Credit Card'} 
-                            bankName={creditCardStatement.account.institution_name || undefined} 
-                            className="h-10 w-10" 
+                          <BankLogo
+                            src={creditCardStatement.account.institution_logo}
+                            alt={creditCardStatement.account.institution_name || 'Credit Card'}
+                            bankName={creditCardStatement.account.institution_name || undefined}
+                            className="h-10 w-10"
                           />
                         </div>
                         <div className="flex-1">
