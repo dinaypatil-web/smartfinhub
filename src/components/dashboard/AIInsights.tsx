@@ -32,12 +32,12 @@ export default function AIInsights() {
     const currentMonth = now.getMonth() + 1;
     const currentYear = now.getFullYear();
     const currentMonthStr = now.toISOString().slice(0, 7);
-    
+
     const transactions = await transactionApi.getTransactions(user.id);
     const accounts = await accountApi.getAccounts(user.id);
     const budgets = await budgetApi.getBudgets(user.id);
 
-    const monthlyTransactions = transactions.filter(t => 
+    const monthlyTransactions = transactions.filter(t =>
       t.transaction_date.startsWith(currentMonthStr)
     );
 
@@ -70,7 +70,7 @@ export default function AIInsights() {
         category: t.transaction_type === 'income' ? (t.income_category || 'others') : (t.category || 'uncategorized'),
         amount: t.amount,
         date: t.transaction_date,
-        description: t.description,
+        description: t.description ?? undefined,
       })),
       accountBalances,
       historicalData,
@@ -80,34 +80,34 @@ export default function AIInsights() {
   const calculateHistoricalData = (transactions: any[], currentMonth: number, currentYear: number) => {
     const lastThreeMonths = [];
     const categoryTrends: Record<string, number[]> = {};
-    
+
     for (let i = 1; i <= 3; i++) {
       let month = currentMonth - i;
       let year = currentYear;
-      
+
       if (month <= 0) {
         month += 12;
         year -= 1;
       }
-      
+
       const monthStr = `${year}-${String(month).padStart(2, '0')}`;
       const monthTransactions = transactions.filter(t => t.transaction_date.startsWith(monthStr));
-      
+
       const income = monthTransactions
         .filter(t => t.transaction_type === 'income')
         .reduce((sum, t) => sum + t.amount, 0);
-      
+
       const expenses = monthTransactions
         .filter(t => t.transaction_type === 'expense' || t.transaction_type === 'loan_payment')
         .reduce((sum, t) => sum + t.amount, 0);
-      
+
       lastThreeMonths.unshift({
         month: monthStr,
         income,
         expenses,
         savings: income - expenses,
       });
-      
+
       // Track category trends
       monthTransactions
         .filter(t => t.transaction_type === 'expense')
@@ -118,13 +118,13 @@ export default function AIInsights() {
           categoryTrends[t.category].push(t.amount);
         });
     }
-    
+
     const monthlyAverages = {
       income: lastThreeMonths.reduce((sum, m) => sum + m.income, 0) / lastThreeMonths.length,
       expenses: lastThreeMonths.reduce((sum, m) => sum + m.expenses, 0) / lastThreeMonths.length,
       savings: lastThreeMonths.reduce((sum, m) => sum + m.savings, 0) / lastThreeMonths.length,
     };
-    
+
     return {
       monthlyAverages,
       categoryTrends,
@@ -134,7 +134,7 @@ export default function AIInsights() {
 
   const generateAnalysis = async () => {
     const data = await prepareAnalysisData();
-    
+
     if (data.transactions.length === 0) {
       setAnalysis('No transaction data available. Start adding transactions to get AI-powered insights.');
       setHasAnalysis(true);
@@ -178,10 +178,10 @@ export default function AIInsights() {
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
-      
+
       // Only fetch current month transactions for quick insight
       const monthlyTransactions = await transactionApi.getTransactionsByDateRange(user.id, startOfMonth, endOfMonth);
-      
+
       const totalIncome = monthlyTransactions
         .filter(t => t.transaction_type === 'income')
         .reduce((sum, t) => sum + t.amount, 0);
@@ -298,7 +298,7 @@ export default function AIInsights() {
 
         {!isLoading && analysis && hasAnalysis && (
           <div className="prose prose-sm max-w-none dark:prose-invert">
-            <div 
+            <div
               className="text-sm text-muted-foreground line-clamp-6"
               dangerouslySetInnerHTML={{ __html: analysisHtml }}
             />

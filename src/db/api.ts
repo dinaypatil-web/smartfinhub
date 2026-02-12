@@ -5,7 +5,6 @@ import type {
   Transaction,
   InterestRateHistory,
   Budget,
-  EMIStatus,
   EMITransaction,
   LoanEMIPayment,
   AccountWithInterestHistory,
@@ -1769,9 +1768,9 @@ export const creditCardStatementApi = {
       .select('*')
       .eq('id', id)
       .single();
-    
+
     if (fetchError) throw fetchError;
-    
+
     const delta = -existing.payment_amount;
 
     const { error } = await supabase
@@ -1793,15 +1792,15 @@ export const creditCardStatementApi = {
       .gt('created_at', fromDate);
 
     if (error) throw error;
-    
+
     if (subsequentRecords && subsequentRecords.length > 0) {
       for (const record of subsequentRecords) {
         await supabase
           .from('credit_card_advance_payments')
-          .update({ 
+          .update({
             remaining_balance: record.remaining_balance + delta,
             updated_at: new Date().toISOString()
-           })
+          })
           .eq('id', record.id);
       }
     }
@@ -1862,6 +1861,17 @@ export const creditCardStatementApi = {
       .from('credit_card_repayment_allocations')
       .select('*')
       .eq('repayment_id', repaymentId);
+
+    if (error) throw error;
+    return Array.isArray(data) ? data : [];
+  },
+
+  // Get all repayment allocations for a user (for backup)
+  async getAllRepaymentAllocations(userId: string): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('credit_card_repayment_allocations')
+      .select('*, transactions!inner(user_id)')
+      .eq('transactions.user_id', userId);
 
     if (error) throw error;
     return Array.isArray(data) ? data : [];

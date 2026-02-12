@@ -166,13 +166,9 @@ export default function Dashboard() {
       const now = new Date();
       const currentMonth = now.getMonth() + 1;
       const currentYear = now.getFullYear();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
 
-      const [monthExpenses, allTransactions] = await Promise.all([
-        transactionApi.getTransactionsByDateRange(user.id, startOfMonth, endOfMonth),
-        transactionApi.getTransactions(user.id)
-      ]);
+
+      const allTransactions = await transactionApi.getTransactions(user.id);
 
       const loanPromises = (summaryData?.accounts_by_type.loan || []).map(async (account) => {
         if (!account.loan_principal || !account.current_interest_rate || !account.loan_tenure_months) {
@@ -245,20 +241,7 @@ export default function Dashboard() {
     }
   };
 
-  const getAccountTypeIcon = (type: string) => {
-    switch (type) {
-      case 'cash':
-        return <Wallet className="h-5 w-5" />;
-      case 'bank':
-        return <Building2 className="h-5 w-5" />;
-      case 'credit_card':
-        return <CreditCard className="h-5 w-5" />;
-      case 'loan':
-        return <Wallet className="h-5 w-5" />;
-      default:
-        return <Wallet className="h-5 w-5" />;
-    }
-  };
+
 
   const handlePostMonthlyInterest = async () => {
     if (!user || !summary) return;
@@ -373,12 +356,7 @@ export default function Dashboard() {
     }
   };
 
-  const getBalanceColor = (account: Account) => {
-    if (account.account_type === 'credit_card' || account.account_type === 'loan') {
-      return Number(account.balance) > 0 ? 'text-danger' : 'text-success';
-    }
-    return Number(account.balance) >= 0 ? 'text-success' : 'text-danger';
-  };
+
 
   const handleAccountClick = (account: Account) => {
     setSelectedAccount(account);
@@ -419,20 +397,7 @@ export default function Dashboard() {
     '#f97316', // Orange
   ];
 
-  const getAccountTypeColor = (type: string) => {
-    switch (type) {
-      case 'cash':
-        return 'from-emerald-500 to-teal-600';
-      case 'bank':
-        return 'from-blue-500 to-indigo-600';
-      case 'credit_card':
-        return 'from-purple-500 to-pink-600';
-      case 'loan':
-        return 'from-orange-500 to-red-600';
-      default:
-        return 'from-gray-500 to-gray-600';
-    }
-  };
+
 
   if (loading) {
     return (
@@ -709,7 +674,7 @@ export default function Dashboard() {
                         fill="#8884d8"
                         dataKey="value"
                       >
-                        {bankAccountsData.map((entry, index) => (
+                        {bankAccountsData.map((_, index) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
@@ -748,7 +713,7 @@ export default function Dashboard() {
                         fill="#8884d8"
                         dataKey="value"
                       >
-                        {expenseData.map((entry, index) => (
+                        {expenseData.map((_, index) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>

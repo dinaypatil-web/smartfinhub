@@ -1,5 +1,22 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+
+// Global error handler for debugging
+window.addEventListener('error', (event) => {
+  const root = document.getElementById('root');
+  if (root) {
+    root.innerHTML = `
+      <div style="color: red; padding: 20px; font-family: monospace;">
+        <h1>Runtime Error</h1>
+        <h3>${event.message}</h3>
+        <pre>${event.error?.stack || 'No stack trace'}</pre>
+      </div>
+    `;
+  }
+});
+
+console.log("Main.tsx executing...");
+document.body.style.backgroundColor = 'yellow'; // Visual confirmation that script is running
 import "./index.css";
 import App from "./App.tsx";
 import { AppWrapper } from "./components/common/PageMeta.tsx";

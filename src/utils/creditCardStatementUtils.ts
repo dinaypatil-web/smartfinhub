@@ -16,6 +16,23 @@ import type { Transaction, Account } from '@/types/types';
  * @param userId - The user ID
  * @returns The created statement line, or null if not a credit card transaction
  */
+import { supabase } from '@/db/supabase';
+
+/**
+ * Automatically creates a credit card statement line item when a transaction is added
+ * to a credit card account.
+ * 
+ * This function:
+ * 1. Checks if the account is a credit card
+ * 2. Determines the statement month based on transaction date
+ * 3. Creates a statement line item linked to the transaction
+ * 4. Marks it as pending (unpaid)
+ * 
+ * @param transaction - The transaction being added
+ * @param account - The account the transaction belongs to
+ * @param userId - The user ID
+ * @returns The created statement line, or null if not a credit card transaction
+ */
 export async function createStatementLineForTransaction(
   transaction: Transaction,
   account: Account,
@@ -28,12 +45,16 @@ export async function createStatementLineForTransaction(
     }
 
     // Only create for purchases/charges, not repayments
-    if (transaction.type === 'credit_card_repayment') {
+    if (transaction.transaction_type === 'credit_card_repayment') {
       return null;
     }
 
-    // Only create for credit card purchases
-    if (transaction.type !== 'credit_card_purchase') {
+    // Only create for credit card purchases (which are recorded as 'expense' for credit card accounts)
+    // AND check that we don't double count if we have a specific 'credit_card_purchase' type
+    // Note: In our system, valid types are defined in TransactionType.
+    // 'credit_card_purchase' is NOT in TransactionType union, so we check for 'expense' + account type
+    // Only create for credit card purchases (which are recorded as 'expense' for credit card accounts)
+    if (transaction.transaction_type !== 'expense') {
       return null;
     }
 
@@ -167,9 +188,7 @@ export async function carryoverUnpaidItems(
     // Note: This would need to be fetched from the database first
     // This is a placeholder showing the logic
 
-    const { data: unpaidItems, error } = await (
-      await import('@/db/api')
-    ).supabase
+    const { data: unpaidItems, error } = await supabase
       .from('credit_card_statement_lines')
       .select('*')
       .eq('credit_card_id', creditCardId)
@@ -194,7 +213,7 @@ export async function carryoverUnpaidItems(
         currency: item.currency
       }));
 
-      await (await import('@/db/api')).supabase
+      await supabase
         .from('credit_card_statement_lines')
         .insert(newItems);
     }

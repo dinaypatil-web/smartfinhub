@@ -19,34 +19,35 @@ import {
     DurationDisplay,
     FullscreenToggle,
     VolumeMenuButton,
-    ProgressControl
+    ProgressControl,
+    Player
 } from 'video-react';
 import 'video-react/dist/video-react.css';
 
 interface VideoProps {
     /** Video resource URL */
-src: string;
-poster?: string; /** Video poster image URL */
-className?: string; /** Custom class name */
-autoPlay?: boolean; /** Whether to autoplay, defaults to false */
-muted?: boolean; /** Whether to mute, defaults to false */
-controls?: boolean; /** Whether to show controls, defaults to true */
-aspectRatio?: string | 'auto' | '16:9' | '4:3'; /** Video aspect ratio, defaults to 'auto' */
+    src: string;
+    poster?: string; /** Video poster image URL */
+    className?: string; /** Custom class name */
+    autoPlay?: boolean; /** Whether to autoplay, defaults to false */
+    muted?: boolean; /** Whether to mute, defaults to false */
+    controls?: boolean; /** Whether to show controls, defaults to true */
+    aspectRatio?: string | 'auto' | '16:9' | '4:3'; /** Video aspect ratio, defaults to 'auto' */
 }
 
 export default function Video({
-className,
-src,
-poster,
-autoPlay = false,
-muted = false,
-controls = true,
-aspectRatio = 'auto'
+    className,
+    src,
+    poster,
+    autoPlay = false,
+    muted = false,
+    controls = true,
+    aspectRatio = 'auto'
 }: VideoProps) {
-return (
-    <div className={`min-w-[100px] ${className}`} custom-component="video">
-    <style>
-        {`
+    return (
+        <div className={`min-w-[100px] ${className}`} custom-component="video">
+            <style>
+                {`
 .video-react-paused .video-react-big-play-button.big-play-button-hide {
     display: block;
 }
@@ -83,29 +84,30 @@ display: block;
     aspect-ratio: 16 / 9;
 }
 `}
-    </style>
-    <Player
-        poster={poster}
-        src={src}
-        autoPlay={autoPlay}
-        muted={muted}
-        aspectRatio={aspectRatio}
-    >
-        <ControlBar
-        disableDefaultControls
-        autoHide
-        disableCompletely={!controls}
-        >
-        <PlayToggle key="play-toggle" />
-        <VolumeMenuButton key="volume-menu-button" vertical />
-        <CurrentTimeDisplay key="current-time-display" />
-        <TimeDivider key="time-divider" />
-        <DurationDisplay key="duration-display" />
-        <ProgressControl key="progress-control" />
-        <FullscreenToggle key="fullscreen-toggle" />
-        </ControlBar>
-        <BigPlayButton position="center" />
-    </Player>
-    </div>
-);
+            </style>
+            <Player
+                poster={poster}
+                src={src}
+                autoPlay={autoPlay}
+                muted={muted}
+                aspectRatio={aspectRatio}
+            >
+                <ControlBar
+                    disableDefaultControls
+                    autoHide
+                    disableCompletely={!controls}
+                >
+                    <PlayToggle key="play-toggle" />
+                    <VolumeMenuButton key="volume-menu-button" vertical />
+                    <CurrentTimeDisplay key="current-time-display" />
+                    <TimeDivider key="time-divider" />
+                    <DurationDisplay key="duration-display" />
+                    <ProgressControl key="progress-control" />
+                    {/* @ts-ignore */}
+                    <FullscreenToggle key="fullscreen-toggle" />
+                </ControlBar>
+                <BigPlayButton position="center" />
+            </Player>
+        </div>
+    );
 }

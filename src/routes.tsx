@@ -22,6 +22,8 @@ import ResetPassword from './pages/ResetPassword';
 import AuthCallback from './pages/AuthCallback';
 import ConfirmEmail from './pages/ConfirmEmail';
 
+const LoanEMISimulator = lazy(() => import('./pages/LoanEMISimulator'));
+
 interface RouteConfig {
   name: string;
   path: string;
@@ -79,6 +81,13 @@ const routes: RouteConfig[] = [
     name: 'Loan EMI History',
     path: '/loan-emi-history',
     element: <ProtectedRoute><LoanEMIHistory /></ProtectedRoute>,
+    visible: true,
+    protected: true,
+  },
+  {
+    name: 'Loan EMI Simulator',
+    path: '/loan-emi-simulator',
+    element: <ProtectedRoute><LoanEMISimulator /></ProtectedRoute>,
     visible: true,
     protected: true,
   },

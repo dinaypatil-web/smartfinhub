@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, ArrowLeft, TrendingDown, AlertCircle } from 'lucide-react';
+import { Loader2, ArrowLeft, TrendingDown, AlertCircle, RefreshCw } from 'lucide-react';
 import { formatCurrency } from '@/utils/format';
 import { Badge } from '@/components/ui/badge';
 
@@ -62,11 +62,11 @@ export default function LoanEMIHistory() {
     fetchPayments();
   }, [selectedAccountId]);
 
-  const selectedAccount = loanAccounts.find(a => a.id === selectedAccountId);
+  const selectedAccount = loanAccounts.find((a: Account) => a.id === selectedAccountId);
 
-  const totalPrincipalPaid = emiPayments.reduce((sum, p) => sum + p.principal_component, 0);
-  const totalInterestPaid = emiPayments.reduce((sum, p) => sum + p.interest_component, 0);
-  const totalEMIPaid = emiPayments.reduce((sum, p) => sum + p.emi_amount, 0);
+  const totalPrincipalPaid = emiPayments.reduce((sum: number, p: LoanEMIPayment) => sum + p.principal_component, 0);
+  const totalInterestPaid = emiPayments.reduce((sum: number, p: LoanEMIPayment) => sum + p.interest_component, 0);
+  const totalEMIPaid = emiPayments.reduce((sum: number, p: LoanEMIPayment) => sum + p.emi_amount, 0);
 
   const currentOutstanding = selectedAccount
     ? Number(selectedAccount.balance)
@@ -88,6 +88,15 @@ export default function LoanEMIHistory() {
                 <ArrowLeft className="h-5 w-5" />
               </Button>
               <h1 className="text-3xl font-bold text-slate-900 dark:text-white">EMI Payment History</h1>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/loan-emi-simulator')}
+                className="ml-auto"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                EMI Simulator
+              </Button>
             </div>
             <p className="text-slate-600 dark:text-slate-400">Track principal and interest payments for your loans</p>
           </div>
@@ -120,7 +129,7 @@ export default function LoanEMIHistory() {
                     <SelectValue placeholder="Select a loan account" />
                   </SelectTrigger>
                   <SelectContent>
-                    {loanAccounts.map(account => (
+                    {loanAccounts.map((account: Account) => (
                       <SelectItem key={account.id} value={account.id}>
                         {account.account_name} - {formatCurrency(Number(account.balance), account.currency)} outstanding
                       </SelectItem>
@@ -232,7 +241,7 @@ export default function LoanEMIHistory() {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {emiPayments.map((payment) => {
+                            {emiPayments.map((payment: LoanEMIPayment) => {
                               const interestPercentage = payment.emi_amount > 0
                                 ? (payment.interest_component / payment.emi_amount) * 100
                                 : 0;

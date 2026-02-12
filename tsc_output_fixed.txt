@@ -1,0 +1,62 @@
+﻿src/components/AccountStatementDialog.tsx(14,38): error TS6133: 'formatAccountNumber' is declared but its value is never read.
+src/components/common/Footer.tsx(4,9): error TS6133: 'currentYear' is declared but its value is never read.
+src/components/dashboard/AIInsights.tsx(68,7): error TS2322: Type '{ type: TransactionType; category: string; amount: number; date: string; description: string | null; }[]' is not assignable to type '{ type: string; category: string; amount: number; date: string; description?: string | undefined; }[]'.
+  Type '{ type: TransactionType; category: string; amount: number; date: string; description: string | null; }' is not assignable to type '{ type: string; category: string; amount: number; date: string; description?: string | undefined; }'.
+    Types of property 'description' are incompatible.
+      Type 'string | null' is not assignable to type 'string | undefined'.
+        Type 'null' is not assignable to type 'string | undefined'.
+src/components/dashboard/SelectBankAppDialog.tsx(6,1): error TS6133: 'ScrollArea' is declared but its value is never read.
+src/components/dashboard/SelectBankAppDialog.tsx(33,10): error TS6133: 'selectedApp' is declared but its value is never read.
+src/components/LoanEMIPaymentManager.tsx(6,1): error TS6133: 'Textarea' is declared but its value is never read.
+src/components/LoanEMIPaymentManager.tsx(11,15): error TS6196: 'LoanEMIPayment' is declared but never used.
+src/components/LoanScheduleComparison.tsx(186,11): error TS6133: 'totalProjectedInterest' is declared but its value is never read.
+src/components/ui/map-cn.tsx(142,5): error TS18047: 'map' is possibly 'null'.
+src/components/ui/map-cn.tsx(150,5): error TS18047: 'map' is possibly 'null'.
+src/components/ui/map-cn.tsx(154,5): error TS18047: 'map' is possibly 'null'.
+src/components/ui/qrcodedataurl.tsx(15,20): error TS7016: Could not find a declaration file for module 'qrcode'. 'D:/smartfinhub/node_modules/.pnpm/qrcode@1.5.4/node_modules/qrcode/lib/index.js' implicitly has an 'any' type.
+  Try `npm i --save-dev @types/qrcode` if it exists or add a new declaration (.d.ts) file containing `declare module 'qrcode';`
+src/components/ui/toaster.tsx(16,75): error TS6133: 'index' is declared but its value is never read.
+src/components/ui/video.tsx(87,6): error TS2304: Cannot find name 'Player'.
+src/components/ui/video.tsx(105,10): error TS2741: Property 'actions' is missing in type '{ key: string; }' but required in type 'FullScreenToggleProps'.
+src/components/ui/video.tsx(108,7): error TS2304: Cannot find name 'Player'.
+src/contexts/EncryptionContext.tsx(25,3): error TS6133: 'createKeyValidator' is declared but its value is never read.
+src/contexts/EncryptionContext.tsx(26,3): error TS6133: 'validateKey' is declared but its value is never read.
+src/contexts/HybridAuthContext.tsx(62,5): error TS6133: 'getAccessTokenSilently' is declared but its value is never read.
+src/db/api.ts(8,3): error TS6196: 'EMIStatus' is declared but never used.
+src/pages/AccountForm.tsx(5,15): error TS6196: 'Account' is declared but never used.
+src/pages/AccountForm.tsx(673,19): error TS2322: Type 'Dispatch<SetStateAction<Omit<LoanEMIPayment, "id" | "created_at" | "updated_at" | "user_id" | "account_id">[]>>' is not assignable to type '(payments: EMIPaymentEntry[]) => void'.
+  Types of parameters 'value' and 'payments' are incompatible.
+    Type 'EMIPaymentEntry[]' is not assignable to type 'SetStateAction<Omit<LoanEMIPayment, "id" | "created_at" | "updated_at" | "user_id" | "account_id">[]>'.
+      Type 'EMIPaymentEntry[]' is not assignable to type 'Omit<LoanEMIPayment, "id" | "created_at" | "updated_at" | "user_id" | "account_id">[]'.
+        Property 'transaction_id' is missing in type 'EMIPaymentEntry' but required in type 'Omit<LoanEMIPayment, "id" | "created_at" | "updated_at" | "user_id" | "account_id">'.
+src/pages/AccountForm.tsx(674,19): error TS2322: Type 'Omit<LoanEMIPayment, "id" | "created_at" | "updated_at" | "user_id" | "account_id">[]' is not assignable to type 'EMIPaymentEntry[]'.
+  Type 'Omit<LoanEMIPayment, "id" | "created_at" | "updated_at" | "user_id" | "account_id">' is not assignable to type 'EMIPaymentEntry'.
+    Types of property 'notes' are incompatible.
+      Type 'string | null' is not assignable to type 'string'.
+        Type 'null' is not assignable to type 'string'.
+src/pages/AIAnalysisPage.tsx(119,7): error TS2322: Type '{ type: TransactionType; category: string; amount: number; date: string; description: string | null; }[]' is not assignable to type '{ type: string; category: string; amount: number; date: string; description?: string | undefined; }[]'.
+  Type '{ type: TransactionType; category: string; amount: number; date: string; description: string | null; }' is not assignable to type '{ type: string; category: string; amount: number; date: string; description?: string | undefined; }'.
+    Types of property 'description' are incompatible.
+      Type 'string | null' is not assignable to type 'string | undefined'.
+        Type 'null' is not assignable to type 'string | undefined'.
+src/pages/BackupRestore.tsx(70,32): error TS2551: Property 'getAllRepaymentAllocations' does not exist on type '{ getStatementItems(creditCardId: string, statementMonth?: string | undefined): Promise<any[]>; getUnpaidStatementLines(creditCardId: string): Promise<any[]>; ... 16 more ...; reverseRepayment(repaymentId: string): Promise<...>; }'. Did you mean 'getRepaymentAllocations'?
+src/pages/Budgets.tsx(11,59): error TS6133: 'Edit2' is declared but its value is never read.
+src/pages/Budgets.tsx(189,9): error TS6133: 'removeCategoryBudget' is declared but its value is never read.
+src/pages/Dashboard.tsx(172,14): error TS6133: 'monthExpenses' is declared but its value is never read.
+src/pages/Dashboard.tsx(248,9): error TS6133: 'getAccountTypeIcon' is declared but its value is never read.
+src/pages/Dashboard.tsx(376,9): error TS6133: 'getBalanceColor' is declared but its value is never read.
+src/pages/Dashboard.tsx(422,9): error TS6133: 'getAccountTypeColor' is declared but its value is never read.
+src/pages/Dashboard.tsx(712,48): error TS6133: 'entry' is declared but its value is never read.
+src/pages/Dashboard.tsx(751,43): error TS6133: 'entry' is declared but its value is never read.
+src/pages/LoanEMIHistory.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/pages/LoanEMISimulator.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/pages/Login.tsx(80,62): error TS6133: 'accessToken' is declared but its value is never read.
+src/pages/Login.tsx(96,15): error TS6133: 'data' is declared but its value is never read.
+src/pages/Register.tsx(26,10): error TS6133: 'registrationType' is declared but its value is never read.
+src/pages/Transactions.tsx(42,9): error TS6133: 'currency' is declared but its value is never read.
+src/utils/billingCycleCalculations.ts(87,32): error TS6133: 'statementDay' is declared but its value is never read.
+src/utils/creditCardStatementUtils.ts(31,21): error TS2339: Property 'type' does not exist on type 'Transaction'.
+src/utils/creditCardStatementUtils.ts(36,21): error TS2339: Property 'type' does not exist on type 'Transaction'.
+src/utils/creditCardStatementUtils.ts(172,7): error TS2339: Property 'supabase' does not exist on type 'typeof import("D:/smartfinhub/src/db/api")'.
+src/utils/creditCardStatementUtils.ts(197,40): error TS2339: Property 'supabase' does not exist on type 'typeof import("D:/smartfinhub/src/db/api")'.
+src/utils/loanInterestPosting.ts(2,37): error TS6196: 'LoanEMIPayment' is declared but never used.

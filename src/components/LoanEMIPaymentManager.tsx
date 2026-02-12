@@ -3,12 +3,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Trash2, Calendar, Edit2, Check, X, Calculator } from 'lucide-react';
 import { calculateAllEMIBreakdowns } from '@/utils/loanCalculations';
 import { formatCurrency } from '@/utils/format';
-import type { LoanEMIPayment, InterestRateHistory } from '@/types/types';
+import type { InterestRateHistory } from '@/types/types';
 import { interestRateApi } from '@/db/api';
 import { useToast } from '@/hooks/use-toast';
 
@@ -20,7 +19,8 @@ interface EMIPaymentEntry {
   outstanding_principal: number;
   interest_rate: number;
   payment_number: number;
-  notes: string;
+  notes: string | null;
+  transaction_id: string | null;
 }
 
 interface LoanEMIPaymentManagerProps {
@@ -82,7 +82,7 @@ export default function LoanEMIPaymentManager({
 
   const loadInterestRateHistory = async () => {
     if (!accountId) return;
-    
+
     setLoadingRates(true);
     try {
       const rates = await interestRateApi.getInterestRateHistory(accountId);
@@ -129,7 +129,8 @@ export default function LoanEMIPaymentManager({
     const newEntry = {
       payment_date: newPayment.payment_date,
       emi_amount: newPayment.emi_amount,
-      notes: newPayment.notes
+      notes: newPayment.notes,
+      transaction_id: null
     };
 
     setEmiEntries([...emiEntries, newEntry]);
@@ -164,8 +165,8 @@ export default function LoanEMIPaymentManager({
       interest_rate: rate.interest_rate
     }));
 
-    const outstandingPrincipal = payments.length > 0 
-      ? payments[payments.length - 1].outstanding_principal 
+    const outstandingPrincipal = payments.length > 0
+      ? payments[payments.length - 1].outstanding_principal
       : loanPrincipal;
 
     const effectiveStartDate = payments.length > 0
@@ -185,12 +186,13 @@ export default function LoanEMIPaymentManager({
       ...payment,
       payment_number: startingPaymentNumber + index,
       interest_rate: interestRate,
-      notes: sortedEntries[index]?.notes || ''
+      notes: sortedEntries[index]?.notes || '',
+      transaction_id: null
     }));
 
     setPayments([...payments, ...paymentsWithNotes]);
     setEmiEntries([]);
-    
+
     toast({
       title: 'Success',
       description: `Calculated components for ${calculatedPayments.length} payments.`,
@@ -216,7 +218,7 @@ export default function LoanEMIPaymentManager({
   const handleSaveEdit = (index: number) => {
     const principalComponent = parseFloat(editValues.principal_component);
     const interestComponent = parseFloat(editValues.interest_component);
-    
+
     if (isNaN(principalComponent) || isNaN(interestComponent)) {
       toast({
         title: 'Invalid Input',
@@ -229,7 +231,7 @@ export default function LoanEMIPaymentManager({
     const payment = payments[index];
     const expectedTotal = payment.emi_amount;
     const actualTotal = principalComponent + interestComponent;
-    
+
     if (Math.abs(actualTotal - expectedTotal) > 0.01) {
       toast({
         title: 'Validation Error',
@@ -241,7 +243,7 @@ export default function LoanEMIPaymentManager({
 
     const updatedPayments = [...payments];
     let outstandingPrincipal = index === 0 ? loanPrincipal : payments[index - 1].outstanding_principal;
-    
+
     updatedPayments[index] = {
       ...updatedPayments[index],
       principal_component: principalComponent,
@@ -257,7 +259,7 @@ export default function LoanEMIPaymentManager({
         outstanding_principal: newOutstanding
       };
     }
-    
+
     setPayments(updatedPayments);
     setEditingIndex(null);
     toast({
@@ -273,8 +275,8 @@ export default function LoanEMIPaymentManager({
 
   const totalPrincipalPaid = payments.reduce((sum, p) => sum + p.principal_component, 0);
   const totalInterestPaid = payments.reduce((sum, p) => sum + p.interest_component, 0);
-  const currentOutstanding = payments.length > 0 
-    ? payments[payments.length - 1].outstanding_principal 
+  const currentOutstanding = payments.length > 0
+    ? payments[payments.length - 1].outstanding_principal
     : loanPrincipal;
 
   return (
