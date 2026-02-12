@@ -107,17 +107,22 @@ export default function TransactionForm() {
     if (formData.from_account_id && formData.transaction_date && !formData.is_emi) {
       const account = accounts.find((a: Account) => a.id === formData.from_account_id);
       if (account && account.account_type === 'credit_card' && account.statement_day && account.due_day) {
-        const transactionDate = new Date(formData.transaction_date);
-        const { statementDate, dueDate } = getTransactionStatementInfo(
-          account.statement_day,
-          account.due_day,
-          transactionDate
-        );
+        try {
+          const transactionDate = new Date(formData.transaction_date);
+          const { statementDate, dueDate } = getTransactionStatementInfo(
+            account.statement_day,
+            account.due_day,
+            transactionDate
+          );
 
-        setStatementInfo({
-          statementDate,
-          dueDate
-        });
+          setStatementInfo({
+            statementDate,
+            dueDate
+          });
+        } catch (error) {
+          console.error('Error calculating statement info:', error);
+          setStatementInfo(null);
+        }
       } else {
         setStatementInfo(null);
       }
@@ -166,26 +171,33 @@ export default function TransactionForm() {
   // Validate credit limit when amount or account changes
   useEffect(() => {
     if (formData.from_account_id && formData.amount) {
-      const account = accounts.find((a: Account) => a.id === formData.from_account_id);
-      if (account && account.account_type === 'credit_card') {
-        const amount = parseFloat(formData.amount);
-        if (!isNaN(amount)) {
-          // Adjust balance based on the original transaction if we are editing
-          const isSameAccount = formData.from_account_id === originalAccountId;
-          const baseBalance = (id && isSameAccount) ? account.balance - originalAmount : account.balance;
-          const projectedBalance = baseBalance + amount;
+      try {
+        const account = accounts.find((a: Account) => a.id === formData.from_account_id);
+        if (account && account.account_type === 'credit_card') {
+          const amount = parseFloat(formData.amount);
+          if (!isNaN(amount) && amount > 0) {
+            // Adjust balance based on the original transaction if we are editing
+            const isSameAccount = formData.from_account_id === originalAccountId;
+            const baseBalance = (id && isSameAccount) ? account.balance - originalAmount : account.balance;
+            const projectedBalance = baseBalance + amount;
 
-          // Display warning based on the result of the edit
-          const warning = getCreditLimitWarningMessage(projectedBalance, account.credit_limit, account.currency);
-          setCreditLimitWarning(warning);
+            // Display warning based on the result of the edit
+            const warning = getCreditLimitWarningMessage(projectedBalance, account.credit_limit, account.currency);
+            setCreditLimitWarning(warning);
 
-          // Validate if the net change would exceed the limit
-          const validation = validateCreditLimit(baseBalance, amount, account.credit_limit);
-          if (!validation.valid) {
-            setCreditLimitWarning(`⚠️ ${validation.message}`);
+            // Validate if the net change would exceed the limit
+            const validation = validateCreditLimit(baseBalance, amount, account.credit_limit);
+            if (!validation.valid) {
+              setCreditLimitWarning(`⚠️ ${validation.message}`);
+            }
+          } else {
+            setCreditLimitWarning(null);
           }
+        } else {
+          setCreditLimitWarning(null);
         }
-      } else {
+      } catch (error) {
+        console.error('Error validating credit limit:', error);
         setCreditLimitWarning(null);
       }
     } else {
@@ -435,24 +447,34 @@ export default function TransactionForm() {
 
     // Validate credit limit for credit card transactions
     if (formData.from_account_id) {
-      const account = accounts.find((a: Account) => a.id === formData.from_account_id);
-      if (account && account.account_type === 'credit_card' && account.credit_limit) {
-        const isSameAccount = formData.from_account_id === originalAccountId;
-        const baseBalance = (id && isSameAccount) ? account.balance - originalAmount : account.balance;
+      try {
+        const account = accounts.find((a: Account) => a.id === formData.from_account_id);
+        if (account && account.account_type === 'credit_card' && account.credit_limit) {
+          const amount = parseFloat(formData.amount);
+          const isSameAccount = formData.from_account_id === originalAccountId;
+          const currentBalance = Number(account.balance) || 0;
+          const originalAmt = Number(originalAmount) || 0;
+          const creditLimit = Number(account.credit_limit) || 0;
+          
+          const baseBalance = (id && isSameAccount) ? currentBalance - originalAmt : currentBalance;
 
-        const validation = validateCreditLimit(
-          baseBalance,
-          parseFloat(formData.amount),
-          account.credit_limit
-        );
-        if (!validation.valid) {
-          toast({
-            title: 'Credit Limit Exceeded',
-            description: validation.message,
-            variant: 'destructive',
-          });
-          return;
+          const validation = validateCreditLimit(
+            baseBalance,
+            amount,
+            creditLimit
+          );
+          if (!validation.valid) {
+            toast({
+              title: 'Credit Limit Exceeded',
+              description: validation.message,
+              variant: 'destructive',
+            });
+            return;
+          }
         }
+      } catch (error) {
+        console.error('Error validating credit limit:', error);
+        // Don't block the transaction if validation fails
       }
     }
 
@@ -835,18 +857,22 @@ export default function TransactionForm() {
                       const amount = parseFloat(formData.amount) || 0;
 
                       // Calculate projected Available Credit for Credit Cards
-                      let availableBalance = selectedAccount.balance;
+                      let availableBalance = Number(selectedAccount.balance) || 0;
                       let projectedAvailable = 0;
                       let isOverLimit = false;
 
                       if (isCreditCard && selectedAccount.credit_limit) {
                         const isSameAccount = formData.from_account_id === originalAccountId;
-                        const baseBalance = (id && isSameAccount) ? selectedAccount.balance - originalAmount : selectedAccount.balance;
+                        const currentBalance = Number(selectedAccount.balance) || 0;
+                        const creditLimit = Number(selectedAccount.credit_limit) || 0;
+                        const originalAmt = Number(originalAmount) || 0;
+                        
+                        const baseBalance = (id && isSameAccount) ? currentBalance - originalAmt : currentBalance;
                         const projectedBalance = baseBalance + amount;
-
-                        availableBalance = selectedAccount.credit_limit - selectedAccount.balance;
-                        projectedAvailable = selectedAccount.credit_limit - projectedBalance;
-                        isOverLimit = projectedBalance > selectedAccount.credit_limit;
+                        
+                        availableBalance = creditLimit - currentBalance;
+                        projectedAvailable = creditLimit - projectedBalance;
+                        isOverLimit = projectedBalance > creditLimit;
                       }
 
                       return (
