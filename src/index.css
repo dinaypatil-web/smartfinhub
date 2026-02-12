@@ -11,7 +11,7 @@ All colors MUST be HSL.
   :root {
     --radius: 0.75rem;
     /* ICICI Bank Official Colors - Deep Saffron (#F99D27), Blue Sapphire (#005B75), American Red (#B02A30) */
-    --background: 35 100% 85%;
+    --background: 56 100% 90%;
     --foreground: 195 100% 23%;
     --card: 0 0% 100%;
     --card-foreground: 195 100% 23%;
