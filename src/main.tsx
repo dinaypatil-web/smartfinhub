@@ -16,7 +16,6 @@ window.addEventListener('error', (event) => {
 });
 
 console.log("Main.tsx executing...");
-document.body.style.backgroundColor = 'yellow'; // Visual confirmation that script is running
 import "./index.css";
 import App from "./App.tsx";
 import { AppWrapper } from "./components/common/PageMeta.tsx";
