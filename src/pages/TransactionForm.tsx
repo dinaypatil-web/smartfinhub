@@ -22,7 +22,7 @@ import {
   getCreditLimitWarningMessage
 } from '@/utils/emiCalculations';
 import { calculateEMIBreakdown } from '@/utils/loanCalculations';
-import { getTransactionStatementInfo } from '@/utils/statementCalculations';
+import { getTransactionStatementInfo, getStatementPeriod } from '@/utils/statementCalculations';
 import { INCOME_CATEGORIES } from '@/constants/incomeCategories';
 import { cache } from '@/utils/cache';
 
@@ -66,6 +66,8 @@ export default function TransactionForm() {
   const [statementInfo, setStatementInfo] = useState<{
     statementDate: Date;
     dueDate: Date;
+    periodStartDate?: Date;
+    periodEndDate?: Date;
   } | null>(null);
 
   const [existingEMI, setExistingEMI] = useState<any>(null);
@@ -83,6 +85,7 @@ export default function TransactionForm() {
   const [ccAllocations, setCCAllocations] = useState<CreditCardPaymentAllocation[]>([]);
   const [ccAdvanceCreated, setCCAdvanceCreated] = useState(0);
   const [ccAdvanceUsed, setCCAdvanceUsed] = useState(0);
+  const [ccAdvanceBalance, setCCAdvanceBalance] = useState(0);
 
   useEffect(() => {
     if (user) {
@@ -104,8 +107,20 @@ export default function TransactionForm() {
 
   // Calculate statement and due dates for credit card transactions
   useEffect(() => {
-    if (formData.from_account_id && formData.transaction_date && !formData.is_emi) {
-      const account = accounts.find((a: Account) => a.id === formData.from_account_id);
+    let accountId = '';
+
+    // For spending (Expense/Transfer FROM card)
+    if (formData.from_account_id && !formData.is_emi &&
+      (formData.transaction_type === 'expense' || formData.transaction_type === 'withdrawal' || formData.transaction_type === 'transfer')) {
+      accountId = formData.from_account_id;
+    }
+    // For repayment (Transfer/Repayment TO card)
+    else if (formData.to_account_id && formData.transaction_type === 'credit_card_repayment') {
+      accountId = formData.to_account_id;
+    }
+
+    if (accountId && formData.transaction_date) {
+      const account = accounts.find((a: Account) => a.id === accountId);
       if (account && account.account_type === 'credit_card' && account.statement_day && account.due_day) {
         try {
           const transactionDate = new Date(formData.transaction_date);
@@ -115,10 +130,25 @@ export default function TransactionForm() {
             transactionDate
           );
 
-          setStatementInfo({
-            statementDate,
-            dueDate
-          });
+          // For repayment, also compute the statement period
+          // The period being paid is: lastStatementDate (exclusive) to currentStatementDate (inclusive)
+          if (formData.transaction_type === 'credit_card_repayment') {
+            const { lastStatementDate, currentStatementDate } = getStatementPeriod(
+              account.statement_day,
+              transactionDate
+            );
+            setStatementInfo({
+              statementDate,
+              dueDate,
+              periodStartDate: lastStatementDate,
+              periodEndDate: currentStatementDate
+            });
+          } else {
+            setStatementInfo({
+              statementDate,
+              dueDate
+            });
+          }
         } catch (error) {
           console.error('Error calculating statement info:', error);
           setStatementInfo(null);
@@ -129,7 +159,36 @@ export default function TransactionForm() {
     } else {
       setStatementInfo(null);
     }
-  }, [formData.from_account_id, formData.transaction_date, formData.is_emi, accounts]);
+  }, [formData.from_account_id, formData.to_account_id, formData.transaction_type, formData.transaction_date, formData.is_emi, accounts]);
+
+  // Fetch advance balance for the selected credit card during repayment
+  useEffect(() => {
+    const fetchAdvanceBalance = async () => {
+      if (formData.transaction_type === 'credit_card_repayment' && formData.to_account_id) {
+        try {
+          const balance = await creditCardStatementApi.getAdvanceBalance(formData.to_account_id);
+          setCCAdvanceBalance(balance);
+        } catch (err) {
+          console.error('Error fetching advance balance:', err);
+          setCCAdvanceBalance(0);
+        }
+      } else {
+        setCCAdvanceBalance(0);
+      }
+    };
+    fetchAdvanceBalance();
+  }, [formData.transaction_type, formData.to_account_id]);
+
+  // When "Advance Balance" is selected as payment source, set advance consumed to amount
+  useEffect(() => {
+    if (formData.transaction_type === 'credit_card_repayment' && 
+        formData.from_account_id === 'advance_balance' && 
+        formData.amount) {
+      const amount = parseFloat(formData.amount) || 0;
+      setCCAdvanceUsed(amount);
+      setCCAdvanceCreated(0); // No advance created when using advance balance
+    }
+  }, [formData.transaction_type, formData.from_account_id, formData.amount]);
 
   // Auto-select "Loan repayments" category when loan_payment transaction type is selected
   useEffect(() => {
@@ -425,6 +484,17 @@ export default function TransactionForm() {
       return;
     }
 
+    // If using advance balance, validate amount doesn't exceed available advance
+    const isUsingAdvanceBalance = formData.from_account_id === 'advance_balance';
+    if (isUsingAdvanceBalance && parseFloat(formData.amount) > ccAdvanceBalance) {
+      toast({
+        title: 'Error',
+        description: `Amount exceeds available advance balance of ${ccAdvanceBalance}`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
     // Validate EMI fields if EMI is selected
     if (formData.is_emi) {
       if (!formData.emi_months || parseInt(formData.emi_months) <= 0) {
@@ -455,7 +525,7 @@ export default function TransactionForm() {
           const currentBalance = Number(account.balance) || 0;
           const originalAmt = Number(originalAmount) || 0;
           const creditLimit = Number(account.credit_limit) || 0;
-          
+
           const baseBalance = (id && isSameAccount) ? currentBalance - originalAmt : currentBalance;
 
           const validation = validateCreditLimit(
@@ -484,7 +554,7 @@ export default function TransactionForm() {
       const transactionData: any = {
         user_id: user.id,
         transaction_type: formData.transaction_type,
-        from_account_id: formData.from_account_id || null,
+        from_account_id: formData.from_account_id === 'advance_balance' ? null : (formData.from_account_id || null),
         to_account_id: formData.to_account_id || null,
         amount: parseFloat(formData.amount),
         currency: formData.currency,
@@ -599,7 +669,7 @@ export default function TransactionForm() {
               if (existingAdvance.credit_card_id !== formData.to_account_id) {
                 // Delete old advance payment (this will propagate balance updates to the old card)
                 await creditCardStatementApi.deleteAdvancePayment(existingAdvance.id);
-                
+
                 // Create new advance payment on the new card if needed
                 if (ccAdvanceCreated > 0) {
                   await creditCardStatementApi.createAdvancePayment(
@@ -656,18 +726,51 @@ export default function TransactionForm() {
         if (formData.transaction_type === 'credit_card_repayment' && created && formData.to_account_id) {
           try {
             if (ccAllocations.length > 0) {
-              const mappedAllocations = ccAllocations.map(a => ({
-                line_id: a.statement_line_id,
-                amount: a.amount_paid,
-                emi_id: a.emi_id
-              }));
+              const mappedAllocations = [];
+
+              for (const alloc of ccAllocations) {
+                let lineId = alloc.statement_line_id;
+
+                // Handle virtual EMI lines (create real statement line on the fly)
+                if (lineId.startsWith('emi_') && alloc.emi_id) {
+                  try {
+                    const emi = await emiApi.getEMIById(alloc.emi_id);
+                    if (emi) {
+                      const statementMonth = formData.transaction_date.slice(0, 7);
+                      const newLine = await creditCardStatementApi.createStatementLine({
+                        credit_card_id: formData.to_account_id,
+                        user_id: user.id,
+                        transaction_id: alloc.transaction_id || null,
+                        description: alloc.description || `EMI Installment: ${emi.description}`,
+                        amount: alloc.amount_paid,
+                        transaction_date: emi.next_due_date <= formData.transaction_date ? emi.next_due_date : formData.transaction_date,
+                        statement_month: statementMonth,
+                        status: 'pending', // Will be updated to paid shortly
+                        emi_id: emi.id
+                      });
+                      lineId = newLine.id;
+                    }
+                  } catch (err) {
+                    console.error('Error creating statement line for EMI:', err);
+                    continue; // Skip this allocation if creation fails
+                  }
+                }
+
+                mappedAllocations.push({
+                  line_id: lineId,
+                  amount: alloc.amount_paid,
+                  emi_id: alloc.emi_id
+                });
+              }
+
               await creditCardStatementApi.allocateRepayment(created.id, mappedAllocations);
 
-              for (const allocation of ccAllocations) {
+              // Update status for all allocations
+              for (const allocation of mappedAllocations) {
                 await creditCardStatementApi.updateStatementLineStatus(
-                  allocation.statement_line_id,
+                  allocation.line_id,
                   'paid',
-                  allocation.amount_paid
+                  allocation.amount
                 );
 
                 if (allocation.emi_id) {
@@ -835,11 +938,18 @@ export default function TransactionForm() {
                           </SelectItem>
                         ))
                         : formData.transaction_type === 'credit_card_repayment'
-                          ? accounts.filter(a => a.account_type === 'bank' || a.account_type === 'cash').map(account => (
-                            <SelectItem key={account.id} value={account.id}>
-                              {account.account_name}
-                            </SelectItem>
-                          ))
+                          ? [
+                            ...accounts.filter(a => a.account_type === 'bank' || a.account_type === 'cash').map(account => (
+                              <SelectItem key={account.id} value={account.id}>
+                                {account.account_name}
+                              </SelectItem>
+                            )),
+                            ...(ccAdvanceBalance > 0 ? [
+                              <SelectItem key="advance_balance" value="advance_balance">
+                                Advance Balance ({formatCurrency(ccAdvanceBalance, formData.currency)})
+                              </SelectItem>
+                            ] : [])
+                          ]
                           : accounts.filter(a => a.account_type !== 'loan').map(account => (
                             <SelectItem key={account.id} value={account.id}>
                               {account.account_name} ({account.account_type})
@@ -866,10 +976,10 @@ export default function TransactionForm() {
                         const currentBalance = Number(selectedAccount.balance) || 0;
                         const creditLimit = Number(selectedAccount.credit_limit) || 0;
                         const originalAmt = Number(originalAmount) || 0;
-                        
+
                         const baseBalance = (id && isSameAccount) ? currentBalance - originalAmt : currentBalance;
                         const projectedBalance = baseBalance + amount;
-                        
+
                         availableBalance = creditLimit - currentBalance;
                         projectedAvailable = creditLimit - projectedBalance;
                         isOverLimit = projectedBalance > creditLimit;
@@ -1071,10 +1181,32 @@ export default function TransactionForm() {
                 creditCardId={formData.to_account_id}
                 repaymentAmount={parseFloat(formData.amount) || 0}
                 onAllocationsChange={setCCAllocations}
-                onAdvanceCreatedChange={setCCAdvanceCreated}
-                onAdvanceUsedChange={setCCAdvanceUsed}
+                onAdvanceCreatedChange={(amount) => {
+                  // Don't override advance created when using advance balance
+                  if (formData.from_account_id !== 'advance_balance') {
+                    setCCAdvanceCreated(amount);
+                  }
+                }}
+                onAdvanceUsedChange={(amount) => {
+                  // Don't override advance used when using advance balance
+                  if (formData.from_account_id !== 'advance_balance') {
+                    setCCAdvanceUsed(amount);
+                  }
+                }}
+                onTotalSelectedChange={(total) => {
+                  // Auto-populate amount field with total selected
+                  if (total > 0) {
+                    setFormData(prev => ({ ...prev, amount: total.toString() }));
+                    // If using advance balance, also set advance consumed to total
+                    if (formData.from_account_id === 'advance_balance') {
+                      setCCAdvanceUsed(total);
+                      setCCAdvanceCreated(0);
+                    }
+                  }
+                }}
                 currency={formData.currency}
                 initialAllocations={ccAllocations}
+                periodEndDate={statementInfo?.periodEndDate ? statementInfo.periodEndDate.toISOString().split('T')[0] : undefined}
               />
             )}
 
@@ -1220,64 +1352,104 @@ export default function TransactionForm() {
             {/* Credit Card Repayment Summary UI */}
             {formData.transaction_type === 'credit_card_repayment' && formData.to_account_id && (
               <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 border rounded-lg bg-purple-50/50 dark:bg-purple-950/10">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <CreditCard className="h-3 w-3 text-purple-600" />
-                      Allocated to Statement
+                {formData.from_account_id === 'advance_balance' ? (
+                  // Special display when using advance balance
+                  <div className="p-4 border rounded-lg bg-blue-50/50 dark:bg-blue-950/10">
+                    <div className="flex items-center gap-2 mb-3">
+                      <TrendingDown className="h-5 w-5 text-blue-600" />
+                      <h3 className="font-semibold text-blue-900 dark:text-blue-200">Using Advance Balance</h3>
                     </div>
-                    <div className="text-lg font-bold text-purple-600">
-                      {formatCurrency(ccAllocations.reduce((sum, a) => sum + a.amount_paid, 0), formData.currency)}
-                    </div>
-                    <div className="text-[10px] text-muted-foreground">
-                      {ccAllocations.length} items selected
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <div className="text-xs text-muted-foreground">Advance Consumed</div>
+                        <div className="text-2xl font-bold text-blue-600">
+                          {formatCurrency(ccAdvanceUsed, formData.currency)}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground">
+                          From existing advance balance
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-xs text-muted-foreground">Current Outstanding</div>
+                        {(() => {
+                          const account = accounts.find((a: Account) => a.id === formData.to_account_id);
+                          const currentBalance = account ? Math.abs(Number(account.balance)) : 0;
+                          const newBalance = Math.max(0, currentBalance - (parseFloat(formData.amount) || 0));
+                          return (
+                            <>
+                              <div className="text-2xl font-bold text-blue-600">
+                                {formatCurrency(newBalance, formData.currency)}
+                              </div>
+                              <div className="text-[10px] text-muted-foreground">
+                                Before: {formatCurrency(currentBalance, formData.currency)}
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
                     </div>
                   </div>
+                ) : (
+                  // Normal display when using bank account
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 border rounded-lg bg-purple-50/50 dark:bg-purple-950/10">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <CreditCard className="h-3 w-3 text-purple-600" />
+                        Allocated to Statement
+                      </div>
+                      <div className="text-lg font-bold text-purple-600">
+                        {formatCurrency(ccAllocations.reduce((sum, a) => sum + a.amount_paid, 0), formData.currency)}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground">
+                        {ccAllocations.length} items selected
+                      </div>
+                    </div>
 
-                  <div className="space-y-1 border-l pl-4 border-purple-100 dark:border-purple-900/30">
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      {ccAdvanceCreated > 0 ? (
-                        <>
-                          <Plus className="h-3 w-3 text-emerald-600" />
-                          Advance Created
-                        </>
-                      ) : (
-                        <>
-                          <TrendingDown className="h-3 w-3 text-blue-600" />
-                          Advance Consumed
-                        </>
-                      )}
+                    <div className="space-y-1 border-l pl-4 border-purple-100 dark:border-purple-900/30">
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        {ccAdvanceCreated > 0 ? (
+                          <>
+                            <Plus className="h-3 w-3 text-emerald-600" />
+                            Advance Created
+                          </>
+                        ) : (
+                          <>
+                            <TrendingDown className="h-3 w-3 text-blue-600" />
+                            Advance Consumed
+                          </>
+                        )}
+                      </div>
+                      <div className={`text-lg font-bold ${ccAdvanceCreated > 0 ? 'text-emerald-600' : 'text-blue-600'}`}>
+                        {formatCurrency(ccAdvanceCreated > 0 ? ccAdvanceCreated : ccAdvanceUsed, formData.currency)}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground">
+                        {ccAdvanceCreated > 0 ? 'Recorded for future' : 'Adjusted from existing'}
+                      </div>
                     </div>
-                    <div className={`text-lg font-bold ${ccAdvanceCreated > 0 ? 'text-emerald-600' : 'text-blue-600'}`}>
-                      {formatCurrency(ccAdvanceCreated > 0 ? ccAdvanceCreated : ccAdvanceUsed, formData.currency)}
-                    </div>
-                    <div className="text-[10px] text-muted-foreground">
-                      {ccAdvanceCreated > 0 ? 'Recorded for future' : 'Adjusted from existing'}
-                    </div>
-                  </div>
 
-                  <div className="space-y-1 border-l pl-4 border-purple-100 dark:border-purple-900/30">
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Info className="h-3 w-3 text-blue-600" />
-                      Current Outstanding
+                    <div className="space-y-1 border-l pl-4 border-purple-100 dark:border-purple-900/30">
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Info className="h-3 w-3 text-blue-600" />
+                        Current Outstanding
+                      </div>
+                      {(() => {
+                        const account = accounts.find((a: Account) => a.id === formData.to_account_id);
+                        const currentBalance = account ? Math.abs(Number(account.balance)) : 0;
+                        const newBalance = Math.max(0, currentBalance - (parseFloat(formData.amount) || 0));
+                        return (
+                          <>
+                            <div className="text-lg font-bold text-blue-600">
+                              {formatCurrency(newBalance, formData.currency)}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+                              Before: {formatCurrency(currentBalance, formData.currency)}
+                            </div>
+                          </>
+                        );
+                      })()}
                     </div>
-                    {(() => {
-                      const account = accounts.find((a: Account) => a.id === formData.to_account_id);
-                      const currentBalance = account ? Math.abs(Number(account.balance)) : 0;
-                      const newBalance = Math.max(0, currentBalance - (parseFloat(formData.amount) || 0));
-                      return (
-                        <>
-                          <div className="text-lg font-bold text-blue-600">
-                            {formatCurrency(newBalance, formData.currency)}
-                          </div>
-                          <div className="text-[10px] text-muted-foreground flex items-center gap-1">
-                            Before: {formatCurrency(currentBalance, formData.currency)}
-                          </div>
-                        </>
-                      );
-                    })()}
                   </div>
-                </div>
+                )}
               </div>
             )}
 

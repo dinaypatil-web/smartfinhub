@@ -1585,6 +1585,21 @@ export const creditCardStatementApi = {
     });
   },
 
+  // Get all unpaid statement lines up to a specific date (for repayment selection)
+  // This fetches ALL pending items from any period up to the statement date
+  async getUnpaidStatementLinesUpToDate(creditCardId: string, endDate: string): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('credit_card_statement_lines')
+      .select('*')
+      .eq('credit_card_id', creditCardId)
+      .eq('status', 'pending')
+      .lte('transaction_date', endDate)
+      .order('transaction_date', { ascending: false });
+
+    if (error) throw error;
+    return Array.isArray(data) ? data : [];
+  },
+
   // Create a statement line item
   async createStatementLine(line: any): Promise<any> {
     const { data, error } = await supabase

@@ -14,8 +14,10 @@ interface CreditCardStatementSelectorProps {
   onAllocationsChange: (allocations: CreditCardPaymentAllocation[]) => void;
   onAdvanceCreatedChange: (amount: number) => void;
   onAdvanceUsedChange: (amount: number) => void;
+  onTotalSelectedChange?: (amount: number) => void;
   currency: string;
   initialAllocations?: CreditCardPaymentAllocation[];
+  periodEndDate?: string;   // Current statement date (inclusive) — items up to this date
 }
 
 export const CreditCardStatementSelector: React.FC<CreditCardStatementSelectorProps> = ({
@@ -24,8 +26,10 @@ export const CreditCardStatementSelector: React.FC<CreditCardStatementSelectorPr
   onAllocationsChange,
   onAdvanceCreatedChange,
   onAdvanceUsedChange,
+  onTotalSelectedChange,
   currency,
-  initialAllocations = []
+  initialAllocations = [],
+  periodEndDate
 }) => {
   const [statementItems, setStatementItems] = useState<StatementItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,30 +45,93 @@ export const CreditCardStatementSelector: React.FC<CreditCardStatementSelectorPr
         setLoading(true);
         setError(null);
 
-        // Get unpaid statement lines
-        const unpaidItems = await creditCardStatementApi.getUnpaidStatementLines(creditCardId);
+        // Get active EMIs for this credit card first (needed for filtering)
+        const activeEMIs = await emiApi.getActiveEMIsByAccount(creditCardId);
 
-        // If we have initial allocations, fetch those specific lines too (as they might be marked "paid" already)
-        let allocatedItems: any[] = [];
-        if (initialAllocations.length > 0) {
-          const lineIds = initialAllocations.map(a => a.statement_line_id);
-          allocatedItems = await creditCardStatementApi.getStatementLinesByIds(lineIds);
+        // Build a set of transaction_ids that have been converted to EMI
+        // These are the ORIGINAL purchase transactions — they should NOT appear
+        const emiPurchaseTransactionIds = new Set(
+          activeEMIs
+            .filter(emi => emi.transaction_id)
+            .map(emi => emi.transaction_id)
+        );
+
+        // Get unpaid statement lines up to the statement date
+        let unpaidItems: any[];
+        if (periodEndDate) {
+          // Fetch ALL pending items from any period up to the current statement date
+          unpaidItems = await creditCardStatementApi.getUnpaidStatementLinesUpToDate(creditCardId, periodEndDate);
+        } else {
+          unpaidItems = await creditCardStatementApi.getUnpaidStatementLines(creditCardId);
         }
 
-        // Combine and unique items
+        // Filter out original EMI purchase transactions
+        // A line is the original purchase if:
+        //   - It has a transaction_id that matches an EMI's transaction_id
+        //   - AND it does NOT have an emi_id (it's not an installment record)
+        unpaidItems = unpaidItems.filter(item => {
+          if (!item.emi_id && item.transaction_id && emiPurchaseTransactionIds.has(item.transaction_id)) {
+            return false; // This is the original purchase converted to EMI — exclude
+          }
+          return true;
+        });
+
+        // Filter EMIs: only include those with installment due on or before statement date
+        const relevantEMIs = activeEMIs.filter(emi => {
+          if (!periodEndDate) return true;
+          return emi.next_due_date <= periodEndDate;
+        });
+
+        // Convert relevant EMIs to virtual statement items
+        // Only if they don't already exist as real statement lines
+        const existingEmiIds = new Set(unpaidItems.filter(i => i.emi_id).map(i => i.emi_id));
+
+        const emiItems = relevantEMIs
+          .filter(emi => !existingEmiIds.has(emi.id))
+          .map(emi => ({
+            id: `emi_${emi.id}`,
+            credit_card_id: creditCardId,
+            user_id: emi.user_id,
+            transaction_id: emi.transaction_id,
+            description: `EMI Installment: ${emi.description} (${emi.emi_months - emi.remaining_installments + 1}/${emi.emi_months})`,
+            amount: emi.monthly_emi,
+            transaction_date: emi.next_due_date,
+            status: 'pending',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            emi_id: emi.id,
+            isEMI: true,
+            emiDetails: emi
+          }));
+
+        // If we have initial allocations (edit mode), fetch those specific lines too
+        let allocatedItems: any[] = [];
+        if (initialAllocations.length > 0) {
+          const realLineIds = initialAllocations
+            .filter(a => !a.statement_line_id.startsWith('emi_'))
+            .map(a => a.statement_line_id);
+
+          if (realLineIds.length > 0) {
+            allocatedItems = await creditCardStatementApi.getStatementLinesByIds(realLineIds);
+          }
+        }
+
+        // Combine and deduplicate items
         const allItemsMap = new Map();
         unpaidItems.forEach(item => allItemsMap.set(item.id, item));
         allocatedItems.forEach(item => allItemsMap.set(item.id, item));
+        emiItems.forEach(item => allItemsMap.set(item.id, item));
+
         const items = Array.from(allItemsMap.values());
 
         // Get advance balance
         const balance = await creditCardStatementApi.getAdvanceBalance(creditCardId);
         setAdvanceBalance(balance);
 
-        // Fetch EMI details if needed
+        // Fetch EMI details for REAL statement lines if needed (virtual ones already have it)
         const itemsWithDetails = await Promise.all(
           items.map(async (item) => {
-            if (item.emi_id) {
+            if (item.emi_id && !item.emiDetails) {
               try {
                 const emiDetails = await emiApi.getEMIById(item.emi_id);
                 return {
@@ -80,6 +147,9 @@ export const CreditCardStatementSelector: React.FC<CreditCardStatementSelectorPr
             return item;
           })
         );
+
+        // Sort by date descending
+        itemsWithDetails.sort((a, b) => new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime());
 
         setStatementItems(itemsWithDetails);
 
@@ -103,7 +173,7 @@ export const CreditCardStatementSelector: React.FC<CreditCardStatementSelectorPr
     };
 
     loadData();
-  }, [creditCardId, initialAllocations.length]);
+  }, [creditCardId, initialAllocations.length, periodEndDate]);
 
   // Calculate totals and allocations
   useEffect(() => {
@@ -135,7 +205,12 @@ export const CreditCardStatementSelector: React.FC<CreditCardStatementSelectorPr
     onAllocationsChange(allocations);
     onAdvanceCreatedChange(created);
     onAdvanceUsedChange(used);
-  }, [selectedItems, statementItems, repaymentAmount, advanceBalance, onAllocationsChange, onAdvanceCreatedChange, onAdvanceUsedChange]);
+    
+    // Notify parent of total selected amount
+    if (onTotalSelectedChange) {
+      onTotalSelectedChange(totalSelected);
+    }
+  }, [selectedItems, statementItems, repaymentAmount, advanceBalance, onAllocationsChange, onAdvanceCreatedChange, onAdvanceUsedChange, onTotalSelectedChange]);
 
   const toggleItemSelection = (itemId: string) => {
     const newSelected = new Set(selectedItems);

@@ -184,6 +184,16 @@ export default function AIAnalysisPage() {
   };
 
   const handleGenerateAnalysis = async () => {
+    // Check if APP_ID is configured
+    if (!import.meta.env.VITE_APP_ID) {
+      toast({
+        title: 'AI Service Not Configured',
+        description: 'Please configure VITE_APP_ID in your .env file to use AI analysis features.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     const data = await prepareAnalysisData();
 
     if (data.transactions.length === 0) {
@@ -228,6 +238,16 @@ export default function AIAnalysisPage() {
   };
 
   const handleGenerateOptimization = async () => {
+    // Check if APP_ID is configured
+    if (!import.meta.env.VITE_APP_ID) {
+      toast({
+        title: 'AI Service Not Configured',
+        description: 'Please configure VITE_APP_ID in your .env file to use AI optimization features.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     const data = await prepareAnalysisData();
 
     if (data.transactions.length === 0) {
