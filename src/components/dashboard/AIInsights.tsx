@@ -133,6 +133,13 @@ export default function AIInsights() {
   };
 
   const generateAnalysis = async () => {
+    if (!import.meta.env.VITE_APP_ID) {
+      setAnalysis('AI service not configured. Please set VITE_APP_ID in your .env file.');
+      setAnalysisHtml('<p>AI service not configured. Please set VITE_APP_ID in your .env file.</p>');
+      setHasAnalysis(true);
+      return;
+    }
+
     const data = await prepareAnalysisData();
 
     if (data.transactions.length === 0) {

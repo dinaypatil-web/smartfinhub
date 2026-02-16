@@ -58,6 +58,10 @@ export async function generateFinancialAnalysis(
   };
 
   try {
+    if (!APP_ID) {
+      throw new Error('AI service not configured. Please set VITE_APP_ID in your .env file.');
+    }
+
     const response = await fetch(AI_API_URL, {
       method: 'POST',
       headers: {
@@ -82,6 +86,7 @@ export async function generateFinancialAnalysis(
 
     const decoder = new TextDecoder();
     let buffer = '';
+    let completed = false;
 
     const parser = createParser({
       onEvent: (event) => {
@@ -93,7 +98,8 @@ export async function generateFinancialAnalysis(
           }
 
           const finishReason = data.candidates?.[0]?.finishReason;
-          if (finishReason === 'STOP') {
+          if (finishReason === 'STOP' && !completed) {
+            completed = true;
             onComplete();
           }
         } catch (e) {
@@ -111,7 +117,9 @@ export async function generateFinancialAnalysis(
       buffer = '';
     }
 
-    onComplete();
+    if (!completed) {
+      onComplete();
+    }
   } catch (error) {
     console.error('AI Service Error:', error);
     onError(error instanceof Error ? error.message : 'Failed to generate analysis');
@@ -119,7 +127,7 @@ export async function generateFinancialAnalysis(
 }
 
 function buildFinancialAnalysisPrompt(data: AIAnalysisData): string {
-  const savingsRate = data.totalIncome > 0 
+  const savingsRate = data.totalIncome > 0
     ? ((data.totalIncome - data.totalExpenses) / data.totalIncome * 100).toFixed(1)
     : '0';
 
@@ -146,9 +154,9 @@ function buildFinancialAnalysisPrompt(data: AIAnalysisData): string {
     historicalSection = `
 
 **Historical Trends (Last 3 Months):**
-${lastThreeMonths.map(m => 
-  `- ${m.month}: Income ₹${m.income.toFixed(2)}, Expenses ₹${m.expenses.toFixed(2)}, Savings ₹${m.savings.toFixed(2)}`
-).join('\n')}
+${lastThreeMonths.map(m =>
+      `- ${m.month}: Income ₹${m.income.toFixed(2)}, Expenses ₹${m.expenses.toFixed(2)}, Savings ₹${m.savings.toFixed(2)}`
+    ).join('\n')}
 
 **Monthly Averages:**
 - Average Income: ₹${monthlyAverages.income.toFixed(2)}
@@ -174,9 +182,9 @@ ${historicalSection}
 
 **Recent Transactions (last 10):**
 ${data.transactions.slice(-10).map(t => {
-  const desc = t.description ? ` - "${t.description}"` : '';
-  return `- ${t.date}: ${t.type} - ${t.category} - ₹${t.amount.toFixed(2)}${desc}`;
-}).join('\n')}
+    const desc = t.description ? ` - "${t.description}"` : '';
+    return `- ${t.date}: ${t.type} - ${t.category} - ₹${t.amount.toFixed(2)}${desc}`;
+  }).join('\n')}
 
 **IMPORTANT**: Pay special attention to transaction descriptions as they provide valuable context about spending patterns, merchant names, and specific purchase details. Use these descriptions to:
 - Identify recurring expenses and subscriptions
@@ -244,15 +252,15 @@ export async function generateBudgetOptimization(
 
 **Expense Breakdown:**
 ${Object.entries(
-  data.transactions
-    .filter(t => t.type === 'expense')
-    .reduce((acc, t) => {
-      acc[t.category] = (acc[t.category] || 0) + t.amount;
-      return acc;
-    }, {} as Record<string, number>)
-)
-  .map(([cat, amt]) => `- ${cat}: ₹${amt.toFixed(2)}`)
-  .join('\n')}
+    data.transactions
+      .filter(t => t.type === 'expense')
+      .reduce((acc, t) => {
+        acc[t.category] = (acc[t.category] || 0) + t.amount;
+        return acc;
+      }, {} as Record<string, number>)
+  )
+      .map(([cat, amt]) => `- ${cat}: ₹${amt.toFixed(2)}`)
+      .join('\n')}
 
 Please provide:
 1. **Optimized Budget Allocation**: Suggested budget for each category
@@ -273,6 +281,10 @@ Be realistic and practical. Focus on sustainable changes.`;
   };
 
   try {
+    if (!APP_ID) {
+      throw new Error('AI service not configured. Please set VITE_APP_ID in your .env file.');
+    }
+
     const response = await fetch(AI_API_URL, {
       method: 'POST',
       headers: {
@@ -297,6 +309,7 @@ Be realistic and practical. Focus on sustainable changes.`;
 
     const decoder = new TextDecoder();
     let buffer = '';
+    let completed = false;
 
     const parser = createParser({
       onEvent: (event) => {
@@ -308,7 +321,8 @@ Be realistic and practical. Focus on sustainable changes.`;
           }
 
           const finishReason = data.candidates?.[0]?.finishReason;
-          if (finishReason === 'STOP') {
+          if (finishReason === 'STOP' && !completed) {
+            completed = true;
             onComplete();
           }
         } catch (e) {
@@ -326,7 +340,9 @@ Be realistic and practical. Focus on sustainable changes.`;
       buffer = '';
     }
 
-    onComplete();
+    if (!completed) {
+      onComplete();
+    }
   } catch (error) {
     console.error('AI Service Error:', error);
     onError(error instanceof Error ? error.message : 'Failed to generate optimization');
