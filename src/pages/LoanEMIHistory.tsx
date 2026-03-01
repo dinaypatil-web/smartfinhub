@@ -8,13 +8,15 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, ArrowLeft, TrendingDown, AlertCircle, RefreshCw } from 'lucide-react';
+import { Loader2, ArrowLeft, TrendingDown, AlertCircle, RefreshCw, Trash2 } from 'lucide-react';
 import { formatCurrency } from '@/utils/format';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
 
 export default function LoanEMIHistory() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { toast } = useToast();
   const [loanAccounts, setLoanAccounts] = useState<Account[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState('');
   const [emiPayments, setEMIPayments] = useState<LoanEMIPayment[]>([]);
@@ -60,7 +62,32 @@ export default function LoanEMIHistory() {
     };
 
     fetchPayments();
-  }, [selectedAccountId]);
+  }, [selectedAccountId, user]);
+
+  const handleDeletePayment = async (paymentId: string) => {
+    if (!window.confirm('Are you sure you want to delete this payment record? This will not delete the associated transaction if any.')) {
+      return;
+    }
+
+    try {
+      setCalculating(true);
+      await loanEMIPaymentApi.deletePayment(paymentId);
+      setEMIPayments(emiPayments.filter(p => p.id !== paymentId));
+      toast({
+        title: 'Success',
+        description: 'Payment record deleted successfully.',
+      });
+    } catch (error) {
+      console.error('Error deleting payment:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete payment record.',
+        variant: 'destructive',
+      });
+    } finally {
+      setCalculating(false);
+    }
+  };
 
   const selectedAccount = loanAccounts.find((a: Account) => a.id === selectedAccountId);
 
@@ -238,6 +265,7 @@ export default function LoanEMIHistory() {
                               <TableHead className="text-right">Interest %</TableHead>
                               <TableHead className="text-right">Outstanding</TableHead>
                               <TableHead>Status</TableHead>
+                              <TableHead className="text-right w-[100px]">Actions</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -276,6 +304,17 @@ export default function LoanEMIHistory() {
                                     <Badge variant="outline" className="bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800">
                                       Paid
                                     </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleDeletePayment(payment.id)}
+                                      className="h-8 w-8 text-slate-400 hover:text-red-600 transition-colors"
+                                      title="Delete payment record"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
                                   </TableCell>
                                 </TableRow>
                               );

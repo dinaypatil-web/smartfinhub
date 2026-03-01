@@ -393,21 +393,36 @@ export const transactionApi = {
         const principalComponent = Number((amount - interestComponent).toFixed(2));
         const outstandingPrincipal = Number((currentBalance - principalComponent).toFixed(2));
 
-        const nextPaymentNumber = await loanEMIPaymentApi.getNextPaymentNumber(transaction.to_account_id);
+        // DEDUPLICATION: Check if an EMI payment already exists for this date and account
+        const existingPayments = await loanEMIPaymentApi.getPaymentsByAccount(transaction.to_account_id);
+        const existingPayment = existingPayments.find(p => p.payment_date === transaction.transaction_date);
 
-        await loanEMIPaymentApi.createPayment({
-          user_id: transaction.user_id,
-          account_id: transaction.to_account_id,
-          payment_date: transaction.transaction_date,
-          emi_amount: amount,
-          principal_component: principalComponent,
-          interest_component: interestComponent,
-          outstanding_principal: outstandingPrincipal,
-          interest_rate: interestRate,
-          payment_number: nextPaymentNumber,
-          transaction_id: data.id,
-          notes: transaction.description
-        });
+        if (existingPayment) {
+          // Update existing instead of creating new
+          await loanEMIPaymentApi.updatePayment(existingPayment.id, {
+            transaction_id: data.id,
+            emi_amount: amount,
+            principal_component: principalComponent,
+            interest_component: interestComponent,
+            outstanding_principal: outstandingPrincipal,
+            notes: transaction.description || existingPayment.notes
+          });
+        } else {
+          const nextPaymentNumber = await loanEMIPaymentApi.getNextPaymentNumber(transaction.to_account_id);
+          await loanEMIPaymentApi.createPayment({
+            user_id: transaction.user_id,
+            account_id: transaction.to_account_id,
+            payment_date: transaction.transaction_date,
+            emi_amount: amount,
+            principal_component: principalComponent,
+            interest_component: interestComponent,
+            outstanding_principal: outstandingPrincipal,
+            interest_rate: interestRate,
+            payment_number: nextPaymentNumber,
+            transaction_id: data.id,
+            notes: transaction.description
+          });
+        }
       }
     }
 
@@ -442,10 +457,10 @@ export const transactionApi = {
 
       // Update associated records
       if (data.transaction_type === 'loan_payment' && data.to_account_id) {
-        // Delete old
+        // Delete old (wait, this might be too drastic if we want to deduplicate)
+        // Instead of deleting all with transaction_id, let's just ensure we have one
         await supabase.from('loan_emi_payments').delete().eq('transaction_id', transactionId);
 
-        // Create new
         const loanAccount = await accountApi.getAccountById(data.to_account_id);
         if (loanAccount && loanAccount.account_type === 'loan') {
           const amount = Number(data.amount);
@@ -455,21 +470,36 @@ export const transactionApi = {
           const interestComponent = Number((currentBalance * monthlyRate).toFixed(2));
           const principalComponent = Number((amount - interestComponent).toFixed(2));
           const outstandingPrincipal = Number((currentBalance - principalComponent).toFixed(2));
-          const nextPaymentNumber = await loanEMIPaymentApi.getNextPaymentNumber(data.to_account_id);
 
-          await loanEMIPaymentApi.createPayment({
-            user_id: data.user_id,
-            account_id: data.to_account_id,
-            payment_date: data.transaction_date,
-            emi_amount: amount,
-            principal_component: principalComponent,
-            interest_component: interestComponent,
-            outstanding_principal: outstandingPrincipal,
-            interest_rate: interestRate,
-            payment_number: nextPaymentNumber,
-            transaction_id: data.id,
-            notes: data.description
-          });
+          // Check for manual entry on same date
+          const existingPayments = await loanEMIPaymentApi.getPaymentsByAccount(data.to_account_id);
+          const existingPayment = existingPayments.find(p => p.payment_date === data.transaction_date && !p.transaction_id);
+
+          if (existingPayment) {
+            await loanEMIPaymentApi.updatePayment(existingPayment.id, {
+              transaction_id: data.id,
+              emi_amount: amount,
+              principal_component: principalComponent,
+              interest_component: interestComponent,
+              outstanding_principal: outstandingPrincipal,
+              notes: data.description || existingPayment.notes
+            });
+          } else {
+            const nextPaymentNumber = await loanEMIPaymentApi.getNextPaymentNumber(data.to_account_id);
+            await loanEMIPaymentApi.createPayment({
+              user_id: data.user_id,
+              account_id: data.to_account_id,
+              payment_date: data.transaction_date,
+              emi_amount: amount,
+              principal_component: principalComponent,
+              interest_component: interestComponent,
+              outstanding_principal: outstandingPrincipal,
+              interest_rate: interestRate,
+              payment_number: nextPaymentNumber,
+              transaction_id: data.id,
+              notes: data.description
+            });
+          }
         }
       }
 
