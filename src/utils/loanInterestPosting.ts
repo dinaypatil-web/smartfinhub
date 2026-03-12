@@ -10,9 +10,9 @@ async function calculateLoanInterestForPeriod(
   account: Account,
   startDate: Date,
   endDate: Date
-): Promise<number> {
+): Promise<{ amount: number; sourcedFromEMI: boolean }> {
   if (!account.loan_principal || !account.current_interest_rate) {
-    return 0;
+    return { amount: 0, sourcedFromEMI: false };
   }
 
   // Get EMI payment history for this account
@@ -31,7 +31,10 @@ async function calculateLoanInterestForPeriod(
       (sum, payment) => sum + payment.interest_component,
       0
     );
-    return Math.round(totalInterestFromEMI * 100) / 100;
+    return {
+      amount: Math.round(totalInterestFromEMI * 100) / 100,
+      sourcedFromEMI: true
+    };
   }
 
   // No EMI payments in period, calculate interest based on daily balance
@@ -109,7 +112,10 @@ async function calculateLoanInterestForPeriod(
     currentDate.setDate(currentDate.getDate() + 1);
   }
 
-  return Math.round(totalInterest * 100) / 100;
+  return {
+    amount: Math.round(totalInterest * 100) / 100,
+    sourcedFromEMI: false
+  };
 }
 
 /**
@@ -252,11 +258,13 @@ export async function postMonthlyInterest(account: Account, userId: string): Pro
 
     // Calculate interest from last posting to today
     const today = new Date();
-    const interestAmount = await calculateLoanInterestForPeriod(
+    const result = await calculateLoanInterestForPeriod(
       account,
       lastPostingDate,
       today
     );
+
+    const { amount: interestAmount, sourcedFromEMI } = result;
 
     if (interestAmount <= 0) {
       return {
@@ -267,8 +275,9 @@ export async function postMonthlyInterest(account: Account, userId: string): Pro
     }
 
     // Note: EMI Payment Records are created and stored with principal/interest breakdown
-    // when the payment transaction is entered. This posting only creates the interest
-    // charge transaction based on the calculated interest. Previous payments are not adjusted.
+    // when the payment transaction is entered. This posting tool:
+    // 1. Creates a formal interest_charge transaction for history.
+    // 2. Only adjusts the balance if interest wasn't already 'charged' via EMI bifurcation.
 
     // Create interest charge transaction
     const transaction: Omit<Transaction, 'id' | 'created_at' | 'updated_at'> = {
@@ -286,14 +295,18 @@ export async function postMonthlyInterest(account: Account, userId: string): Pro
 
     await transactionApi.createTransaction(transaction);
 
-    // Update account balance
-    const newBalance = Number(account.balance) + interestAmount;
-    await accountApi.updateAccount(account.id, { balance: newBalance });
+    // Update account balance ONLY if it wasn't already handled by EMI bifurcation
+    if (!sourcedFromEMI) {
+      const newBalance = Number(account.balance) + interestAmount;
+      await accountApi.updateAccount(account.id, { balance: newBalance });
+    }
 
     return {
       success: true,
       interestAmount,
-      message: `Interest of ${interestAmount} posted successfully. EMI payment records created with bifurcation for current transactions only.`
+      message: sourcedFromEMI
+        ? `Interest of ${interestAmount} was already reflected in your balance through EMI payments. A transaction record has been created for your history.`
+        : `Interest of ${interestAmount} posted successfully and added to your loan balance.`
     };
   } catch (error) {
     console.error('Error posting monthly interest:', error);
