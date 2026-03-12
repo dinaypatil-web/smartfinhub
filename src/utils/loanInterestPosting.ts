@@ -205,16 +205,17 @@ export async function shouldPostInterest(account: Account): Promise<boolean> {
     return false;
   }
 
-  // Check if interest was already posted this month
+  // Check if interest was already posted for the current cycle
   const lastPostingDate = await getLastInterestPostingDate(account);
   if (lastPostingDate) {
-    const lastPostingMonth = lastPostingDate.getMonth();
-    const lastPostingYear = lastPostingDate.getFullYear();
-    const currentMonth = today.getMonth();
-    const currentYear = today.getFullYear();
+    // Construct the due date for the current month
+    const currentMonthDueDate = new Date(today);
+    currentMonthDueDate.setDate(account.due_date);
+    currentMonthDueDate.setHours(0, 0, 0, 0);
 
-    // If already posted this month, don't post again
-    if (lastPostingMonth === currentMonth && lastPostingYear === currentYear) {
+    // If we've already posted interest on or after the current month's due date,
+    // then it's already done for this cycle.
+    if (lastPostingDate >= currentMonthDueDate) {
       return false;
     }
   }
