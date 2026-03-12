@@ -1,5 +1,5 @@
 import { accountApi, transactionApi, interestRateApi, loanEMIPaymentApi } from '@/db/api';
-import type { Account, Transaction, LoanEMIPayment } from '@/types/types';
+import type { Account, Transaction } from '@/types/types';
 
 /**
  * Calculate interest for a loan account for a given period
@@ -17,7 +17,7 @@ async function calculateLoanInterestForPeriod(
 
   // Get EMI payment history for this account
   const emiPayments = await loanEMIPaymentApi.getPaymentsByAccount(account.id);
-  
+
   // Check if there are EMI payments in this period
   const emiPaymentsInPeriod = emiPayments.filter(payment => {
     const paymentDate = new Date(payment.payment_date);
@@ -63,7 +63,7 @@ async function calculateLoanInterestForPeriod(
   });
 
   // Sort transactions by date
-  accountTransactions.sort((a, b) => 
+  accountTransactions.sort((a, b) =>
     new Date(a.transaction_date).getTime() - new Date(b.transaction_date).getTime()
   );
 
@@ -77,7 +77,7 @@ async function calculateLoanInterestForPeriod(
   for (const transaction of accountTransactions) {
     const dateKey = transaction.transaction_date;
     const change = balanceChanges.get(dateKey) || 0;
-    
+
     // For loan accounts, payments reduce balance, charges increase it
     if (transaction.from_account_id === account.id) {
       // Payment from loan account (reduces balance)
@@ -91,10 +91,10 @@ async function calculateLoanInterestForPeriod(
   // Calculate interest for each day
   while (currentDate <= endDate) {
     const dateKey = currentDate.toISOString().split('T')[0];
-    
+
     // Get applicable interest rate for this date
     const applicableRate = getApplicableRate(dateKey, rateHistory);
-    
+
     // Calculate daily interest
     const dailyInterest = (currentBalance * applicableRate) / (365 * 100);
     totalInterest += dailyInterest;
@@ -124,7 +124,7 @@ function getApplicableRate(
   );
 
   let applicableRate = sortedRates[0]?.interest_rate || 0;
-  
+
   for (const rate of sortedRates) {
     if (rate.effective_date <= date) {
       applicableRate = rate.interest_rate;
@@ -142,34 +142,34 @@ function getApplicableRate(
  */
 async function getLastInterestPostingDate(account: Account): Promise<Date | null> {
   const allTransactions = await transactionApi.getTransactions(account.user_id);
-  
+
   // Find the most recent interest_charge transaction for this account
   const interestTransactions = allTransactions
-    .filter(t => 
-      t.transaction_type === 'interest_charge' && 
+    .filter(t =>
+      t.transaction_type === 'interest_charge' &&
       t.to_account_id === account.id
     )
-    .sort((a, b) => 
+    .sort((a, b) =>
       new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime()
     );
 
   // Also check EMI payment history
   const emiPayments = await loanEMIPaymentApi.getPaymentsByAccount(account.id);
-  const sortedEMIPayments = [...emiPayments].sort((a, b) => 
+  const sortedEMIPayments = [...emiPayments].sort((a, b) =>
     new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime()
   );
 
   // Get the most recent date from either source
-  const lastInterestTransactionDate = interestTransactions.length > 0 
-    ? new Date(interestTransactions[0].transaction_date) 
+  const lastInterestTransactionDate = interestTransactions.length > 0
+    ? new Date(interestTransactions[0].transaction_date)
     : null;
-  const lastEMIPaymentDate = sortedEMIPayments.length > 0 
-    ? new Date(sortedEMIPayments[0].payment_date) 
+  const lastEMIPaymentDate = sortedEMIPayments.length > 0
+    ? new Date(sortedEMIPayments[0].payment_date)
     : null;
 
   if (lastInterestTransactionDate && lastEMIPaymentDate) {
-    return lastInterestTransactionDate > lastEMIPaymentDate 
-      ? lastInterestTransactionDate 
+    return lastInterestTransactionDate > lastEMIPaymentDate
+      ? lastInterestTransactionDate
       : lastEMIPaymentDate;
   }
 
@@ -200,8 +200,8 @@ export async function shouldPostInterest(account: Account): Promise<boolean> {
   const today = new Date();
   const todayDay = today.getDate();
 
-  // Check if today is the due date
-  if (todayDay !== account.due_date) {
+  // Check if today is on or after the due date
+  if (todayDay < account.due_date) {
     return false;
   }
 
@@ -320,7 +320,7 @@ export async function checkAndPostInterestForAllLoans(
   for (const account of accounts) {
     if (account.account_type === 'loan') {
       const shouldPost = await shouldPostInterest(account);
-      
+
       if (shouldPost) {
         const result = await postMonthlyInterest(account, userId);
         results.push({
@@ -356,36 +356,36 @@ export async function getAccruedInterestReference(
   }
 
   const allTransactions = await transactionApi.getTransactions(account.user_id);
-  
+
   // Find the most recent interest_charge transaction for this account
   const interestTransactions = allTransactions
-    .filter(t => 
-      t.transaction_type === 'interest_charge' && 
+    .filter(t =>
+      t.transaction_type === 'interest_charge' &&
       t.to_account_id === account.id
     )
-    .sort((a, b) => 
+    .sort((a, b) =>
       new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime()
     );
 
   // Get EMI payment history
   const emiPayments = await loanEMIPaymentApi.getPaymentsByAccount(account.id);
-  const sortedEMIPayments = [...emiPayments].sort((a, b) => 
+  const sortedEMIPayments = [...emiPayments].sort((a, b) =>
     new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime()
   );
 
   // Determine the most recent interest event
-  const lastInterestTransaction = interestTransactions.length > 0 
-    ? interestTransactions[0] 
+  const lastInterestTransaction = interestTransactions.length > 0
+    ? interestTransactions[0]
     : null;
-  const lastEMIPayment = sortedEMIPayments.length > 0 
-    ? sortedEMIPayments[0] 
+  const lastEMIPayment = sortedEMIPayments.length > 0
+    ? sortedEMIPayments[0]
     : null;
 
   // Compare dates and use the most recent
   if (lastInterestTransaction && lastEMIPayment) {
     const interestDate = new Date(lastInterestTransaction.transaction_date);
     const emiDate = new Date(lastEMIPayment.payment_date);
-    
+
     if (interestDate > emiDate) {
       // Interest transaction is more recent
       // Calculate balance after this transaction
