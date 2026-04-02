@@ -357,7 +357,7 @@ export const transactionApi = {
     if (error) throw error;
     if (!data) throw new Error('Failed to create transaction');
 
-    await this.updateAccountBalances(transaction);
+    await this.updateAccountBalances(transaction, (transaction as any).loan_components);
 
     // Phase 1: Support Credit Card Statement Lines (Added in previous task)
     // Skip if it's an EMI purchase or has "EMI" in the description
@@ -389,8 +389,9 @@ export const transactionApi = {
 
         // Calculate components
         const monthlyRate = (interestRate / 100) / 12;
-        const interestComponent = Number((currentBalance * monthlyRate).toFixed(2));
-        const principalComponent = Number((amount - interestComponent).toFixed(2));
+        const loan_components = (transaction as any).loan_components;
+        const interestComponent = loan_components ? Number(loan_components.interest) : Number((currentBalance * monthlyRate).toFixed(2));
+        const principalComponent = loan_components ? Number(loan_components.principal) : Number((amount - interestComponent).toFixed(2));
         const outstandingPrincipal = Number((currentBalance - principalComponent).toFixed(2));
 
         // DEDUPLICATION: Check if an EMI payment already exists for this date and account
@@ -453,7 +454,7 @@ export const transactionApi = {
 
     if (oldTransaction) {
       await this.reverseAccountBalances(oldTransaction);
-      await this.updateAccountBalances(data);
+      await this.updateAccountBalances(data, (updates as any).loan_components);
 
       // Update associated records
       if (data.transaction_type === 'loan_payment' && data.to_account_id) {
@@ -467,8 +468,9 @@ export const transactionApi = {
           const interestRate = Number(loanAccount.current_interest_rate || 0);
           const currentBalance = Number(loanAccount.balance);
           const monthlyRate = (interestRate / 100) / 12;
-          const interestComponent = Number((currentBalance * monthlyRate).toFixed(2));
-          const principalComponent = Number((amount - interestComponent).toFixed(2));
+          const loan_components = (updates as any).loan_components;
+          const interestComponent = loan_components ? Number(loan_components.interest) : Number((currentBalance * monthlyRate).toFixed(2));
+          const principalComponent = loan_components ? Number(loan_components.principal) : Number((amount - interestComponent).toFixed(2));
           const outstandingPrincipal = Number((currentBalance - principalComponent).toFixed(2));
 
           // Check for manual entry on same date
@@ -563,7 +565,10 @@ export const transactionApi = {
     }
   },
 
-  async updateAccountBalances(transaction: Transaction | Omit<Transaction, 'id' | 'created_at' | 'updated_at'>): Promise<void> {
+  async updateAccountBalances(
+    transaction: Transaction | Omit<Transaction, 'id' | 'created_at' | 'updated_at'>,
+    loanComponents?: { principal: number; interest: number }
+  ): Promise<void> {
     const amount = Number(transaction.amount);
 
     switch (transaction.transaction_type) {
@@ -637,8 +642,9 @@ export const transactionApi = {
             const interestRate = Number(loanAccount.current_interest_rate || 0);
             const currentBalance = Number(loanAccount.balance);
             const monthlyRate = (interestRate / 100) / 12;
-            const interest = Number((currentBalance * monthlyRate).toFixed(2));
-            const principal = amount - interest;
+            const loan_components = loanComponents;
+            const interest = loan_components ? Number(loan_components.interest) : Number((currentBalance * monthlyRate).toFixed(2));
+            const principal = loan_components ? Number(loan_components.principal) : amount - interest;
             // Subtract only the principal component from the loan balance
             await this.adjustBalance(transaction.to_account_id, -principal);
           } else {

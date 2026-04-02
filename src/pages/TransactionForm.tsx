@@ -78,7 +78,6 @@ export default function TransactionForm() {
     principal: number;
     interest: number;
   } | null>(null);
-  const [loanOutstandingPrincipalBefore, setLoanOutstandingPrincipalBefore] = useState<number>(0);
   const [isManualBreakdown, setIsManualBreakdown] = useState(false);
 
   // Credit Card Statement and Payment Management
@@ -293,12 +292,9 @@ export default function TransactionForm() {
                     outstandingPrincipal = Number(account.loan_principal || account.balance);
                   }
                 }
-                setLoanOutstandingPrincipalBefore(outstandingPrincipal);
               } catch (error) {
                 console.error("Error sourcing historical principal for edit:", error);
               }
-            } else {
-              setLoanOutstandingPrincipalBefore(outstandingPrincipal);
             }
 
             // Simple calculation: Interest = Outstanding Principal × Annual Rate / 12 / 100
@@ -567,7 +563,10 @@ export default function TransactionForm() {
 
       if (id) {
         const transactionId = id as string;
-        await transactionApi.updateTransaction(transactionId, transactionData);
+        await transactionApi.updateTransaction(transactionId, {
+          ...transactionData,
+          loan_components: formData.transaction_type === 'loan_payment' ? loanBreakdown : undefined
+        });
 
         // Handle EMI update
         if (formData.is_emi) {
@@ -602,24 +601,6 @@ export default function TransactionForm() {
           await emiApi.deleteEMI(existingEMI.id);
         }
 
-        // Handle Loan Payment update
-        if (formData.transaction_type === 'loan_payment' && formData.to_account_id && loanBreakdown) {
-          const loanAccount = accounts.find(a => a.id === formData.to_account_id);
-          if (loanAccount) {
-            const currentPayment = await loanEMIPaymentApi.getPaymentByTransactionId(transactionId);
-            if (currentPayment) {
-              await loanEMIPaymentApi.updatePaymentByTransactionId(transactionId, {
-                payment_date: formData.transaction_date,
-                emi_amount: parseFloat(formData.amount),
-                principal_component: loanBreakdown.principal,
-                interest_component: loanBreakdown.interest,
-                outstanding_principal: Math.max(0, loanOutstandingPrincipalBefore - loanBreakdown.principal),
-                interest_rate: Number(loanAccount.current_interest_rate || 0),
-                notes: formData.description
-              });
-            }
-          }
-        }
 
         // Handle Credit Card Repayment update
         if (formData.transaction_type === 'credit_card_repayment' && formData.to_account_id) {
@@ -721,7 +702,10 @@ export default function TransactionForm() {
         });
       } else {
         // Create new transaction
-        const created = await transactionApi.createTransaction(transactionData);
+        const created = await transactionApi.createTransaction({
+          ...transactionData,
+          loan_components: formData.transaction_type === 'loan_payment' ? loanBreakdown : undefined
+        });
 
         if (formData.transaction_type === 'credit_card_repayment' && created && formData.to_account_id) {
           try {
@@ -806,29 +790,6 @@ export default function TransactionForm() {
           }
         }
 
-        if (formData.transaction_type === 'loan_payment' && formData.to_account_id && loanBreakdown && created) {
-          const loanAccount = accounts.find(a => a.id === formData.to_account_id);
-          if (loanAccount) {
-            const existingPayments = await loanEMIPaymentApi.getPaymentsByAccount(formData.to_account_id as string);
-            await loanEMIPaymentApi.createLoanEMIPayment({
-              user_id: user.id,
-              account_id: formData.to_account_id as string,
-              payment_date: formData.transaction_date,
-              emi_amount: parseFloat(formData.amount),
-              principal_component: loanBreakdown.principal,
-              interest_component: loanBreakdown.interest,
-              outstanding_principal: Math.max(0, loanOutstandingPrincipalBefore - loanBreakdown.principal),
-              interest_rate: Number(loanAccount.current_interest_rate || 0),
-              payment_number: existingPayments.length + 1,
-              transaction_id: created.id,
-              notes: formData.description
-            });
-
-            if (loanBreakdown.interest > 0) {
-              await accountApi.adjustBalance(formData.to_account_id as string, loanBreakdown.interest);
-            }
-          }
-        }
 
         if (formData.is_emi && created) {
           const purchaseAmount = parseFloat(formData.amount);
