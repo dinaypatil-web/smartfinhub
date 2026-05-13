@@ -343,9 +343,12 @@ export const transactionApi = {
   },
 
   async createTransaction(transaction: Omit<Transaction, 'id' | 'created_at' | 'updated_at'>): Promise<Transaction> {
+    // Extract loan_components to prevent sending it to the database
+    const { loan_components, ...restTransaction } = transaction as any;
+
     const transactionData = {
-      ...transaction,
-      currency: transaction.currency || 'INR'
+      ...restTransaction,
+      currency: restTransaction.currency || 'INR'
     };
 
     const { data, error } = await supabase
@@ -437,8 +440,15 @@ export const transactionApi = {
       .eq('id', transactionId)
       .maybeSingle();
 
+    if (oldTransaction) {
+      await this.reverseAccountBalances(oldTransaction);
+    }
+
+    // Extract loan_components to prevent sending it to the database
+    const { loan_components, ...restUpdates } = updates as any;
+
     const updateData = {
-      ...updates,
+      ...restUpdates,
       updated_at: new Date().toISOString()
     };
 
@@ -453,7 +463,6 @@ export const transactionApi = {
     if (!data) throw new Error('Transaction not found');
 
     if (oldTransaction) {
-      await this.reverseAccountBalances(oldTransaction);
       await this.updateAccountBalances(data, (updates as any).loan_components);
 
       // Update associated records

@@ -605,31 +605,54 @@ export default function TransactionForm() {
         // Handle Credit Card Repayment update
         if (formData.transaction_type === 'credit_card_repayment' && formData.to_account_id) {
           try {
-            // 1. Revert old allocations
-            const oldAllocations = await creditCardStatementApi.getRepaymentAllocations(transactionId);
-            for (const alloc of oldAllocations) {
-              await creditCardStatementApi.updateStatementLineStatus(alloc.statement_line_id, 'pending', 0);
-              if (alloc.emi_id) {
-                await emiApi.unpayEMIInstallment(alloc.emi_id);
-              }
-            }
-
+            // Revert step is handled by api.ts inside updateTransaction automatically.
             await creditCardStatementApi.deleteAllocations(transactionId);
 
-            // 2. Apply new allocations
+            // Apply new allocations
             if (ccAllocations.length > 0) {
-              const mappedAllocations = ccAllocations.map(a => ({
-                line_id: a.statement_line_id,
-                amount: a.amount_paid,
-                emi_id: a.emi_id
-              }));
+              const mappedAllocations = [];
+
+              for (const alloc of ccAllocations) {
+                let lineId = alloc.statement_line_id;
+
+                // Handle virtual EMI lines (create real statement line on the fly)
+                if (lineId.startsWith('emi_') && alloc.emi_id) {
+                  try {
+                    const emi = await emiApi.getEMIById(alloc.emi_id);
+                    if (emi) {
+                      const statementMonth = formData.transaction_date.slice(0, 7);
+                      const newLine = await creditCardStatementApi.createStatementLine({
+                        credit_card_id: formData.to_account_id,
+                        user_id: user.id,
+                        transaction_id: alloc.transaction_id || null,
+                        description: alloc.description || `EMI Installment: ${emi.description}`,
+                        amount: (alloc as any).amount_paid !== undefined ? (alloc as any).amount_paid : (alloc as any).allocated_amount,
+                        transaction_date: emi.next_due_date <= formData.transaction_date ? emi.next_due_date : formData.transaction_date,
+                        statement_month: statementMonth,
+                        status: 'pending',
+                        emi_id: emi.id
+                      });
+                      lineId = newLine.id;
+                    }
+                  } catch (err) {
+                    console.error('Error creating statement line for EMI:', err);
+                  }
+                }
+
+                mappedAllocations.push({
+                  line_id: lineId,
+                  amount: (alloc as any).amount_paid !== undefined ? (alloc as any).amount_paid : (alloc as any).allocated_amount,
+                  emi_id: alloc.emi_id
+                });
+              }
+
               await creditCardStatementApi.allocateRepayment(transactionId, mappedAllocations);
 
-              for (const allocation of ccAllocations) {
+              for (const allocation of mappedAllocations) {
                 await creditCardStatementApi.updateStatementLineStatus(
-                  allocation.statement_line_id,
+                  allocation.line_id,
                   'paid',
-                  allocation.amount_paid
+                  allocation.amount
                 );
 
                 if (allocation.emi_id) {
