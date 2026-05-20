@@ -1,6 +1,6 @@
 import { createParser } from 'eventsource-parser';
 
-const APP_ID = import.meta.env.VITE_APP_ID;
+const APP_ID = import.meta.env.VITE_APP_ID || 'smartfinhub';
 const AI_API_URL = 'https://api-integrations.appmedo.com/app-7wraacwkpcld/api-rLob8RdzAOl9/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse';
 
 export interface AIMessage {

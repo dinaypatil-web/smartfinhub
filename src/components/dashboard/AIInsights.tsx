@@ -133,7 +133,8 @@ export default function AIInsights() {
   };
 
   const generateAnalysis = async () => {
-    if (!import.meta.env.VITE_APP_ID) {
+    const appId = import.meta.env.VITE_APP_ID || 'smartfinhub';
+    if (!appId) {
       setAnalysis('AI service not configured. Please set VITE_APP_ID in your .env file.');
       setAnalysisHtml('<p>AI service not configured. Please set VITE_APP_ID in your .env file.</p>');
       setHasAnalysis(true);

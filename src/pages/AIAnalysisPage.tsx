@@ -184,8 +184,9 @@ export default function AIAnalysisPage() {
   };
 
   const handleGenerateAnalysis = async () => {
+    const appId = import.meta.env.VITE_APP_ID || 'smartfinhub';
     // Check if APP_ID is configured
-    if (!import.meta.env.VITE_APP_ID) {
+    if (!appId) {
       toast({
         title: 'AI Service Not Configured',
         description: 'Please configure VITE_APP_ID in your .env file to use AI analysis features.',
@@ -238,8 +239,9 @@ export default function AIAnalysisPage() {
   };
 
   const handleGenerateOptimization = async () => {
+    const appId = import.meta.env.VITE_APP_ID || 'smartfinhub';
     // Check if APP_ID is configured
-    if (!import.meta.env.VITE_APP_ID) {
+    if (!appId) {
       toast({
         title: 'AI Service Not Configured',
         description: 'Please configure VITE_APP_ID in your .env file to use AI optimization features.',
