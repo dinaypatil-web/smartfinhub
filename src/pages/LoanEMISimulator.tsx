@@ -56,10 +56,14 @@ export default function LoanEMISimulator() {
   const [actualPayments, setActualPayments] = useState<LoanEMIPayment[]>([]);
   const [loadingPayments, setLoadingPayments] = useState(false);
 
-  // Manual & Core Parameters
-  const [principal, setPrincipal] = useState<number>(500000);
+  // Original Loan Parameters (for EMI calculation)
+  const [originalPrincipal, setOriginalPrincipal] = useState<number>(500000);
+  const [originalTenure, setOriginalTenure] = useState<number>(120);
+
+  // Current Outstanding & Remaining Parameters (for simulation start point)
+  const [outstandingPrincipal, setOutstandingPrincipal] = useState<number>(500000);
   const [annualRate, setAnnualRate] = useState<number>(9.5);
-  const [tenureMonths, setTenureMonths] = useState<number>(120);
+  const [remainingTenureMonths, setRemainingTenureMonths] = useState<number>(120);
   const [simulatedEMI, setSimulatedEMI] = useState<number>(0);
 
   // Per-month EMI overrides for projected installments (key = projected month index starting at 1)
@@ -130,16 +134,20 @@ export default function LoanEMISimulator() {
       const account = loanAccounts.find(a => a.id === selectedAccountId);
       if (account) {
         // Coerce types defensively
+        const origLoanAmount = Number(account.loan_principal || account.balance || 0);
         const outstandingBal = Number(account.balance || 0);
         const interestRate = Number(account.current_interest_rate || 9.5);
-        
-        // If there are actual payments, remaining tenure = total tenure - actual payments count
         const totalTenure = Number(account.loan_tenure_months || 120);
         const remainingMonths = Math.max(1, totalTenure - actualPayments.length);
         
-        setPrincipal(outstandingBal);
+        // Original loan parameters (for EMI calculation)
+        setOriginalPrincipal(origLoanAmount);
+        setOriginalTenure(totalTenure);
+        
+        // Current outstanding & remaining (for simulation start point)
+        setOutstandingPrincipal(outstandingBal);
         setAnnualRate(interestRate);
-        setTenureMonths(remainingMonths);
+        setRemainingTenureMonths(remainingMonths);
         
         // Determine start date based on last payment or today
         if (actualPayments.length > 0) {
@@ -154,13 +162,13 @@ export default function LoanEMISimulator() {
     }
   }, [selectedAccountId, loanAccounts, actualPayments]);
 
-  // Standard/Original EMI calculation
+  // Standard/Original EMI calculation — based on ORIGINAL loan amount, rate & tenure
   const originalEMI = useMemo(() => {
-    if (principal > 0 && annualRate > 0 && tenureMonths > 0) {
-      return calculateEMI(principal, annualRate, tenureMonths);
+    if (originalPrincipal > 0 && annualRate > 0 && originalTenure > 0) {
+      return calculateEMI(originalPrincipal, annualRate, originalTenure);
     }
     return 0;
-  }, [principal, annualRate, tenureMonths]);
+  }, [originalPrincipal, annualRate, originalTenure]);
 
   // Sync Simulated EMI with standard EMI when parameters load
   useEffect(() => {
@@ -171,14 +179,14 @@ export default function LoanEMISimulator() {
 
   // Project original standard amortization schedule for remaining balance
   const standardRemainingSchedule = useMemo(() => {
-    if (principal <= 0 || annualRate <= 0 || originalEMI <= 0 || tenureMonths <= 0) return [];
+    if (outstandingPrincipal <= 0 || annualRate <= 0 || originalEMI <= 0 || remainingTenureMonths <= 0) return [];
     
     const results: CombinedScheduleItem[] = [];
-    let currentPrincipal = principal;
+    let currentPrincipal = outstandingPrincipal;
     let month = 1;
     const start = new Date(startDate);
 
-    while (currentPrincipal > 0 && month <= tenureMonths) {
+    while (currentPrincipal > 0 && month <= remainingTenureMonths) {
       const interest = Math.round(currentPrincipal * (annualRate / 12 / 100) * 100) / 100;
       const emi = Math.min(originalEMI, currentPrincipal + interest);
       const principalComponent = Math.round((emi - interest) * 100) / 100;
@@ -201,7 +209,7 @@ export default function LoanEMISimulator() {
       month++;
     }
     return results;
-  }, [principal, annualRate, originalEMI, tenureMonths, startDate]);
+  }, [outstandingPrincipal, annualRate, originalEMI, remainingTenureMonths, startDate]);
 
   // Handler to update a single projected month's EMI override
   const handleEmiOverride = useCallback((projectedMonth: number, value: number) => {
@@ -225,10 +233,10 @@ export default function LoanEMISimulator() {
 
   // Project simulated future amortization schedule starting from current outstanding balance
   const simulatedFutureSchedule = useMemo(() => {
-    if (principal <= 0 || annualRate <= 0 || simulatedEMI <= 0) return [];
+    if (outstandingPrincipal <= 0 || annualRate <= 0 || simulatedEMI <= 0) return [];
     
     const results: CombinedScheduleItem[] = [];
-    let currentPrincipal = principal;
+    let currentPrincipal = outstandingPrincipal;
     let month = 1;
     const start = new Date(startDate);
 
@@ -265,7 +273,7 @@ export default function LoanEMISimulator() {
       month++;
     }
     return results;
-  }, [principal, annualRate, simulatedEMI, startDate, actualPayments, emiOverrides]);
+  }, [outstandingPrincipal, annualRate, simulatedEMI, startDate, actualPayments, emiOverrides]);
 
   // Combine Actual Payments (if any) and Simulated Projections into a single list
   const unifiedRepaymentSchedule = useMemo(() => {
@@ -436,10 +444,10 @@ export default function LoanEMISimulator() {
                     </Select>
                   </div>
 
-                  {/* Principal */}
+                  {/* Original Loan Amount */}
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
-                      <Label htmlFor="principal" className="text-sm font-semibold">Outstanding Principal</Label>
+                      <Label htmlFor="originalPrincipal" className="text-sm font-semibold">Original Loan Amount</Label>
                       {selectedAccountId !== 'manual' && (
                         <Badge variant="outline" className="text-xs bg-slate-100 dark:bg-slate-800 border-slate-300">
                           Synced
@@ -448,19 +456,56 @@ export default function LoanEMISimulator() {
                     </div>
                     <div className="relative">
                       <Input
-                        id="principal"
+                        id="originalPrincipal"
                         type="number"
                         disabled={selectedAccountId !== 'manual'}
-                        value={principal || ''}
-                        onChange={(e: ChangeEvent<HTMLInputElement>) => setPrincipal(Math.max(0, Number(e.target.value)))}
+                        value={originalPrincipal || ''}
+                        onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                          const val = Math.max(0, Number(e.target.value));
+                          setOriginalPrincipal(val);
+                          setOutstandingPrincipal(val);
+                        }}
                         className="pl-8 border-slate-200 dark:border-slate-800"
                         placeholder="e.g. 500000"
                       />
                       <span className="absolute left-3 top-2.5 text-slate-400 text-sm">₹</span>
                     </div>
+                    {selectedAccountId !== 'manual' ? (
+                      <p className="text-xs text-muted-foreground italic">
+                        Original sanctioned loan amount from your account.
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground italic">
+                        Enter the original sanctioned loan amount.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Current Outstanding Principal */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <Label htmlFor="outstandingPrincipal" className="text-sm font-semibold">Current Outstanding</Label>
+                      {selectedAccountId !== 'manual' && (
+                        <Badge variant="outline" className="text-xs bg-emerald-100 dark:bg-emerald-900/30 border-emerald-300 text-emerald-700 dark:text-emerald-400">
+                          Live Balance
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <Input
+                        id="outstandingPrincipal"
+                        type="number"
+                        disabled={selectedAccountId !== 'manual'}
+                        value={outstandingPrincipal || ''}
+                        onChange={(e: ChangeEvent<HTMLInputElement>) => setOutstandingPrincipal(Math.max(0, Number(e.target.value)))}
+                        className="pl-8 border-slate-200 dark:border-slate-800"
+                        placeholder="e.g. 350000"
+                      />
+                      <span className="absolute left-3 top-2.5 text-slate-400 text-sm">₹</span>
+                    </div>
                     {selectedAccountId !== 'manual' && (
                       <p className="text-xs text-muted-foreground italic">
-                        Derived from the current balance of your selected account.
+                        Current outstanding balance — simulation projects from here.
                       </p>
                     )}
                   </div>
@@ -482,20 +527,25 @@ export default function LoanEMISimulator() {
                     </div>
                   </div>
 
-                  {/* Balance Tenure */}
+                  {/* Original Loan Tenure */}
                   <div className="space-y-2">
-                    <Label htmlFor="tenureMonths" className="text-sm font-semibold">Balance Tenure (Months)</Label>
+                    <Label htmlFor="originalTenure" className="text-sm font-semibold">Original Tenure (Months)</Label>
                     <Input
-                      id="tenureMonths"
+                      id="originalTenure"
                       type="number"
-                      value={tenureMonths || ''}
-                      onChange={(e: ChangeEvent<HTMLInputElement>) => setTenureMonths(Math.max(1, Math.round(Number(e.target.value))))}
+                      disabled={selectedAccountId !== 'manual'}
+                      value={originalTenure || ''}
+                      onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                        const val = Math.max(1, Math.round(Number(e.target.value)));
+                        setOriginalTenure(val);
+                        setRemainingTenureMonths(val);
+                      }}
                       className="border-slate-200 dark:border-slate-800"
                       placeholder="e.g. 120"
                     />
                     {selectedAccountId !== 'manual' && (
                       <p className="text-xs text-muted-foreground italic">
-                        Auto-adjusted for payments already recorded.
+                        Original loan tenure. Remaining: {remainingTenureMonths} months ({actualPayments.length} paid).
                       </p>
                     )}
                   </div>
@@ -560,11 +610,11 @@ export default function LoanEMISimulator() {
               </Card>
 
               {/* Warning if simulated EMI is too low to cover interest */}
-              {simulatedEMI > 0 && annualRate > 0 && principal > 0 && simulatedEMI <= Math.round(principal * (annualRate / 12 / 100)) && (
+              {simulatedEMI > 0 && annualRate > 0 && outstandingPrincipal > 0 && simulatedEMI <= Math.round(outstandingPrincipal * (annualRate / 12 / 100)) && (
                 <Alert variant="destructive" className="border-red-200 bg-red-50 dark:bg-red-950/20 text-red-800 dark:text-red-300">
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription className="text-xs">
-                    <strong>EMI too low!</strong> The simulated EMI of {formatCurrency(simulatedEMI, currency)} is lower than or equal to the monthly interest charged ({formatCurrency(principal * (annualRate / 12 / 100), currency)}). The loan balance will never reduce. Please increase your Simulated EMI.
+                    <strong>EMI too low!</strong> The simulated EMI of {formatCurrency(simulatedEMI, currency)} is lower than or equal to the monthly interest charged ({formatCurrency(outstandingPrincipal * (annualRate / 12 / 100), currency)}). The loan balance will never reduce. Please increase your Simulated EMI.
                   </AlertDescription>
                 </Alert>
               )}
