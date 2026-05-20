@@ -14,6 +14,7 @@ const Settings = lazy(() => import('./pages/Settings'));
 const BackupRestore = lazy(() => import('./pages/BackupRestore'));
 const AIAnalysisPage = lazy(() => import('./pages/AIAnalysisPage'));
 const LoanEMIHistory = lazy(() => import('./pages/LoanEMIHistory'));
+const LoanEMISimulator = lazy(() => import('./pages/LoanEMISimulator'));
 
 // Auth pages loaded immediately for faster initial access
 import Login from './pages/Login';
@@ -80,6 +81,13 @@ const routes: RouteConfig[] = [
     path: '/loan-emi-history',
     element: <ProtectedRoute><LoanEMIHistory /></ProtectedRoute>,
     visible: true,
+    protected: true,
+  },
+  {
+    name: 'Loan EMI Simulator',
+    path: '/loan-emi-simulator',
+    element: <ProtectedRoute><LoanEMISimulator /></ProtectedRoute>,
+    visible: false,
     protected: true,
   },
   {
