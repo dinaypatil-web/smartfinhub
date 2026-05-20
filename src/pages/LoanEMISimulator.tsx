@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, ChangeEvent } from 'react';
+import { useEffect, useState, useMemo, useCallback, ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useHybridAuth as useAuth } from '@/contexts/HybridAuthContext';
 import { accountApi, loanEMIPaymentApi } from '@/db/api';
@@ -23,7 +23,9 @@ import {
   Hourglass,
   Loader2,
   CheckCircle2,
-  HelpCircle
+  HelpCircle,
+  Pencil,
+  RotateCcw
 } from 'lucide-react';
 import { formatCurrency } from '@/utils/format';
 import { calculateEMI } from '@/utils/loanCalculations';
@@ -59,6 +61,9 @@ export default function LoanEMISimulator() {
   const [annualRate, setAnnualRate] = useState<number>(9.5);
   const [tenureMonths, setTenureMonths] = useState<number>(120);
   const [simulatedEMI, setSimulatedEMI] = useState<number>(0);
+
+  // Per-month EMI overrides for projected installments (key = projected month index starting at 1)
+  const [emiOverrides, setEmiOverrides] = useState<Record<number, number>>({});
   
   // Custom outstanding date starting point
   const [startDate, setStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -198,6 +203,26 @@ export default function LoanEMISimulator() {
     return results;
   }, [principal, annualRate, originalEMI, tenureMonths, startDate]);
 
+  // Handler to update a single projected month's EMI override
+  const handleEmiOverride = useCallback((projectedMonth: number, value: number) => {
+    setEmiOverrides(prev => {
+      const next = { ...prev };
+      if (value <= 0 || Math.round(value) === Math.round(simulatedEMI)) {
+        delete next[projectedMonth];
+      } else {
+        next[projectedMonth] = value;
+      }
+      return next;
+    });
+  }, [simulatedEMI]);
+
+  // Clear all per-month overrides
+  const clearAllOverrides = useCallback(() => {
+    setEmiOverrides({});
+  }, []);
+
+  const overrideCount = Object.keys(emiOverrides).length;
+
   // Project simulated future amortization schedule starting from current outstanding balance
   const simulatedFutureSchedule = useMemo(() => {
     if (principal <= 0 || annualRate <= 0 || simulatedEMI <= 0) return [];
@@ -211,12 +236,15 @@ export default function LoanEMISimulator() {
     while (currentPrincipal > 0 && month <= 600) {
       const interest = Math.round(currentPrincipal * (annualRate / 12 / 100) * 100) / 100;
       
-      // If user inputs a simulated EMI that cannot cover interest, alert/break early
-      if (simulatedEMI <= interest + 0.05 && currentPrincipal > 100) {
+      // Use per-month override if set, otherwise fall back to global simulatedEMI
+      const monthEMI = emiOverrides[month] ?? simulatedEMI;
+
+      // If effective EMI cannot cover interest, break early
+      if (monthEMI <= interest + 0.05 && currentPrincipal > 100) {
         break; 
       }
 
-      const emi = Math.min(simulatedEMI, currentPrincipal + interest);
+      const emi = Math.min(monthEMI, currentPrincipal + interest);
       const principalComponent = Math.round((emi - interest) * 100) / 100;
       const nextPrincipal = Math.max(0, Math.round((currentPrincipal - principalComponent) * 100) / 100);
 
@@ -237,7 +265,7 @@ export default function LoanEMISimulator() {
       month++;
     }
     return results;
-  }, [principal, annualRate, simulatedEMI, startDate, actualPayments]);
+  }, [principal, annualRate, simulatedEMI, startDate, actualPayments, emiOverrides]);
 
   // Combine Actual Payments (if any) and Simulated Projections into a single list
   const unifiedRepaymentSchedule = useMemo(() => {
@@ -487,12 +515,12 @@ export default function LoanEMISimulator() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => setSimulatedEMI(Math.round(originalEMI))}
+                        onClick={() => { setSimulatedEMI(Math.round(originalEMI)); clearAllOverrides(); }}
                         className="h-8 text-xs font-semibold text-slate-500 hover:text-blue-600"
-                        title="Reset to standard rate"
+                        title="Reset to standard rate and clear all per-month overrides"
                       >
                         <RefreshCw className="h-3 w-3 mr-1" />
-                        Reset
+                        Reset All
                       </Button>
                     </div>
 
@@ -622,13 +650,19 @@ export default function LoanEMISimulator() {
                     </div>
                     
                     {/* Status indicator badges */}
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400">
                         Paid (Actual)
                       </Badge>
                       <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/20 dark:text-blue-400">
                         Projected (Future)
                       </Badge>
+                      {overrideCount > 0 && (
+                        <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 cursor-pointer" onClick={clearAllOverrides}>
+                          <RotateCcw className="h-3 w-3 mr-1 inline" />
+                          {overrideCount} Custom EMI{overrideCount > 1 ? 's' : ''} — Reset
+                        </Badge>
+                      )}
                     </div>
                   </div>
                 </CardHeader>
@@ -693,9 +727,34 @@ export default function LoanEMISimulator() {
                                 )}
                               </TableCell>
                               
-                              {/* EMI Amount */}
+                              {/* EMI Amount — editable for projected rows */}
                               <TableCell className={`text-right font-bold ${row.isActual ? 'text-emerald-700 dark:text-emerald-400' : 'text-blue-700 dark:text-blue-400'}`}>
-                                {formatCurrency(row.emiAmount, currency)}
+                                {row.isActual ? (
+                                  formatCurrency(row.emiAmount, currency)
+                                ) : (() => {
+                                  const projectedMonth = row.month - actualPayments.length;
+                                  const hasOverride = emiOverrides[projectedMonth] !== undefined;
+                                  return (
+                                    <div className="flex items-center justify-end gap-1 group">
+                                      <Pencil className={`h-3 w-3 flex-shrink-0 transition-opacity ${
+                                        hasOverride ? 'text-amber-500 opacity-100' : 'text-slate-400 opacity-0 group-hover:opacity-60'
+                                      }`} />
+                                      <input
+                                        type="number"
+                                        className={`w-[100px] text-right font-bold bg-transparent border-b transition-colors focus:outline-none focus:ring-0 ${
+                                          hasOverride
+                                            ? 'border-amber-400 dark:border-amber-500 text-amber-700 dark:text-amber-400'
+                                            : 'border-transparent hover:border-blue-300 dark:hover:border-blue-600 text-blue-700 dark:text-blue-400'
+                                        } focus:border-blue-500 dark:focus:border-blue-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                                        value={emiOverrides[projectedMonth] ?? Math.round(row.emiAmount)}
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                                          handleEmiOverride(projectedMonth, Math.max(0, Number(e.target.value)));
+                                        }}
+                                        title="Edit this month's EMI to simulate a custom prepayment"
+                                      />
+                                    </div>
+                                  );
+                                })()}
                               </TableCell>
                               
                               {/* Principal */}
@@ -728,6 +787,10 @@ export default function LoanEMISimulator() {
                   <strong>Standard vs. Simulated EMI</strong>: The amortization calculations are compiled using the reducing balance method. 
                   Increasing your Simulated EMI above standard payments applies the excess directly toward reducing outstanding principal. 
                   This reduces the base principal for subsequent interest calculations, yielding compounding interest savings and accelerating loan closure.
+                  <br /><br />
+                  <strong>Per-Month Editing</strong>: Click any projected EMI amount in the schedule to customize that specific month's payment. 
+                  Changes cascade forward — all subsequent months recalculate based on the updated outstanding principal. 
+                  Customized amounts are highlighted in amber. Use the "Reset" badge above the table to clear all overrides.
                 </AlertDescription>
               </Alert>
 
