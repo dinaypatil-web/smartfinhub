@@ -40,8 +40,10 @@ export default function AIAnalysisPage() {
     const currentYear = now.getFullYear();
     const currentMonthStr = now.toISOString().slice(0, 7);
 
-    const transactions = await transactionApi.getTransactions(user.id);
-    const budgets = await budgetApi.getBudgets(user.id);
+    const [transactions, budgets] = await Promise.all([
+      transactionApi.getTransactions(user.id),
+      budgetApi.getBudgets(user.id),
+    ]);
 
     const monthlyTransactions = transactions.filter(t => t.transaction_date.startsWith(currentMonthStr));
 
@@ -84,9 +86,11 @@ export default function AIAnalysisPage() {
     const currentYear = now.getFullYear();
     const currentMonthStr = now.toISOString().slice(0, 7);
 
-    const transactions = await transactionApi.getTransactions(user.id);
-    const accounts = await accountApi.getAccounts(user.id);
-    const budgets = await budgetApi.getBudgets(user.id);
+    const [transactions, accounts, budgets] = await Promise.all([
+      transactionApi.getTransactions(user.id),
+      accountApi.getAccounts(user.id),
+      budgetApi.getBudgets(user.id),
+    ]);
 
     const monthlyTransactions = transactions.filter(t =>
       t.transaction_date.startsWith(currentMonthStr)
@@ -195,47 +199,57 @@ export default function AIAnalysisPage() {
       return;
     }
 
-    const data = await prepareAnalysisData();
-
-    if (data.transactions.length === 0) {
-      toast({
-        title: 'No Data Available',
-        description: 'Please add some transactions first to get AI analysis.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
     setIsLoadingAnalysis(true);
     setAnalysis('');
     setAnalysisHtml('');
 
-    let fullText = '';
+    try {
+      const data = await prepareAnalysisData();
 
-    await generateFinancialAnalysis(
-      data,
-      (chunk) => {
-        fullText += chunk;
-        setAnalysis(fullText);
-        const html = marked.parse(fullText) as string;
-        setAnalysisHtml(html);
-      },
-      () => {
-        setIsLoadingAnalysis(false);
+      if (data.transactions.length === 0) {
         toast({
-          title: 'Analysis Complete',
-          description: 'Your financial analysis has been generated.',
-        });
-      },
-      (error) => {
-        setIsLoadingAnalysis(false);
-        toast({
-          title: 'Analysis Failed',
-          description: error,
+          title: 'No Data Available',
+          description: 'Please add some transactions first to get AI analysis.',
           variant: 'destructive',
         });
+        setIsLoadingAnalysis(false);
+        return;
       }
-    );
+
+      let fullText = '';
+
+      await generateFinancialAnalysis(
+        data,
+        (chunk) => {
+          fullText += chunk;
+          setAnalysis(fullText);
+          const html = marked.parse(fullText) as string;
+          setAnalysisHtml(html);
+        },
+        () => {
+          setIsLoadingAnalysis(false);
+          toast({
+            title: 'Analysis Complete',
+            description: 'Your financial analysis has been generated.',
+          });
+        },
+        (error) => {
+          setIsLoadingAnalysis(false);
+          toast({
+            title: 'Analysis Failed',
+            description: error,
+            variant: 'destructive',
+          });
+        }
+      );
+    } catch (err) {
+      setIsLoadingAnalysis(false);
+      toast({
+        title: 'Error Preparing Data',
+        description: err instanceof Error ? err.message : 'Unknown error occurred.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleGenerateOptimization = async () => {
@@ -250,47 +264,57 @@ export default function AIAnalysisPage() {
       return;
     }
 
-    const data = await prepareAnalysisData();
-
-    if (data.transactions.length === 0) {
-      toast({
-        title: 'No Data Available',
-        description: 'Please add some transactions first to get budget optimization.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
     setIsLoadingOptimization(true);
     setOptimization('');
     setOptimizationHtml('');
 
-    let fullText = '';
+    try {
+      const data = await prepareAnalysisData();
 
-    await generateBudgetOptimization(
-      data,
-      (chunk) => {
-        fullText += chunk;
-        setOptimization(fullText);
-        const html = marked.parse(fullText) as string;
-        setOptimizationHtml(html);
-      },
-      () => {
-        setIsLoadingOptimization(false);
+      if (data.transactions.length === 0) {
         toast({
-          title: 'Optimization Complete',
-          description: 'Your budget optimization has been generated.',
-        });
-      },
-      (error) => {
-        setIsLoadingOptimization(false);
-        toast({
-          title: 'Optimization Failed',
-          description: error,
+          title: 'No Data Available',
+          description: 'Please add some transactions first to get budget optimization.',
           variant: 'destructive',
         });
+        setIsLoadingOptimization(false);
+        return;
       }
-    );
+
+      let fullText = '';
+
+      await generateBudgetOptimization(
+        data,
+        (chunk) => {
+          fullText += chunk;
+          setOptimization(fullText);
+          const html = marked.parse(fullText) as string;
+          setOptimizationHtml(html);
+        },
+        () => {
+          setIsLoadingOptimization(false);
+          toast({
+            title: 'Optimization Complete',
+            description: 'Your budget optimization has been generated.',
+          });
+        },
+        (error) => {
+          setIsLoadingOptimization(false);
+          toast({
+            title: 'Optimization Failed',
+            description: error,
+            variant: 'destructive',
+          });
+        }
+      );
+    } catch (err) {
+      setIsLoadingOptimization(false);
+      toast({
+        title: 'Error Preparing Data',
+        description: err instanceof Error ? err.message : 'Unknown error occurred.',
+        variant: 'destructive',
+      });
+    }
   };
 
   return (
