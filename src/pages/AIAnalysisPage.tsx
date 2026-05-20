@@ -386,7 +386,7 @@ export default function AIAnalysisPage() {
               </div>
             </CardHeader>
             <CardContent>
-              {isLoadingAnalysis && (
+              {isLoadingAnalysis && !analysis && (
                 <div className="flex flex-col items-center justify-center py-12 space-y-4">
                   <Loader2 className="h-12 w-12 animate-spin text-primary" />
                   <p className="text-sm text-muted-foreground">
@@ -407,9 +407,17 @@ export default function AIAnalysisPage() {
                 </div>
               )}
 
-              {!isLoadingAnalysis && analysis && (
-                <div className="prose prose-sm max-w-none dark:prose-invert">
-                  <div dangerouslySetInnerHTML={{ __html: analysisHtml }} />
+              {analysis && (
+                <div className="space-y-4">
+                  <div className="prose prose-sm max-w-none dark:prose-invert">
+                    <div dangerouslySetInnerHTML={{ __html: analysisHtml }} />
+                  </div>
+                  {isLoadingAnalysis && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground animate-pulse mt-4">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      AI is streaming insights...
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>
@@ -445,7 +453,7 @@ export default function AIAnalysisPage() {
               </div>
             </CardHeader>
             <CardContent>
-              {isLoadingOptimization && (
+              {isLoadingOptimization && !optimization && (
                 <div className="flex flex-col items-center justify-center py-12 space-y-4">
                   <Loader2 className="h-12 w-12 animate-spin text-primary" />
                   <p className="text-sm text-muted-foreground">
@@ -466,9 +474,17 @@ export default function AIAnalysisPage() {
                 </div>
               )}
 
-              {!isLoadingOptimization && optimization && (
-                <div className="prose prose-sm max-w-none dark:prose-invert">
-                  <div dangerouslySetInnerHTML={{ __html: optimizationHtml }} />
+              {optimization && (
+                <div className="space-y-4">
+                  <div className="prose prose-sm max-w-none dark:prose-invert">
+                    <div dangerouslySetInnerHTML={{ __html: optimizationHtml }} />
+                  </div>
+                  {isLoadingOptimization && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground animate-pulse mt-4">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      AI is streaming recommendations...
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>

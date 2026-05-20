@@ -295,7 +295,7 @@ export default function AIInsights() {
           </div>
         )}
 
-        {isLoading && (
+        {isLoading && !analysis && (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <span className="ml-2 text-sm text-muted-foreground">
@@ -304,12 +304,18 @@ export default function AIInsights() {
           </div>
         )}
 
-        {!isLoading && analysis && hasAnalysis && (
+        {analysis && (
           <div className="prose prose-sm max-w-none dark:prose-invert">
             <div
               className="text-sm text-muted-foreground line-clamp-6"
               dangerouslySetInnerHTML={{ __html: analysisHtml }}
             />
+            {isLoading && (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground animate-pulse mt-2">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                AI is streaming...
+              </div>
+            )}
           </div>
         )}
 
