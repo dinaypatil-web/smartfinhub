@@ -1,4 +1,4 @@
-import { createParser } from 'eventsource-parser';
+// Custom robust SSE parser implementation
 
 const APP_ID = import.meta.env.VITE_APP_ID || 'smartfinhub';
 const AI_API_URL = 'https://api-integrations.appmedo.com/app-7wraacwkpcld/api-rLob8RdzAOl9/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse';
@@ -46,18 +46,18 @@ export async function generateFinancialAnalysis(
   onComplete: () => void,
   onError: (error: string) => void
 ): Promise<void> {
-  const prompt = buildFinancialAnalysisPrompt(data);
-
-  const payload = {
-    contents: [
-      {
-        role: 'user' as const,
-        parts: [{ text: prompt }],
-      },
-    ],
-  };
-
   try {
+    const prompt = buildFinancialAnalysisPrompt(data);
+
+    const payload = {
+      contents: [
+        {
+          role: 'user' as const,
+          parts: [{ text: prompt }],
+        },
+      ],
+    };
+
     if (!APP_ID) {
       throw new Error('AI service not configured. Please set VITE_APP_ID in your .env file.');
     }
@@ -88,33 +88,46 @@ export async function generateFinancialAnalysis(
     let buffer = '';
     let completed = false;
 
-    const parser = createParser({
-      onEvent: (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (text) {
-            onChunk(text);
-          }
-
-          const finishReason = data.candidates?.[0]?.finishReason;
-          if (finishReason === 'STOP' && !completed) {
-            completed = true;
-            onComplete();
-          }
-        } catch (e) {
-          console.error('Error parsing SSE data:', e);
-        }
-      },
-    });
-
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
 
       buffer += decoder.decode(value, { stream: true });
-      parser.feed(buffer);
-      buffer = '';
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith('data: ')) continue;
+
+        const dataStr = trimmed.slice(6);
+        if (dataStr === '[DONE]') {
+          completed = true;
+          onComplete();
+          break;
+        }
+
+        try {
+          const parsedData = JSON.parse(dataStr);
+          const text = parsedData.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) {
+            onChunk(text);
+          }
+
+          const finishReason = parsedData.candidates?.[0]?.finishReason;
+          if (finishReason === 'STOP' && !completed) {
+            completed = true;
+            onComplete();
+            break;
+          }
+        } catch (e) {
+          console.error('Error parsing SSE line:', e, dataStr);
+        }
+      }
+
+      if (completed) {
+        break;
+      }
     }
 
     if (!completed) {
@@ -127,18 +140,23 @@ export async function generateFinancialAnalysis(
 }
 
 function buildFinancialAnalysisPrompt(data: AIAnalysisData): string {
-  const savingsRate = data.totalIncome > 0
-    ? ((data.totalIncome - data.totalExpenses) / data.totalIncome * 100).toFixed(1)
+  const totalIncomeNum = Number(data.totalIncome || 0);
+  const totalExpensesNum = Number(data.totalExpenses || 0);
+  const budgetedExpensesNum = Number(data.budgetedExpenses || 0);
+
+  const savingsRate = totalIncomeNum > 0
+    ? ((totalIncomeNum - totalExpensesNum) / totalIncomeNum * 100).toFixed(1)
     : '0';
 
-  const budgetAdherence = data.budgetedExpenses > 0
-    ? ((data.totalExpenses / data.budgetedExpenses) * 100).toFixed(1)
+  const budgetAdherence = budgetedExpensesNum > 0
+    ? ((totalExpensesNum / budgetedExpensesNum) * 100).toFixed(1)
     : 'N/A';
 
   const categoryBreakdown = data.transactions
     .filter(t => t.type === 'expense')
     .reduce((acc, t) => {
-      acc[t.category] = (acc[t.category] || 0) + t.amount;
+      const amt = Number(t.amount || 0);
+      acc[t.category] = (acc[t.category] || 0) + amt;
       return acc;
     }, {} as Record<string, number>);
 
@@ -154,22 +172,25 @@ function buildFinancialAnalysisPrompt(data: AIAnalysisData): string {
     historicalSection = `
 
 **Historical Trends (Last 3 Months):**
-${lastThreeMonths.map(m =>
-      `- ${m.month}: Income ₹${m.income.toFixed(2)}, Expenses ₹${m.expenses.toFixed(2)}, Savings ₹${m.savings.toFixed(2)}`
-    ).join('\n')}
+${lastThreeMonths.map(m => {
+      const inc = Number(m.income || 0);
+      const exp = Number(m.expenses || 0);
+      const sav = Number(m.savings || 0);
+      return `- ${m.month}: Income ₹${inc.toFixed(2)}, Expenses ₹${exp.toFixed(2)}, Savings ₹${sav.toFixed(2)}`;
+    }).join('\n')}
 
 **Monthly Averages:**
-- Average Income: ₹${monthlyAverages.income.toFixed(2)}
-- Average Expenses: ₹${monthlyAverages.expenses.toFixed(2)}
-- Average Savings: ₹${monthlyAverages.savings.toFixed(2)}`;
+- Average Income: ₹${Number(monthlyAverages.income || 0).toFixed(2)}
+- Average Expenses: ₹${Number(monthlyAverages.expenses || 0).toFixed(2)}
+- Average Savings: ₹${Number(monthlyAverages.savings || 0).toFixed(2)}`;
   }
 
   return `You are a professional financial advisor with expertise in personal finance management. Analyze the following financial data and provide comprehensive insights, current month advice, and future budget recommendations.
 
 **Current Month Financial Summary:**
-- Total Income: ₹${data.totalIncome.toFixed(2)}
-- Total Expenses: ₹${data.totalExpenses.toFixed(2)}
-- Budgeted Expenses: ₹${data.budgetedExpenses.toFixed(2)}
+- Total Income: ₹${totalIncomeNum.toFixed(2)}
+- Total Expenses: ₹${totalExpensesNum.toFixed(2)}
+- Budgeted Expenses: ₹${budgetedExpensesNum.toFixed(2)}
 - Savings Rate: ${savingsRate}%
 - Budget Adherence: ${budgetAdherence}%
 
@@ -177,13 +198,17 @@ ${lastThreeMonths.map(m =>
 ${topCategories || 'No expenses recorded'}
 
 **Account Balances:**
-${data.accountBalances.map(acc => `- ${acc.name} (${acc.type}): ₹${acc.balance.toFixed(2)}`).join('\n')}
+${data.accountBalances.map(acc => {
+    const bal = Number(acc.balance || 0);
+    return `- ${acc.name} (${acc.type}): ₹${bal.toFixed(2)}`;
+  }).join('\n')}
 ${historicalSection}
 
 **Recent Transactions (last 10):**
 ${data.transactions.slice(-10).map(t => {
     const desc = t.description ? ` - "${t.description}"` : '';
-    return `- ${t.date}: ${t.type} - ${t.category} - ₹${t.amount.toFixed(2)}${desc}`;
+    const amt = Number(t.amount || 0);
+    return `- ${t.date}: ${t.type} - ${t.category} - ₹${amt.toFixed(2)}${desc}`;
   }).join('\n')}
 
 **IMPORTANT**: Pay special attention to transaction descriptions as they provide valuable context about spending patterns, merchant names, and specific purchase details. Use these descriptions to:
@@ -243,19 +268,21 @@ export async function generateBudgetOptimization(
   onComplete: () => void,
   onError: (error: string) => void
 ): Promise<void> {
-  const prompt = `You are a financial planning expert. Based on the following financial data, suggest an optimized monthly budget that reduces expenses while maintaining quality of life.
+  try {
+    const prompt = `You are a financial planning expert. Based on the following financial data, suggest an optimized monthly budget that reduces expenses while maintaining quality of life.
 
 **Current Financial Data:**
-- Monthly Income: ₹${data.totalIncome.toFixed(2)}
-- Current Expenses: ₹${data.totalExpenses.toFixed(2)}
-- Current Budget: ₹${data.budgetedExpenses.toFixed(2)}
+- Monthly Income: ₹${Number(data.totalIncome || 0).toFixed(2)}
+- Current Expenses: ₹${Number(data.totalExpenses || 0).toFixed(2)}
+- Current Budget: ₹${Number(data.budgetedExpenses || 0).toFixed(2)}
 
 **Expense Breakdown:**
 ${Object.entries(
     data.transactions
       .filter(t => t.type === 'expense')
       .reduce((acc, t) => {
-        acc[t.category] = (acc[t.category] || 0) + t.amount;
+        const amt = Number(t.amount || 0);
+        acc[t.category] = (acc[t.category] || 0) + amt;
         return acc;
       }, {} as Record<string, number>)
   )
@@ -271,16 +298,15 @@ Please provide:
 
 Be realistic and practical. Focus on sustainable changes.`;
 
-  const payload = {
-    contents: [
-      {
-        role: 'user' as const,
-        parts: [{ text: prompt }],
-      },
-    ],
-  };
+    const payload = {
+      contents: [
+        {
+          role: 'user' as const,
+          parts: [{ text: prompt }],
+        },
+      ],
+    };
 
-  try {
     if (!APP_ID) {
       throw new Error('AI service not configured. Please set VITE_APP_ID in your .env file.');
     }
@@ -311,33 +337,46 @@ Be realistic and practical. Focus on sustainable changes.`;
     let buffer = '';
     let completed = false;
 
-    const parser = createParser({
-      onEvent: (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (text) {
-            onChunk(text);
-          }
-
-          const finishReason = data.candidates?.[0]?.finishReason;
-          if (finishReason === 'STOP' && !completed) {
-            completed = true;
-            onComplete();
-          }
-        } catch (e) {
-          console.error('Error parsing SSE data:', e);
-        }
-      },
-    });
-
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
 
       buffer += decoder.decode(value, { stream: true });
-      parser.feed(buffer);
-      buffer = '';
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith('data: ')) continue;
+
+        const dataStr = trimmed.slice(6);
+        if (dataStr === '[DONE]') {
+          completed = true;
+          onComplete();
+          break;
+        }
+
+        try {
+          const parsedData = JSON.parse(dataStr);
+          const text = parsedData.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) {
+            onChunk(text);
+          }
+
+          const finishReason = parsedData.candidates?.[0]?.finishReason;
+          if (finishReason === 'STOP' && !completed) {
+            completed = true;
+            onComplete();
+            break;
+          }
+        } catch (e) {
+          console.error('Error parsing SSE line:', e, dataStr);
+        }
+      }
+
+      if (completed) {
+        break;
+      }
     }
 
     if (!completed) {

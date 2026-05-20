@@ -154,16 +154,23 @@ export default function AIInsights() {
     setHasAnalysis(false);
 
     let fullText = '';
+    let lastParsedTime = 0;
 
     await generateFinancialAnalysis(
       data,
       (chunk) => {
         fullText += chunk;
         setAnalysis(fullText);
-        const html = marked.parse(fullText.slice(0, 500) + '...') as string;
-        setAnalysisHtml(html);
+        const now = Date.now();
+        if (now - lastParsedTime > 300) {
+          const html = marked.parse(fullText.slice(0, 500) + '...') as string;
+          setAnalysisHtml(html);
+          lastParsedTime = now;
+        }
       },
       () => {
+        const html = marked.parse(fullText.slice(0, 500) + '...') as string;
+        setAnalysisHtml(html);
         setIsLoading(false);
         setHasAnalysis(true);
       },
