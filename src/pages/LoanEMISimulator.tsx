@@ -47,6 +47,26 @@ export default function LoanEMISimulator() {
   const { user } = useAuth();
   const { toast } = useToast();
 
+  // State to track if SheetJS is loaded
+  const [xlsxLoaded, setXlsxLoaded] = useState(typeof window !== 'undefined' && !!(window as any).XLSX);
+
+  // Dynamic script loader for SheetJS client-side Excel export
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!(window as any).XLSX) {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.sheetjs.com/xlsx-0.18.5/package/xlsx.full.min.js';
+      script.async = true;
+      script.onload = () => {
+        console.log('SheetJS loaded');
+        setXlsxLoaded(true);
+      };
+      document.head.appendChild(script);
+    } else {
+      setXlsxLoaded(true);
+    }
+  }, []);
+
   // Active Loan Accounts
   const [loanAccounts, setLoanAccounts] = useState<Account[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState('manual');
@@ -370,6 +390,45 @@ export default function LoanEMISimulator() {
     });
   };
 
+  // Export to XLSX using SheetJS (client-side)
+  const exportToXLSX = () => {
+    const xlsx = (window as any).XLSX;
+    if (!xlsx) {
+      toast({ title: 'Export Failed', description: 'SheetJS library not loaded yet.' });
+      return;
+    }
+    if (unifiedRepaymentSchedule.length === 0) return;
+
+    const data = unifiedRepaymentSchedule.map((r) => ({
+      'Month/Inst. No': r.month,
+      'Payment Date': r.paymentDate,
+      'Payment Status': r.isActual ? 'Paid (Actual)' : 'Projected (Simulated)',
+      'EMI Amount': r.emiAmount,
+      'Principal Component': r.principalComponent,
+      'Interest Component': r.interestComponent,
+      'Outstanding Principal': r.outstandingPrincipal,
+    }));
+
+    const ws = xlsx.utils.json_to_sheet(data);
+    const wb = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(wb, ws, 'Schedule');
+    const wbout = xlsx.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([wbout], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Loan_Repayment_Simulation_${selectedAccountId}.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    toast({
+      title: 'Excel Exported',
+      description: 'The simulation schedule has been downloaded as an .xlsx file.',
+    });
+  };
+
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 text-slate-900 dark:text-slate-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -400,7 +459,16 @@ export default function LoanEMISimulator() {
             className="bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-600 dark:hover:bg-blue-700 font-semibold shadow-md transition-all self-start md:self-auto"
           >
             <Download className="mr-2 h-4 w-4" />
-            Export Schedule
+            Export Schedule (CSV)
+          </Button>
+          <Button
+            variant="outline"
+            className="ml-2 hover:bg-slate-100 dark:hover:bg-slate-800"
+            onClick={exportToXLSX}
+            disabled={unifiedRepaymentSchedule.length === 0 || !xlsxLoaded}
+          >
+            {!xlsxLoaded && <Loader2 className="mr-2 h-4 w-4 animate-spin text-blue-600 dark:text-blue-400" />}
+            Export Schedule (XLSX)
           </Button>
         </div>
 
