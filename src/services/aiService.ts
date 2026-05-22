@@ -200,7 +200,11 @@ ${topCategories || 'No expenses recorded'}
 **Account Balances:**
 ${data.accountBalances.map(acc => {
     const bal = Number(acc.balance || 0);
-    return `- ${acc.name} (${acc.type}): ₹${bal.toFixed(2)}`;
+    let note = '';
+    if (acc.type === 'credit_card' && bal < 0) {
+      note = ' (Note: This negative balance represents a positive advance payment/credit surplus - the user has paid ahead)';
+    }
+    return `- ${acc.name} (${acc.type}): ₹${bal.toFixed(2)}${note}`;
   }).join('\n')}
 ${historicalSection}
 
@@ -218,13 +222,18 @@ ${data.transactions.slice(-10).map(t => {
 - Understand the nature of expenses better
 - Provide more personalized and actionable recommendations
 
+**Credit Card Advance Payments**: Pay close attention to credit card balances. A negative credit card balance represents an **advance payment (credit surplus)**, meaning the user has proactively paid ahead. This is a highly positive financial habit. If you detect any negative credit card balances:
+- Explicitly commend the user for this proactive advance payment habit.
+- Treat it as a credit surplus/asset rather than a debt liability in your analysis.
+- Highlight it as a major strength in the 'Financial Health Assessment' section.
+
 Please provide a comprehensive analysis with the following sections:
 
 ## 1. Current Month Analysis & Advice
 - Evaluate spending patterns for the current month
 - Identify any unusual or concerning transactions (use descriptions for context)
 - Provide specific recommendations for the remaining days of this month
-- Highlight areas where the user is doing well
+- Highlight areas where the user is doing well (including commendation for credit card advance payments/pre-payments)
 
 ## 2. Financial Health Assessment
 - Overall evaluation of current financial situation

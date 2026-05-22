@@ -194,8 +194,25 @@ export default function AIInsights() {
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
 
-      // Only fetch current month transactions for quick insight
-      const monthlyTransactions = await transactionApi.getTransactionsByDateRange(user.id, startOfMonth, endOfMonth);
+      // Fetch current month transactions and accounts
+      const [monthlyTransactions, accounts] = await Promise.all([
+        transactionApi.getTransactionsByDateRange(user.id, startOfMonth, endOfMonth),
+        accountApi.getAccounts(user.id)
+      ]);
+
+      // Check if there are any credit card accounts with negative balance (meaning advance payments/credit surplus)
+      const negativeCreditCards = accounts.filter(
+        acc => acc.account_type === 'credit_card' && Number(acc.balance) < 0
+      );
+
+      if (negativeCreditCards.length > 0) {
+        const cardNames = negativeCreditCards.map(c => c.account_name).join(', ');
+        return {
+          icon: <Sparkles className="h-5 w-5 text-emerald-500 animate-pulse" />,
+          text: `Outstanding! Advance payment detected on ${cardNames}. This proactive payment habit keeps you ahead!`,
+          color: 'text-emerald-600 dark:text-emerald-400 font-semibold',
+        };
+      }
 
       const totalIncome = monthlyTransactions
         .filter(t => t.transaction_type === 'income')
