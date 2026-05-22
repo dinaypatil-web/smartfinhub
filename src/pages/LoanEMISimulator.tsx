@@ -53,18 +53,50 @@ export default function LoanEMISimulator() {
   // Dynamic script loader for SheetJS client-side Excel export
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    if (!(window as any).XLSX) {
+
+    // Check if it's already available
+    if ((window as any).XLSX) {
+      setXlsxLoaded(true);
+      return;
+    }
+
+    // Check if script is already present in the DOM
+    const existingScript = document.querySelector('script[src*="xlsx"]');
+    
+    if (!existingScript) {
       const script = document.createElement('script');
-      script.src = 'https://cdn.sheetjs.com/xlsx-0.18.5/package/xlsx.full.min.js';
+      // Using highly reliable global cdnjs CDN
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
       script.async = true;
       script.onload = () => {
-        console.log('SheetJS loaded');
+        console.log('SheetJS loaded via cdnjs');
         setXlsxLoaded(true);
       };
+      script.onerror = () => {
+        console.error('Failed to load SheetJS from cdnjs. Trying unpkg fallback...');
+        const fallbackScript = document.createElement('script');
+        fallbackScript.src = 'https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js';
+        fallbackScript.async = true;
+        fallbackScript.onload = () => {
+          console.log('SheetJS loaded via unpkg fallback');
+          setXlsxLoaded(true);
+        };
+        document.head.appendChild(fallbackScript);
+      };
       document.head.appendChild(script);
-    } else {
-      setXlsxLoaded(true);
     }
+
+    // Polling interval as a robust fallback to detect when XLSX is globally loaded
+    const interval = setInterval(() => {
+      if ((window as any).XLSX) {
+        setXlsxLoaded(true);
+        clearInterval(interval);
+      }
+    }, 200);
+
+    return () => {
+      clearInterval(interval);
+    };
   }, []);
 
   // Active Loan Accounts
