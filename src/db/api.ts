@@ -440,7 +440,16 @@ export const transactionApi = {
       .eq('id', transactionId)
       .maybeSingle();
 
-    if (oldTransaction) {
+    const newTransactionType = updates.transaction_type !== undefined ? updates.transaction_type : oldTransaction?.transaction_type;
+    const newFromAccountId = updates.from_account_id !== undefined ? updates.from_account_id : oldTransaction?.from_account_id;
+    const newToAccountId = updates.to_account_id !== undefined ? updates.to_account_id : oldTransaction?.to_account_id;
+
+    const isDifferentialUpdate = !!oldTransaction &&
+      (newTransactionType === oldTransaction.transaction_type &&
+       newFromAccountId === oldTransaction.from_account_id &&
+       newToAccountId === oldTransaction.to_account_id);
+
+    if (oldTransaction && !isDifferentialUpdate) {
       await this.reverseAccountBalances(oldTransaction);
     }
 
@@ -463,7 +472,11 @@ export const transactionApi = {
     if (!data) throw new Error('Transaction not found');
 
     if (oldTransaction) {
-      await this.updateAccountBalances(data, (updates as any).loan_components);
+      if (isDifferentialUpdate) {
+        await this.applyDifferentialUpdateBalances(oldTransaction, data, (updates as any).loan_components);
+      } else {
+        await this.updateAccountBalances(data, (updates as any).loan_components);
+      }
 
       // Update associated records
       if (data.transaction_type === 'loan_payment' && data.to_account_id) {
@@ -546,17 +559,11 @@ export const transactionApi = {
       .eq('id', transactionId)
       .maybeSingle();
 
-    const { error } = await supabase
-      .from('transactions')
-      .delete()
-      .eq('id', transactionId);
-
-    if (error) throw error;
-
     if (transaction) {
+      // 1. Reverse account balances first (so that sub-step cleanup queries like CC repayment reverse can lookup the transaction)
       await this.reverseAccountBalances(transaction);
 
-      // If it's a credit card expense, delete the associated statement line
+      // 2. Delete associated credit card statement lines
       if (transaction.transaction_type === 'expense' && transaction.from_account_id) {
         await supabase
           .from('credit_card_statement_lines')
@@ -564,13 +571,158 @@ export const transactionApi = {
           .eq('transaction_id', transactionId);
       }
 
-      // If it's a loan payment, delete the associated EMI record
+      // 3. Delete associated loan EMI payments
       if (transaction.transaction_type === 'loan_payment' && transaction.to_account_id) {
         await supabase
           .from('loan_emi_payments')
           .delete()
           .eq('transaction_id', transactionId);
       }
+    }
+
+    // 4. Finally delete the transaction record itself from the database
+    const { error } = await supabase
+      .from('transactions')
+      .delete()
+      .eq('id', transactionId);
+
+    if (error) throw error;
+  },
+
+  async applyDifferentialUpdateBalances(
+    oldTransaction: Transaction,
+    newTransaction: Transaction,
+    loanComponents?: { principal: number; interest: number }
+  ): Promise<void> {
+    const diff = Number(newTransaction.amount) - Number(oldTransaction.amount);
+
+    switch (newTransaction.transaction_type) {
+      case 'income':
+        if (newTransaction.to_account_id && diff !== 0) {
+          await this.adjustBalance(newTransaction.to_account_id, diff);
+        }
+        break;
+
+      case 'expense':
+        if (newTransaction.from_account_id && diff !== 0) {
+          const account = await accountApi.getAccountById(newTransaction.from_account_id);
+          if (account?.account_type === 'credit_card') {
+            await this.adjustBalance(newTransaction.from_account_id, diff);
+          } else {
+            await this.adjustBalance(newTransaction.from_account_id, -diff);
+          }
+        }
+        break;
+
+      case 'withdrawal':
+        if (diff !== 0) {
+          if (newTransaction.from_account_id) {
+            const account = await accountApi.getAccountById(newTransaction.from_account_id);
+            if (account?.account_type === 'credit_card') {
+              await this.adjustBalance(newTransaction.from_account_id, diff);
+            } else {
+              await this.adjustBalance(newTransaction.from_account_id, -diff);
+            }
+          }
+          if (newTransaction.to_account_id) {
+            await this.adjustBalance(newTransaction.to_account_id, diff);
+          }
+        }
+        break;
+
+      case 'transfer':
+        if (diff !== 0) {
+          if (newTransaction.from_account_id) {
+            const fromAccount = await accountApi.getAccountById(newTransaction.from_account_id);
+            if (fromAccount?.account_type === 'credit_card') {
+              await this.adjustBalance(newTransaction.from_account_id, diff);
+            } else {
+              await this.adjustBalance(newTransaction.from_account_id, -diff);
+            }
+          }
+          if (newTransaction.to_account_id) {
+            const toAccount = await accountApi.getAccountById(newTransaction.to_account_id);
+            if (toAccount?.account_type === 'credit_card') {
+              await this.adjustBalance(newTransaction.to_account_id, -diff);
+            } else {
+              await this.adjustBalance(newTransaction.to_account_id, diff);
+            }
+          }
+        }
+        break;
+
+      case 'loan_payment': {
+        if (newTransaction.from_account_id && diff !== 0) {
+          await this.adjustBalance(newTransaction.from_account_id, -diff);
+        }
+
+        if (newTransaction.to_account_id) {
+          const loanAccount = await accountApi.getAccountById(newTransaction.to_account_id);
+          if (loanAccount && loanAccount.account_type === 'loan') {
+            const interestRate = Number(loanAccount.current_interest_rate || 0);
+            const monthlyRate = (interestRate / 100) / 12;
+
+            // Fetch old principal component from loan_emi_payments
+            let oldPrincipal = Number(oldTransaction.amount);
+            try {
+              const { data: emiRecord } = await supabase
+                .from('loan_emi_payments')
+                .select('principal_component')
+                .eq('transaction_id', oldTransaction.id)
+                .maybeSingle();
+
+              if (emiRecord) {
+                oldPrincipal = Number(emiRecord.principal_component);
+              } else {
+                const oldInterest = Number((Number(loanAccount.balance) * monthlyRate).toFixed(2));
+                oldPrincipal = Number(oldTransaction.amount) - oldInterest;
+              }
+            } catch (e) {
+              console.error('Error fetching old principal component:', e);
+              const oldInterest = Number((Number(loanAccount.balance) * monthlyRate).toFixed(2));
+              oldPrincipal = Number(oldTransaction.amount) - oldInterest;
+            }
+
+            // Calculate new principal component
+            let newPrincipal = Number(newTransaction.amount);
+            if (loanComponents) {
+              newPrincipal = Number(loanComponents.principal);
+            } else {
+              const newInterest = Number((Number(loanAccount.balance) * monthlyRate).toFixed(2));
+              newPrincipal = Number(newTransaction.amount) - newInterest;
+            }
+
+            const principalDiff = newPrincipal - oldPrincipal;
+            if (principalDiff !== 0) {
+              await this.adjustBalance(newTransaction.to_account_id, -principalDiff);
+            }
+          } else {
+            if (diff !== 0) {
+              await this.adjustBalance(newTransaction.to_account_id, -diff);
+            }
+          }
+        }
+        break;
+      }
+
+      case 'credit_card_repayment':
+        // Run credit card repayment reversal (statement lines, EMI installments, advance balance)
+        // first to fully reset allocations/advances before the new ones are written
+        try {
+          await creditCardStatementApi.reverseRepayment(oldTransaction.id);
+        } catch (e) {
+          console.error('Error running reverseRepayment in differential update:', e);
+        }
+
+        if (diff !== 0) {
+          if (newTransaction.from_account_id) {
+            await this.adjustBalance(newTransaction.from_account_id, -diff);
+          }
+          if (newTransaction.to_account_id) {
+            await this.adjustBalance(newTransaction.to_account_id, -diff);
+          }
+        }
+        break;
     }
   },
 

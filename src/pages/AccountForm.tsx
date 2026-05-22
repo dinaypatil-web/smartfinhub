@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useHybridAuth as useAuth } from '@/contexts/HybridAuthContext';
-import { accountApi, interestRateApi, loanEMIPaymentApi } from '@/db/api';
+import { accountApi, interestRateApi, loanEMIPaymentApi, bankLinksApi, userCustomBankLinksApi } from '@/db/api';
 import type { Account, AccountType, InterestRateType, LoanEMIPayment } from '@/types/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,6 +26,7 @@ export default function AccountForm() {
   const [loading, setLoading] = useState(false);
   const [loadingAccount, setLoadingAccount] = useState(!!id);
   const [manualEntry, setManualEntry] = useState(false);
+  const [customLinkId, setCustomLinkId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     account_type: 'bank' as AccountType,
@@ -45,6 +46,9 @@ export default function AccountForm() {
     statement_day: '',
     due_day: '',
     credit_limit: '',
+    web_url: '',
+    ios_app_url: '',
+    android_app_url: '',
   });
 
   const [calculatedEMI, setCalculatedEMI] = useState<number>(0);
@@ -85,6 +89,48 @@ export default function AccountForm() {
     }
   }, [formData.country]);
 
+  // Fetch default bank links from reference database when institution name changes
+  useEffect(() => {
+    const fetchDefaultBankLinks = async () => {
+      // Only auto-populate if we are creating a new account (no id) and have an institution name
+      if (!id && formData.institution_name && formData.account_type !== 'cash') {
+        try {
+          const defaultLink = await bankLinksApi.getBankLinkByName(formData.institution_name, formData.country);
+          if (defaultLink) {
+            setFormData(prev => ({
+              ...prev,
+              web_url: prev.web_url || defaultLink.web_url || '',
+              ios_app_url: prev.ios_app_url || defaultLink.ios_app_url || '',
+              android_app_url: prev.android_app_url || defaultLink.android_app_url || '',
+            }));
+          } else {
+            // Check if we can find default links in our static banks list as a fallback
+            const selectedBank = availableBanks.find(b => b.name === formData.institution_name);
+            if (selectedBank) {
+              // Try to deduce web URL from logo domain if possible
+              let deducedWebUrl = '';
+              if (selectedBank.logo) {
+                const match = selectedBank.logo.match(/domain=([^&]+)/);
+                if (match && match[1]) {
+                  deducedWebUrl = `https://www.${match[1]}`;
+                }
+              }
+              setFormData(prev => ({
+                ...prev,
+                web_url: prev.web_url || deducedWebUrl,
+                ios_app_url: prev.ios_app_url || selectedBank.iosAppLink || '',
+                android_app_url: prev.android_app_url || selectedBank.androidAppLink || '',
+              }));
+            }
+          }
+        } catch (err) {
+          console.error('Failed to fetch default bank links:', err);
+        }
+      }
+    };
+    fetchDefaultBankLinks();
+  }, [formData.institution_name, formData.country, formData.account_type, id, availableBanks]);
+
   const loadAccount = async () => {
     if (!id) return;
     
@@ -92,6 +138,24 @@ export default function AccountForm() {
     try {
       const account = await accountApi.getAccountById(id);
       if (account) {
+        // Load custom bank links associated with this account
+        let customWebUrl = '';
+        let customIosAppUrl = '';
+        let customAndroidAppUrl = '';
+        
+        try {
+          const customLinks = await userCustomBankLinksApi.getCustomBankLinksByAccount(id);
+          const primaryCustomLink = customLinks[0];
+          if (primaryCustomLink) {
+            customWebUrl = primaryCustomLink.web_url || '';
+            customIosAppUrl = primaryCustomLink.ios_app_url || '';
+            customAndroidAppUrl = primaryCustomLink.android_app_url || '';
+            setCustomLinkId(primaryCustomLink.id);
+          }
+        } catch (err) {
+          console.error('Error loading custom bank links:', err);
+        }
+
         setFormData({
           account_type: account.account_type,
           account_name: account.account_name,
@@ -110,6 +174,9 @@ export default function AccountForm() {
           statement_day: account.statement_day?.toString() || '',
           due_day: account.due_day?.toString() || '',
           credit_limit: account.credit_limit?.toString() || '',
+          web_url: customWebUrl,
+          ios_app_url: customIosAppUrl,
+          android_app_url: customAndroidAppUrl,
         });
 
         if (account.account_type === 'loan') {
@@ -168,6 +235,7 @@ export default function AccountForm() {
         credit_limit: formData.account_type === 'credit_card' && formData.credit_limit ? parseFloat(formData.credit_limit) : null,
       };
 
+      let savedAccountId = id;
       if (id) {
         await accountApi.updateAccount(id, accountData);
 
@@ -193,6 +261,7 @@ export default function AccountForm() {
         });
       } else {
         const newAccount = await accountApi.createAccount(accountData);
+        savedAccountId = newAccount.id;
         
         if (formData.account_type === 'loan' && formData.current_interest_rate && formData.loan_start_date) {
           await interestRateApi.addInterestRate({
@@ -218,6 +287,31 @@ export default function AccountForm() {
           title: 'Success',
           description: 'Account created successfully',
         });
+      }
+
+      // Save/Update/Delete custom bank links
+      if (formData.account_type !== 'cash' && savedAccountId) {
+        const hasCustomLinks = !!(formData.web_url || formData.ios_app_url || formData.android_app_url);
+        
+        if (hasCustomLinks) {
+          const linkData = {
+            user_id: user.id,
+            account_id: savedAccountId,
+            bank_name: formData.institution_name || formData.account_name,
+            web_url: formData.web_url || null,
+            ios_app_url: formData.ios_app_url || null,
+            android_app_url: formData.android_app_url || null,
+            notes: 'Saved from Account Form',
+          };
+
+          if (customLinkId) {
+            await userCustomBankLinksApi.updateCustomBankLink(customLinkId, linkData);
+          } else {
+            await userCustomBankLinksApi.createCustomBankLink(linkData);
+          }
+        } else if (customLinkId) {
+          await userCustomBankLinksApi.deleteCustomBankLink(customLinkId);
+        }
       }
 
       navigate('/accounts');
@@ -336,14 +430,20 @@ export default function AccountForm() {
                         setFormData({
                           ...formData,
                           institution_name: '',
-                          institution_logo: ''
+                          institution_logo: '',
+                          web_url: '',
+                          ios_app_url: '',
+                          android_app_url: ''
                         });
                       } else {
                         const bank = availableBanks.find(b => b.name === value);
                         setFormData({
                           ...formData,
                           institution_name: value,
-                          institution_logo: bank?.logo || ''
+                          institution_logo: bank?.logo || '',
+                          web_url: '',
+                          ios_app_url: '',
+                          android_app_url: ''
                         });
                       }
                     }}
@@ -403,73 +503,66 @@ export default function AccountForm() {
                   </div>
                 )}
 
-                {/* Mobile Banking App Link */}
-                {formData.institution_name && (() => {
-                  const selectedBank = availableBanks.find(b => b.name === formData.institution_name);
-                  if (selectedBank) {
-                    const deviceType = detectDeviceType();
-                    const appStoreName = getAppStoreName(deviceType);
-                    
-                    // Get the appropriate app link based on device
-                    let appLink = '';
-                    if (deviceType === 'ios' && selectedBank.iosAppLink) {
-                      appLink = selectedBank.iosAppLink;
-                    } else if (deviceType === 'android' && selectedBank.androidAppLink) {
-                      appLink = selectedBank.androidAppLink;
-                    } else if (selectedBank.androidAppLink) {
-                      // Fallback to Android link if device type is unknown
-                      appLink = selectedBank.androidAppLink;
-                    } else if (selectedBank.appLink) {
-                      // Legacy support for old appLink format
-                      appLink = selectedBank.appLink;
-                    }
-                    
-                    if (appLink) {
-                      return (
-                        <div className="p-3 bg-emerald-50 dark:bg-emerald-950/20 rounded-lg border border-emerald-200 dark:border-emerald-800">
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-2">
-                              <Smartphone className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                              <div>
-                                <p className="text-sm font-medium text-emerald-900 dark:text-emerald-100">
-                                  Mobile Banking App Available
-                                </p>
-                                <p className="text-xs text-emerald-700 dark:text-emerald-300">
-                                  Download from {appStoreName} for easy access
-                                </p>
-                              </div>
-                            </div>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              className="border-emerald-300 dark:border-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/30"
-                              onClick={() => window.open(appLink, '_blank')}
-                            >
-                              Open App
-                            </Button>
-                          </div>
-                        </div>
-                      );
-                    }
-                  }
-                  return null;
-                })()}
-
-                {/* Custom Logo URL Input */}
+                {/* Bank/UPI Links & Logo Setup Section */}
                 {formData.institution_name && (
-                  <div className="space-y-2">
-                    <Label htmlFor="institution_logo">Custom Logo URL (Optional)</Label>
-                    <Input
-                      id="institution_logo"
-                      type="url"
-                      value={formData.institution_logo}
-                      onChange={(e) => setFormData({ ...formData, institution_logo: e.target.value })}
-                      placeholder="https://example.com/logo.png"
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      If the automatic logo is incorrect or unavailable, paste a logo URL from the internet here
+                  <div className="p-4 bg-muted/30 rounded-lg border border-border space-y-4 mt-4">
+                    <h3 className="text-sm font-semibold flex items-center gap-2">
+                      <Smartphone className="h-4 w-4 text-primary" />
+                      Bank/UPI Links & Logo Setup
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                      Specify standard or custom web links, iOS/Android mobile apps, and logo URL for quick actions on your dashboard.
                     </p>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="web_url">Bank Webpage Link</Label>
+                        <Input
+                          id="web_url"
+                          type="url"
+                          placeholder="https://www.bank.com"
+                          value={formData.web_url}
+                          onChange={(e) => setFormData({ ...formData, web_url: e.target.value })}
+                        />
+                        <p className="text-[10px] text-muted-foreground">URL of the bank's main website or login page</p>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="institution_logo">Bank/UPI Logo URL</Label>
+                        <Input
+                          id="institution_logo"
+                          type="url"
+                          placeholder="https://example.com/logo.png"
+                          value={formData.institution_logo}
+                          onChange={(e) => setFormData({ ...formData, institution_logo: e.target.value })}
+                        />
+                        <p className="text-[10px] text-muted-foreground">Custom URL to override the default bank logo</p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="ios_app_url">iOS App Store Link</Label>
+                        <Input
+                          id="ios_app_url"
+                          type="url"
+                          placeholder="https://apps.apple.com/..."
+                          value={formData.ios_app_url}
+                          onChange={(e) => setFormData({ ...formData, ios_app_url: e.target.value })}
+                        />
+                        <p className="text-[10px] text-muted-foreground">Apple App Store URL for the iOS app</p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="android_app_url">Android Play Store Link</Label>
+                        <Input
+                          id="android_app_url"
+                          type="url"
+                          placeholder="https://play.google.com/..."
+                          value={formData.android_app_url}
+                          onChange={(e) => setFormData({ ...formData, android_app_url: e.target.value })}
+                        />
+                        <p className="text-[10px] text-muted-foreground">Google Play Store URL for the Android app</p>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>

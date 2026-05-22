@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, ArrowLeft, TrendingDown, CreditCard, AlertCircle, Plus, Info } from 'lucide-react';
+import { Loader2, ArrowLeft, TrendingDown, CreditCard, AlertCircle, Plus, Info, Trash2 } from 'lucide-react';
 import { formatCurrency } from '@/utils/format';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CreditCardStatementSelector } from '@/components/CreditCardStatementSelector';
@@ -86,6 +86,8 @@ export default function TransactionForm() {
   const [ccAdvanceUsed, setCCAdvanceUsed] = useState(0);
   const [ccAdvanceBalance, setCCAdvanceBalance] = useState(0);
   const [ccLastAutoFilledTotal, setCCLastAutoFilledTotal] = useState<number | null>(null);
+  const [isSplitRepayment, setIsSplitRepayment] = useState(false);
+  const [splitSources, setSplitSources] = useState<Array<{ accountId: string; amount: string }>>([]);
 
   useEffect(() => {
     if (user) {
@@ -472,17 +474,90 @@ export default function TransactionForm() {
       return;
     }
 
-    if (formData.transaction_type === 'credit_card_repayment' && (!formData.from_account_id || !formData.to_account_id)) {
-      toast({
-        title: 'Error',
-        description: 'Please select both payment source and credit card account',
-        variant: 'destructive',
-      });
-      return;
+    if (formData.transaction_type === 'credit_card_repayment') {
+      if (!formData.to_account_id) {
+        toast({
+          title: 'Error',
+          description: 'Please select a credit card account',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      if (isSplitRepayment) {
+        if (splitSources.length === 0) {
+          toast({
+            title: 'Error',
+            description: 'Please add at least one source account',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        const uniqueAccounts = new Set<string>();
+        for (const source of splitSources) {
+          if (!source.accountId) {
+            toast({
+              title: 'Error',
+              description: 'Please select an account for all sourcing rows',
+              variant: 'destructive',
+            });
+            return;
+          }
+          if (uniqueAccounts.has(source.accountId)) {
+            toast({
+              title: 'Error',
+              description: 'Sourcing accounts must be unique. Please remove duplicate rows.',
+              variant: 'destructive',
+            });
+            return;
+          }
+          uniqueAccounts.add(source.accountId);
+
+          const sourceAmt = parseFloat(source.amount);
+          if (isNaN(sourceAmt) || sourceAmt <= 0) {
+            toast({
+              title: 'Error',
+              description: 'Sourced amounts must be greater than zero',
+              variant: 'destructive',
+            });
+            return;
+          }
+        }
+
+        const sourcedSum = splitSources.reduce((sum, s) => sum + (parseFloat(s.amount) || 0), 0);
+        const requiredAmt = parseFloat(formData.amount);
+        if (isNaN(requiredAmt) || requiredAmt <= 0) {
+          toast({
+            title: 'Error',
+            description: 'Please enter a valid repayment amount',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        if (Math.abs(sourcedSum - requiredAmt) > 0.01) {
+          toast({
+            title: 'Error',
+            description: `The total sourced amount (${formatCurrency(sourcedSum, formData.currency)}) must match the repayment amount (${formatCurrency(requiredAmt, formData.currency)})`,
+            variant: 'destructive',
+          });
+          return;
+        }
+      } else {
+        if (!formData.from_account_id) {
+          toast({
+            title: 'Error',
+            description: 'Please select a payment source account',
+            variant: 'destructive',
+          });
+          return;
+        }
+      }
     }
 
     // If using advance balance, validate amount doesn't exceed available advance
-    const isUsingAdvanceBalance = formData.from_account_id === 'advance_balance';
+    const isUsingAdvanceBalance = !isSplitRepayment && formData.from_account_id === 'advance_balance';
     if (isUsingAdvanceBalance && parseFloat(formData.amount) > ccAdvanceBalance) {
       toast({
         title: 'Error',
@@ -726,16 +801,36 @@ export default function TransactionForm() {
         });
       } else {
         // Create new transaction
-        const created = await transactionApi.createTransaction({
-          ...transactionData,
-          loan_components: formData.transaction_type === 'loan_payment' ? loanBreakdown : undefined
-        });
+        let created: any = null;
 
-        if (formData.transaction_type === 'credit_card_repayment' && created && formData.to_account_id) {
-          try {
+        if (formData.transaction_type === 'credit_card_repayment' && isSplitRepayment) {
+          const createdTransactions = [];
+          for (const source of splitSources) {
+            const createdTx = await transactionApi.createTransaction({
+              user_id: user.id,
+              transaction_type: 'credit_card_repayment',
+              from_account_id: source.accountId,
+              to_account_id: formData.to_account_id,
+              amount: parseFloat(source.amount),
+              currency: formData.currency,
+              category: formData.category || null,
+              income_category: formData.income_category || null,
+              description: formData.description 
+                ? `${formData.description} (Split repayment)`
+                : `Credit card split repayment (${formatCurrency(parseFloat(source.amount), formData.currency)})`,
+              transaction_date: formData.transaction_date,
+            });
+            if (createdTx) {
+              createdTransactions.push({ id: createdTx.id, amount: parseFloat(source.amount) });
+            }
+          }
+
+          if (createdTransactions.length > 0) {
+            // Assign created to first split transaction to prevent downstream errors
+            created = createdTransactions[0];
+
             if (ccAllocations.length > 0) {
-              const mappedAllocations = [];
-
+              const resolvedAllocations = [];
               for (const alloc of ccAllocations) {
                 let lineId = alloc.statement_line_id;
 
@@ -753,52 +848,81 @@ export default function TransactionForm() {
                         amount: alloc.amount_paid,
                         transaction_date: emi.next_due_date <= formData.transaction_date ? emi.next_due_date : formData.transaction_date,
                         statement_month: statementMonth,
-                        status: 'pending', // Will be updated to paid shortly
+                        status: 'pending',
                         emi_id: emi.id
                       });
                       lineId = newLine.id;
                     }
                   } catch (err) {
                     console.error('Error creating statement line for EMI:', err);
-                    continue; // Skip this allocation if creation fails
+                    continue;
                   }
                 }
 
-                mappedAllocations.push({
+                resolvedAllocations.push({
                   line_id: lineId,
-                  amount: alloc.amount_paid,
+                  amount_remaining: alloc.amount_paid,
                   emi_id: alloc.emi_id
                 });
               }
 
-              await creditCardStatementApi.allocateRepayment(created.id, mappedAllocations);
+              let allocationIdx = 0;
+              const processedEMIs = new Set<string>();
+              for (const tx of createdTransactions) {
+                let txSourcedAmountRemaining = tx.amount;
+                const txAllocations = [];
 
-              // Update status for all allocations
-              for (const allocation of mappedAllocations) {
-                await creditCardStatementApi.updateStatementLineStatus(
-                  allocation.line_id,
-                  'paid',
-                  allocation.amount
-                );
+                while (txSourcedAmountRemaining > 0 && allocationIdx < resolvedAllocations.length) {
+                  const currentAlloc = resolvedAllocations[allocationIdx];
+                  if (currentAlloc.amount_remaining <= 0) {
+                    allocationIdx++;
+                    continue;
+                  }
+                  const amountToAllocate = Math.min(txSourcedAmountRemaining, currentAlloc.amount_remaining);
+                  txAllocations.push({
+                    line_id: currentAlloc.line_id,
+                    amount: amountToAllocate,
+                    emi_id: currentAlloc.emi_id
+                  });
+                  currentAlloc.amount_remaining -= amountToAllocate;
+                  txSourcedAmountRemaining -= amountToAllocate;
+                  if (currentAlloc.amount_remaining <= 0.001) {
+                    allocationIdx++;
+                  }
+                }
 
-                if (allocation.emi_id) {
-                  try {
-                    await emiApi.payEMIInstallment(allocation.emi_id);
-                  } catch (err) {
-                    console.error('Error updating EMI installment:', err);
+                if (txAllocations.length > 0) {
+                  await creditCardStatementApi.allocateRepayment(tx.id, txAllocations);
+                  for (const allocation of txAllocations) {
+                    await creditCardStatementApi.updateStatementLineStatus(
+                      allocation.line_id,
+                      'paid',
+                      allocation.amount
+                    );
+
+                    if (allocation.emi_id && !processedEMIs.has(allocation.emi_id)) {
+                      processedEMIs.add(allocation.emi_id);
+                      try {
+                        await emiApi.payEMIInstallment(allocation.emi_id);
+                      } catch (err) {
+                        console.error('Error updating EMI installment:', err);
+                      }
+                    }
                   }
                 }
               }
             }
 
-            if (ccAdvanceCreated > 0) {
+            // Associate advance payment with the last split transaction
+            const lastTx = createdTransactions[createdTransactions.length - 1];
+            if (ccAdvanceCreated > 0 && lastTx) {
               await creditCardStatementApi.createAdvancePayment(
                 user.id,
                 formData.to_account_id as string,
                 ccAdvanceCreated,
                 formData.currency,
-                `Advance payment from transaction ${created.id}`,
-                created.id
+                `Advance payment from transaction ${lastTx.id}`,
+                lastTx.id
               );
             }
 
@@ -809,8 +933,100 @@ export default function TransactionForm() {
                 ccAdvanceUsed
               );
             }
-          } catch (error) {
-            console.error('Error processing CC repayment:', error);
+
+            toast({
+              title: 'Success',
+              description: `Split repayment created successfully across ${splitSources.length} accounts`,
+            });
+          }
+        } else {
+          // Standard Single Account Creation
+          created = await transactionApi.createTransaction({
+            ...transactionData,
+            loan_components: formData.transaction_type === 'loan_payment' ? loanBreakdown : undefined
+          });
+
+          if (formData.transaction_type === 'credit_card_repayment' && created && formData.to_account_id) {
+            try {
+              if (ccAllocations.length > 0) {
+                const mappedAllocations = [];
+
+                for (const alloc of ccAllocations) {
+                  let lineId = alloc.statement_line_id;
+
+                  // Handle virtual EMI lines (create real statement line on the fly)
+                  if (lineId.startsWith('emi_') && alloc.emi_id) {
+                    try {
+                      const emi = await emiApi.getEMIById(alloc.emi_id);
+                      if (emi) {
+                        const statementMonth = formData.transaction_date.slice(0, 7);
+                        const newLine = await creditCardStatementApi.createStatementLine({
+                          credit_card_id: formData.to_account_id,
+                          user_id: user.id,
+                          transaction_id: alloc.transaction_id || null,
+                          description: alloc.description || `EMI Installment: ${emi.description}`,
+                          amount: alloc.amount_paid,
+                          transaction_date: emi.next_due_date <= formData.transaction_date ? emi.next_due_date : formData.transaction_date,
+                          statement_month: statementMonth,
+                          status: 'pending', // Will be updated to paid shortly
+                          emi_id: emi.id
+                        });
+                        lineId = newLine.id;
+                      }
+                    } catch (err) {
+                      console.error('Error creating statement line for EMI:', err);
+                      continue; // Skip this allocation if creation fails
+                    }
+                  }
+
+                  mappedAllocations.push({
+                    line_id: lineId,
+                    amount: alloc.amount_paid,
+                    emi_id: alloc.emi_id
+                  });
+                }
+
+                await creditCardStatementApi.allocateRepayment(created.id, mappedAllocations);
+
+                // Update status for all allocations
+                for (const allocation of mappedAllocations) {
+                  await creditCardStatementApi.updateStatementLineStatus(
+                    allocation.line_id,
+                    'paid',
+                    allocation.amount
+                  );
+
+                  if (allocation.emi_id) {
+                    try {
+                      await emiApi.payEMIInstallment(allocation.emi_id);
+                    } catch (err) {
+                      console.error('Error updating EMI installment:', err);
+                    }
+                  }
+                }
+              }
+
+              if (ccAdvanceCreated > 0) {
+                await creditCardStatementApi.createAdvancePayment(
+                  user.id,
+                  formData.to_account_id as string,
+                  ccAdvanceCreated,
+                  formData.currency,
+                  `Advance payment from transaction ${created.id}`,
+                  created.id
+                );
+              }
+
+              if (ccAdvanceUsed > 0) {
+                await creditCardStatementApi.consumeAdvanceBalance(
+                  user.id,
+                  formData.to_account_id as string,
+                  ccAdvanceUsed
+                );
+              }
+            } catch (error) {
+              console.error('Error processing CC repayment:', error);
+            }
           }
         }
 
@@ -904,96 +1120,283 @@ export default function TransactionForm() {
               formData.transaction_type === 'transfer' || formData.transaction_type === 'loan_payment' ||
               formData.transaction_type === 'credit_card_repayment') && (
                 <div className="space-y-2">
-                  <Label htmlFor="from_account_id">
-                    {formData.transaction_type === 'withdrawal' ? 'From Bank/Credit Card *' :
-                      formData.transaction_type === 'credit_card_repayment' ? 'From Bank Account *' : 'From Account *'}
-                  </Label>
-                  <Select
-                    value={formData.from_account_id}
-                    onValueChange={(value) => setFormData({ ...formData, from_account_id: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select account" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {formData.transaction_type === 'withdrawal'
-                        ? accounts.filter(a => a.account_type === 'bank' || a.account_type === 'credit_card').map(account => (
-                          <SelectItem key={account.id} value={account.id}>
-                            {account.account_name} ({account.account_type})
-                          </SelectItem>
-                        ))
-                        : formData.transaction_type === 'credit_card_repayment'
-                          ? [
-                            ...accounts.filter(a => a.account_type === 'bank' || a.account_type === 'cash').map(account => (
+                  {formData.transaction_type === 'credit_card_repayment' && (
+                    <div className="flex items-center space-x-2 pb-1">
+                      <Checkbox
+                        id="is_split_repayment"
+                        checked={isSplitRepayment}
+                        onCheckedChange={(checked) => {
+                          const flag = checked as boolean;
+                          setIsSplitRepayment(flag);
+                          if (flag) {
+                            const currentSource = formData.from_account_id && formData.from_account_id !== 'advance_balance' 
+                              ? [{ accountId: formData.from_account_id, amount: formData.amount || '0' }]
+                              : [{ accountId: '', amount: '' }];
+                            setSplitSources(currentSource);
+                          } else {
+                            if (splitSources.length > 0 && splitSources[0].accountId) {
+                              setFormData(prev => ({ ...prev, from_account_id: splitSources[0].accountId }));
+                            }
+                          }
+                        }}
+                      />
+                      <Label htmlFor="is_split_repayment" className="cursor-pointer text-sm font-semibold flex items-center gap-1.5 text-purple-800 dark:text-purple-300">
+                        Sourcing from Multiple Accounts
+                      </Label>
+                    </div>
+                  )}
+
+                  {!isSplitRepayment ? (
+                    <>
+                      <Label htmlFor="from_account_id">
+                        {formData.transaction_type === 'withdrawal' ? 'From Bank/Credit Card *' :
+                          formData.transaction_type === 'credit_card_repayment' ? 'From Bank Account *' : 'From Account *'}
+                      </Label>
+                      <Select
+                        value={formData.from_account_id}
+                        onValueChange={(value) => setFormData({ ...formData, from_account_id: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select account" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {formData.transaction_type === 'withdrawal'
+                            ? accounts.filter(a => a.account_type === 'bank' || a.account_type === 'credit_card').map(account => (
                               <SelectItem key={account.id} value={account.id}>
-                                {account.account_name}
+                                {account.account_name} ({account.account_type})
                               </SelectItem>
-                            )),
-                            ...(ccAdvanceBalance > 0 ? [
-                              <SelectItem key="advance_balance" value="advance_balance">
-                                Advance Balance ({formatCurrency(ccAdvanceBalance, formData.currency)})
-                              </SelectItem>
-                            ] : [])
-                          ]
-                          : accounts.filter(a => a.account_type !== 'loan').map(account => (
-                            <SelectItem key={account.id} value={account.id}>
-                              {account.account_name} ({account.account_type})
-                            </SelectItem>
-                          ))
-                      }
-                    </SelectContent>
-                  </Select>
+                            ))
+                            : formData.transaction_type === 'credit_card_repayment'
+                              ? [
+                                ...accounts.filter(a => a.account_type === 'bank' || a.account_type === 'cash').map(account => (
+                                  <SelectItem key={account.id} value={account.id}>
+                                    {account.account_name}
+                                  </SelectItem>
+                                )),
+                                ...(ccAdvanceBalance > 0 ? [
+                                  <SelectItem key="advance_balance" value="advance_balance">
+                                    Advance Balance ({formatCurrency(ccAdvanceBalance, formData.currency)})
+                                  </SelectItem>
+                                ] : [])
+                              ]
+                              : accounts.filter(a => a.account_type !== 'loan').map(account => (
+                                <SelectItem key={account.id} value={account.id}>
+                                  {account.account_name} ({account.account_type})
+                                </SelectItem>
+                              ))
+                          }
+                        </SelectContent>
+                      </Select>
 
-                  {/* Display available balance for selected account */}
-                  {formData.from_account_id && (() => {
-                    const selectedAccount = accounts.find((a: Account) => a.id === formData.from_account_id);
-                    if (selectedAccount) {
-                      const isCreditCard = selectedAccount.account_type === 'credit_card';
-                      const amount = parseFloat(formData.amount) || 0;
+                      {/* Display available balance for selected account */}
+                      {formData.from_account_id && (() => {
+                        const selectedAccount = accounts.find((a: Account) => a.id === formData.from_account_id);
+                        if (selectedAccount) {
+                          const isCreditCard = selectedAccount.account_type === 'credit_card';
+                          const amount = parseFloat(formData.amount) || 0;
 
-                      // Calculate projected Available Credit for Credit Cards
-                      let availableBalance = Number(selectedAccount.balance) || 0;
-                      let projectedAvailable = 0;
-                      let isOverLimit = false;
+                          // Calculate projected Available Credit for Credit Cards
+                          let availableBalance = Number(selectedAccount.balance) || 0;
+                          let projectedAvailable = 0;
+                          let isOverLimit = false;
 
-                      if (isCreditCard && selectedAccount.credit_limit) {
-                        const isSameAccount = formData.from_account_id === originalAccountId;
-                        const currentBalance = Number(selectedAccount.balance) || 0;
-                        const creditLimit = Number(selectedAccount.credit_limit) || 0;
-                        const originalAmt = Number(originalAmount) || 0;
+                          if (isCreditCard && selectedAccount.credit_limit) {
+                            const isSameAccount = formData.from_account_id === originalAccountId;
+                            const currentBalance = Number(selectedAccount.balance) || 0;
+                            const creditLimit = Number(selectedAccount.credit_limit) || 0;
+                            const originalAmt = Number(originalAmount) || 0;
 
-                        const baseBalance = (id && isSameAccount) ? currentBalance - originalAmt : currentBalance;
-                        const projectedBalance = baseBalance + amount;
+                            const baseBalance = (id && isSameAccount) ? currentBalance - originalAmt : currentBalance;
+                            const projectedBalance = baseBalance + amount;
 
-                        availableBalance = creditLimit - currentBalance;
-                        projectedAvailable = creditLimit - projectedBalance;
-                        isOverLimit = projectedBalance > creditLimit;
-                      }
+                            availableBalance = creditLimit - currentBalance;
+                            projectedAvailable = creditLimit - projectedBalance;
+                            isOverLimit = projectedBalance > creditLimit;
+                          }
 
-                      return (
-                        <div className="mt-2 p-3 rounded-lg bg-muted/50 border border-border">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-muted-foreground">
-                              {isCreditCard ? 'Current Balance Limit' : 'Current Balance'}
-                            </span>
-                            <span className={`text-sm font-semibold ${!isCreditCard && availableBalance < 0 ? 'text-destructive' : ''}`}>
-                              {formatCurrency(isCreditCard ? (selectedAccount.credit_limit || 0) - selectedAccount.balance : availableBalance, selectedAccount.currency)}
-                            </span>
-                          </div>
+                          return (
+                            <div className="mt-2 p-3 rounded-lg bg-muted/50 border border-border">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-muted-foreground">
+                                  {isCreditCard ? 'Current Balance Limit' : 'Current Balance'}
+                                </span>
+                                <span className={`text-sm font-semibold ${!isCreditCard && availableBalance < 0 ? 'text-destructive' : ''}`}>
+                                  {formatCurrency(isCreditCard ? (selectedAccount.credit_limit || 0) - selectedAccount.balance : availableBalance, selectedAccount.currency)}
+                                </span>
+                              </div>
 
-                          {isCreditCard && (
-                            <div className="flex items-center justify-between mt-1 pt-1 border-t border-dashed">
-                              <span className="text-sm font-medium">Projected Balance Limit</span>
-                              <span className={`text-sm font-bold ${isOverLimit ? 'text-destructive' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                                {formatCurrency(projectedAvailable, selectedAccount.currency)}
-                              </span>
+                              {isCreditCard && (
+                                <div className="flex items-center justify-between mt-1 pt-1 border-t border-dashed">
+                                  <span className="text-sm font-medium">Projected Balance Limit</span>
+                                  <span className={`text-sm font-bold ${isOverLimit ? 'text-destructive' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                    {formatCurrency(projectedAvailable, selectedAccount.currency)}
+                                  </span>
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-                      );
-                    }
-                    return null;
-                  })()}
+                          );
+                        }
+                        return null;
+                      })()}
+
+                      {/* Display warning box if balance is insufficient */}
+                      {formData.transaction_type === 'credit_card_repayment' && formData.from_account_id && formData.from_account_id !== 'advance_balance' && (() => {
+                        const selectedAccount = accounts.find((a: Account) => a.id === formData.from_account_id);
+                        const balance = selectedAccount ? Number(selectedAccount.balance) : 0;
+                        const reqAmount = parseFloat(formData.amount) || 0;
+                        const hasInsufficientFunds = selectedAccount && selectedAccount.account_type !== 'credit_card' && balance < reqAmount;
+
+                        if (hasInsufficientFunds) {
+                          return (
+                            <Alert className="border-amber-500 bg-amber-50 dark:bg-amber-950/20 mt-2">
+                              <AlertCircle className="h-4 w-4 text-amber-600 animate-pulse" />
+                              <AlertDescription className="text-amber-900 dark:text-amber-200">
+                                <div className="flex flex-col gap-2">
+                                  <span className="font-semibold text-sm">⚠️ Insufficient Funds</span>
+                                  <span className="text-xs">
+                                    Selected account balance ({formatCurrency(balance, selectedAccount.currency)}) is insufficient for this repayment amount ({formatCurrency(reqAmount, formData.currency)}).
+                                  </span>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="w-fit border-amber-500 text-amber-900 hover:bg-amber-100 bg-white"
+                                    onClick={() => {
+                                      setIsSplitRepayment(true);
+                                      const initialSources = [
+                                        { accountId: formData.from_account_id, amount: Math.max(0, balance).toString() },
+                                        { accountId: '', amount: Math.max(0, reqAmount - Math.max(0, balance)).toString() }
+                                      ];
+                                      setSplitSources(initialSources);
+                                    }}
+                                  >
+                                    Split Repayment Across Multiple Accounts
+                                  </Button>
+                                </div>
+                              </AlertDescription>
+                            </Alert>
+                          );
+                        }
+                        return null;
+                      })()}
+                    </>
+                  ) : (
+                    <div className="space-y-3 p-4 rounded-xl border border-purple-200 dark:border-purple-900/50 bg-purple-50/20 dark:bg-purple-950/5">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-semibold text-purple-900 dark:text-purple-300">Sourcing Accounts Breakdown</Label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-200 flex items-center gap-1 h-8"
+                          onClick={() => setSplitSources([...splitSources, { accountId: '', amount: '' }])}
+                        >
+                          <Plus className="h-3.5 w-3.5" /> Add Source
+                        </Button>
+                      </div>
+
+                      <div className="space-y-3">
+                        {splitSources.map((source, index) => {
+                          const sourceAccount = accounts.find(a => a.id === source.accountId);
+                          const sourceBalance = sourceAccount ? Number(sourceAccount.balance) : 0;
+                          const sourceAmount = parseFloat(source.amount) || 0;
+                          const isSourceInsufficient = sourceAccount && sourceBalance < sourceAmount;
+
+                          return (
+                            <div key={index} className="flex gap-2 items-start bg-white dark:bg-slate-900/40 p-3 rounded-lg border border-purple-100 dark:border-purple-950/30">
+                              <div className="flex-1 space-y-1">
+                                <Label className="text-[10px] text-muted-foreground">Source Account {index + 1} *</Label>
+                                <Select
+                                  value={source.accountId}
+                                  onValueChange={(val) => {
+                                    const updated = [...splitSources];
+                                    updated[index].accountId = val;
+                                    setSplitSources(updated);
+                                  }}
+                                >
+                                  <SelectTrigger className="h-9">
+                                    <SelectValue placeholder="Select account" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {accounts.filter(a => a.account_type === 'bank' || a.account_type === 'cash').map(account => (
+                                      <SelectItem key={account.id} value={account.id}>
+                                        {account.account_name} ({formatCurrency(account.balance, account.currency)})
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                {sourceAccount && (
+                                  <div className="flex justify-between items-center text-[10px] px-1 pt-0.5">
+                                    <span className="text-muted-foreground">Balance: {formatCurrency(sourceBalance, sourceAccount.currency)}</span>
+                                    {isSourceInsufficient && (
+                                      <span className="text-destructive font-medium">⚠️ Insufficient funds</span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="w-[130px] space-y-1">
+                                <Label className="text-[10px] text-muted-foreground">Sourced Amount *</Label>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  className="h-9"
+                                  value={source.amount}
+                                  onChange={(e) => {
+                                    const updated = [...splitSources];
+                                    updated[index].amount = e.target.value;
+                                    setSplitSources(updated);
+                                  }}
+                                  placeholder="0.00"
+                                />
+                              </div>
+
+                              {splitSources.length > 1 && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-9 w-9 mt-5 text-muted-foreground hover:text-destructive"
+                                  onClick={() => {
+                                    const updated = splitSources.filter((_, i) => i !== index);
+                                    setSplitSources(updated);
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Live sum breakdown */}
+                      {(() => {
+                        const requiredTotal = parseFloat(formData.amount) || 0;
+                        const sourcedTotal = splitSources.reduce((sum, s) => sum + (parseFloat(s.amount) || 0), 0);
+                        const remaining = requiredTotal - sourcedTotal;
+
+                        return (
+                          <div className="mt-3 pt-3 border-t border-purple-100 dark:border-purple-950/30 flex items-center justify-between text-xs font-semibold">
+                            <div className="flex gap-4">
+                              <span className="text-muted-foreground">Total Required: <strong className="text-foreground">{formatCurrency(requiredTotal, formData.currency)}</strong></span>
+                              <span className="text-muted-foreground">Total Sourced: <strong className="text-purple-600 dark:text-purple-400">{formatCurrency(sourcedTotal, formData.currency)}</strong></span>
+                            </div>
+                            {Math.abs(remaining) > 0.01 ? (
+                              <span className={remaining > 0 ? 'text-amber-600 dark:text-amber-400 animate-pulse' : 'text-destructive'}>
+                                {remaining > 0 ? `Shortfall: ${formatCurrency(remaining, formData.currency)}` : `Excess: ${formatCurrency(Math.abs(remaining), formData.currency)}`}
+                              </span>
+                            ) : (
+                              <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                                ✓ Sourced Fully Matching
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
                 </div>
               )}
 

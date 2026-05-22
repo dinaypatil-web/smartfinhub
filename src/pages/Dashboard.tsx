@@ -461,40 +461,41 @@ export default function Dashboard() {
         <TabsContent value="overview" className="space-y-6 mt-6">
 
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 min-w-max md:min-w-0">
-            <Card className="border-l-4 border-l-emerald-500 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20 hover-lift shadow-card animate-slide-up">
+            <Card className="glass-effect border-l-4 border-l-emerald-500 dark:hover:border-emerald-400 dark:hover:shadow-[0_0_30px_rgba(16,185,129,0.15)] hover-lift transition-smooth shadow-card animate-slide-up">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Current Assets</CardTitle>
-                <div className="h-10 w-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                <CardTitle className="text-sm font-bold text-emerald-600 dark:text-emerald-400 tracking-wide uppercase">Current Assets</CardTitle>
+                <div className="h-10 w-10 rounded-full bg-emerald-500/20 flex items-center justify-center border border-emerald-500/20">
                   <TrendingUp className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight">
                   {formatCurrency(summary?.total_assets || 0, currency)}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-xs text-muted-foreground mt-1.5 font-medium">
                   Cash and bank accounts
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="border-l-4 border-l-red-500 bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-950/20 dark:to-orange-950/20 hover-lift shadow-card animate-slide-up animate-stagger-1">
+            <Card className="glass-effect border-l-4 border-l-red-500 dark:hover:border-red-400 dark:hover:shadow-[0_0_30px_rgba(239,68,68,0.15)] hover-lift transition-smooth shadow-card animate-slide-up animate-stagger-1">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Current Liabilities</CardTitle>
-                <div className="h-10 w-10 rounded-full bg-red-500/20 flex items-center justify-center">
+                <CardTitle className="text-sm font-bold text-red-600 dark:text-red-400 tracking-wide uppercase">Current Liabilities</CardTitle>
+                <div className="h-10 w-10 rounded-full bg-red-500/20 flex items-center justify-center border border-red-500/20">
                   <TrendingDown className="h-5 w-5 text-red-600 dark:text-red-400" />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+                <div className="text-2xl font-black text-red-600 dark:text-red-400 tracking-tight">
                   {formatCurrency(summary?.total_liabilities || 0, currency)}
                 </div>
-                <div className="flex flex-col mt-1">
-                  <p className="text-xs text-muted-foreground">
+                <div className="flex flex-col mt-1.5">
+                  <p className="text-xs text-muted-foreground font-medium">
                     Credit card balances
                   </p>
                   {cashFlow && cashFlow.creditCardDues > 0 && (
-                    <p className="text-xs font-medium text-purple-600 dark:text-purple-400 mt-1">
+                    <p className="text-xs font-semibold text-purple-600 dark:text-purple-400 mt-1 flex items-center gap-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-purple-500 animate-pulse"></span>
                       Monthly Dues: {formatCurrency(cashFlow.creditCardDues, currency)}
                     </p>
                   )}
@@ -502,35 +503,35 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            <Card className="border-l-4 border-l-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 hover-lift shadow-card animate-slide-up animate-stagger-2">
+            <Card className="glass-effect border-l-4 border-l-blue-500 dark:hover:border-blue-400 dark:hover:shadow-[0_0_30px_rgba(59,130,246,0.15)] hover-lift transition-smooth shadow-card animate-slide-up animate-stagger-2">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Liquid Assets</CardTitle>
-                <div className="h-10 w-10 rounded-full bg-blue-500/20 flex items-center justify-center">
+                <CardTitle className="text-sm font-bold text-blue-600 dark:text-blue-400 tracking-wide uppercase">Liquid Assets</CardTitle>
+                <div className="h-10 w-10 rounded-full bg-blue-500/20 flex items-center justify-center border border-blue-500/20">
                   <Wallet className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                <div className="text-2xl font-black text-blue-600 dark:text-blue-400 tracking-tight">
                   {formatCurrency(summary?.liquid_assets || 0, currency)}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-xs text-muted-foreground mt-1.5 font-medium">
                   Available funds
                 </p>
               </CardContent>
             </Card>
 
-            <Card className={`border-l-4 hover-lift shadow-card animate-slide-up animate-stagger-3 ${(summary?.working_capital || 0) >= 0 ? 'border-l-purple-500 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/20 dark:to-pink-950/20' : 'border-l-amber-500 bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20'}`}>
+            <Card className={`glass-effect border-l-4 hover-lift transition-smooth shadow-card animate-slide-up animate-stagger-3 ${(summary?.working_capital || 0) >= 0 ? 'border-l-purple-500 dark:hover:border-purple-400 dark:hover:shadow-[0_0_30px_rgba(168,85,247,0.15)]' : 'border-l-amber-500 dark:hover:border-amber-400 dark:hover:shadow-[0_0_30px_rgba(245,158,11,0.15)]'}`}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Working Capital</CardTitle>
-                <div className={`h-10 w-10 rounded-full ${(summary?.working_capital || 0) >= 0 ? 'bg-purple-500/20' : 'bg-amber-500/20'} flex items-center justify-center`}>
+                <CardTitle className={`text-sm font-bold tracking-wide uppercase ${(summary?.working_capital || 0) >= 0 ? 'text-purple-600 dark:text-purple-400' : 'text-amber-600 dark:text-amber-400'}`}>Working Capital</CardTitle>
+                <div className={`h-10 w-10 rounded-full ${(summary?.working_capital || 0) >= 0 ? 'bg-purple-500/20 border border-purple-500/20' : 'bg-amber-500/20 border border-amber-500/20'} flex items-center justify-center`}>
                   <TrendingUp className={`h-5 w-5 ${(summary?.working_capital || 0) >= 0 ? 'text-purple-600 dark:text-purple-400' : 'text-amber-600 dark:text-amber-400'}`} />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className={`text-2xl font-bold ${(summary?.working_capital || 0) >= 0 ? 'text-purple-600 dark:text-purple-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                <div className={`text-2xl font-black tracking-tight ${(summary?.working_capital || 0) >= 0 ? 'text-purple-600 dark:text-purple-400' : 'text-amber-600 dark:text-amber-400'}`}>
                   {formatCurrency(summary?.working_capital || 0, currency)}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-xs text-muted-foreground mt-1.5 font-medium">
                   Assets minus liabilities
                 </p>
               </CardContent>

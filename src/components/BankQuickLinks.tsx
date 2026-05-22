@@ -67,18 +67,20 @@ export default function BankQuickLinks({ bankName, country, accountId, userId }:
   };
 
   const openBankLink = (type: 'web' | 'ios' | 'android') => {
-    if (!bankLink) return;
-    
+    const webUrl = customLinks[0]?.web_url || bankLink?.web_url;
+    const iosAppUrl = customLinks[0]?.ios_app_url || bankLink?.ios_app_url;
+    const androidAppUrl = customLinks[0]?.android_app_url || bankLink?.android_app_url;
+
     let url = '';
     switch (type) {
       case 'web':
-        url = bankLink.web_url || '';
+        url = webUrl || '';
         break;
       case 'ios':
-        url = bankLink.ios_app_url || '';
+        url = iosAppUrl || '';
         break;
       case 'android':
-        url = bankLink.android_app_url || '';
+        url = androidAppUrl || '';
         break;
     }
     
@@ -157,29 +159,43 @@ export default function BankQuickLinks({ bankName, country, accountId, userId }:
   };
 
   const openSmartLink = () => {
-    if (!bankLink) return;
-    
+    const webUrl = customLinks[0]?.web_url || bankLink?.web_url;
+    const iosAppUrl = customLinks[0]?.ios_app_url || bankLink?.ios_app_url;
+    const androidAppUrl = customLinks[0]?.android_app_url || bankLink?.android_app_url;
+    const deepLinkIos = bankLink?.deep_link_ios;
+    const deepLinkAndroid = bankLink?.deep_link_android;
+
     const platform = detectPlatform();
     
     // Try deep link first for mobile platforms
-    if (platform === 'ios' && bankLink.deep_link_ios) {
-      window.location.href = bankLink.deep_link_ios;
+    if (platform === 'ios' && deepLinkIos) {
+      window.location.href = deepLinkIos;
       // Fallback to app store after a delay if deep link fails
       setTimeout(() => {
-        if (bankLink.ios_app_url) {
-          window.open(bankLink.ios_app_url, '_blank', 'noopener,noreferrer');
+        if (iosAppUrl) {
+          window.open(iosAppUrl, '_blank', 'noopener,noreferrer');
         }
       }, 1500);
-    } else if (platform === 'android' && bankLink.deep_link_android) {
-      window.location.href = bankLink.deep_link_android;
+    } else if (platform === 'android' && deepLinkAndroid) {
+      window.location.href = deepLinkAndroid;
       // Fallback to play store after a delay if deep link fails
       setTimeout(() => {
-        if (bankLink.android_app_url) {
-          window.open(bankLink.android_app_url, '_blank', 'noopener,noreferrer');
+        if (androidAppUrl) {
+          window.open(androidAppUrl, '_blank', 'noopener,noreferrer');
         }
       }, 1500);
-    } else if (bankLink.web_url) {
-      window.open(bankLink.web_url, '_blank', 'noopener,noreferrer');
+    } else if (platform === 'ios' && iosAppUrl) {
+      window.open(iosAppUrl, '_blank', 'noopener,noreferrer');
+    } else if (platform === 'android' && androidAppUrl) {
+      window.open(androidAppUrl, '_blank', 'noopener,noreferrer');
+    } else if (webUrl) {
+      window.open(webUrl, '_blank', 'noopener,noreferrer');
+    } else {
+      toast({
+        title: 'Link not available',
+        description: 'No webpage or mobile app link is configured for this bank.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -187,73 +203,90 @@ export default function BankQuickLinks({ bankName, country, accountId, userId }:
     return null;
   }
 
+  const webUrl = customLinks[0]?.web_url || bankLink?.web_url;
+  const iosAppUrl = customLinks[0]?.ios_app_url || bankLink?.ios_app_url;
+  const androidAppUrl = customLinks[0]?.android_app_url || bankLink?.android_app_url;
+  const hasAnyLink = !!(webUrl || iosAppUrl || androidAppUrl);
+
   // If no bank link found and no custom links, show add button only
-  if (!bankLink && customLinks.length === 0) {
+  if (!hasAnyLink) {
     return (
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
         <DialogTrigger asChild>
-          <Button variant="outline" size="sm" className="gap-2">
-            <Plus className="h-4 w-4" />
-            Add Bank Link
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 rounded-full px-3.5 text-xs font-semibold border-dashed border-primary/30 text-primary-400 dark:text-primary-300 hover:text-primary-200 hover:border-primary hover:bg-primary/10 transition-smooth hover-lift hover:shadow-glow gap-1.5 flex items-center bg-primary/5"
+          >
+            <Plus className="h-4 w-4 text-primary animate-pulse-slow" />
+            Add Quick Link
           </Button>
         </DialogTrigger>
-        <DialogContent>
+        <DialogContent className="glass-effect border-white/10 dark:bg-card/90 max-w-sm rounded-xl animate-scale-in">
           <DialogHeader>
-            <DialogTitle>Add Custom Bank Link</DialogTitle>
-            <DialogDescription>
-              Add quick links to access your bank's website or mobile app.
+            <DialogTitle className="gradient-text font-bold text-base flex items-center gap-2">
+              <Plus className="h-4 w-4 text-primary" />
+              Configure Quick Links
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-xs">
+              Setup quick-action shortcuts for website, iOS app, and Android app.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="bank_name">Bank Name</Label>
+          <div className="space-y-3.5 pt-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="bank_name" className="text-xs font-semibold text-muted-foreground">Bank Name</Label>
               <Input
                 id="bank_name"
+                className="h-9 bg-background/40 border-border/40 focus:border-primary/50 text-xs transition-smooth rounded-lg text-white"
                 value={newLink.bank_name}
                 onChange={(e) => setNewLink({ ...newLink, bank_name: e.target.value })}
               />
             </div>
-            <div>
-              <Label htmlFor="web_url">Website URL</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="web_url" className="text-xs font-semibold text-muted-foreground">Website URL</Label>
               <Input
                 id="web_url"
                 type="url"
                 placeholder="https://www.bank.com"
+                className="h-9 bg-background/40 border-border/40 focus:border-primary/50 text-xs transition-smooth rounded-lg text-white"
                 value={newLink.web_url}
                 onChange={(e) => setNewLink({ ...newLink, web_url: e.target.value })}
               />
             </div>
-            <div>
-              <Label htmlFor="ios_app_url">iOS App URL</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="ios_app_url" className="text-xs font-semibold text-muted-foreground">iOS App URL</Label>
               <Input
                 id="ios_app_url"
                 type="url"
                 placeholder="https://apps.apple.com/..."
+                className="h-9 bg-background/40 border-border/40 focus:border-primary/50 text-xs transition-smooth rounded-lg text-white"
                 value={newLink.ios_app_url}
                 onChange={(e) => setNewLink({ ...newLink, ios_app_url: e.target.value })}
               />
             </div>
-            <div>
-              <Label htmlFor="android_app_url">Android App URL</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="android_app_url" className="text-xs font-semibold text-muted-foreground">Android App URL</Label>
               <Input
                 id="android_app_url"
                 type="url"
                 placeholder="https://play.google.com/..."
+                className="h-9 bg-background/40 border-border/40 focus:border-primary/50 text-xs transition-smooth rounded-lg text-white"
                 value={newLink.android_app_url}
                 onChange={(e) => setNewLink({ ...newLink, android_app_url: e.target.value })}
               />
             </div>
-            <div>
-              <Label htmlFor="notes">Notes (Optional)</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="notes" className="text-xs font-semibold text-muted-foreground">Notes (Optional)</Label>
               <Textarea
                 id="notes"
-                placeholder="Additional notes..."
+                placeholder="Add any helpful hints..."
+                className="bg-background/40 border-border/40 focus:border-primary/50 text-xs transition-smooth rounded-lg min-h-[60px] text-white"
                 value={newLink.notes}
                 onChange={(e) => setNewLink({ ...newLink, notes: e.target.value })}
               />
             </div>
-            <Button onClick={handleAddCustomLink} className="w-full">
-              Add Link
+            <Button onClick={handleAddCustomLink} className="w-full h-9 rounded-lg font-semibold text-xs shadow-primary hover:shadow-glow transition-smooth hover-lift mt-2 bg-primary hover:bg-primary/90 text-white">
+              Save Quick Links
             </Button>
           </div>
         </DialogContent>
@@ -262,32 +295,32 @@ export default function BankQuickLinks({ bankName, country, accountId, userId }:
   }
 
   return (
-    <div className="flex flex-wrap gap-2">
-      {bankLink && (
+    <div className="flex flex-wrap items-center gap-2 pt-1">
+      {hasAnyLink && (
         <>
           <Button
             variant="outline"
             size="sm"
             onClick={openSmartLink}
-            className="gap-2"
+            className="h-8 rounded-full px-3.5 text-xs font-semibold border-primary/30 text-primary-400 dark:text-primary-300 hover:text-primary-200 hover:border-primary hover:bg-primary/10 transition-smooth hover-lift hover:shadow-glow gap-1.5 flex items-center bg-primary/5"
           >
-            <ExternalLink className="h-4 w-4" />
-            Open Bank
+            <ExternalLink className="h-3.5 w-3.5 animate-pulse-slow text-primary" />
+            <span>Smart Link</span>
           </Button>
           
-          {bankLink.web_url && (
+          {webUrl && (
             <Button
               variant="ghost"
               size="sm"
               onClick={() => openBankLink('web')}
-              className="gap-2"
+              className="h-8 rounded-full px-3.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/15 transition-smooth hover-lift gap-1.5 flex items-center bg-emerald-500/5 border border-emerald-500/10 hover:border-emerald-500/30"
             >
-              <Globe className="h-4 w-4" />
-              Web
+              <Globe className="h-3.5 w-3.5 text-emerald-500" />
+              <span>Web Portal</span>
             </Button>
           )}
           
-          {(bankLink.ios_app_url || bankLink.android_app_url) && (
+          {(iosAppUrl || androidAppUrl) && (
             <Button
               variant="ghost"
               size="sm"
@@ -297,91 +330,105 @@ export default function BankQuickLinks({ bankName, country, accountId, userId }:
                 else if (platform === 'android') openBankLink('android');
                 else openBankLink('web');
               }}
-              className="gap-2"
+              className="h-8 rounded-full px-3.5 text-xs font-semibold text-blue-500 dark:text-blue-400 hover:text-blue-300 hover:bg-blue-500/15 transition-smooth hover-lift gap-1.5 flex items-center bg-blue-500/5 border border-blue-500/10 hover:border-blue-500/30"
             >
-              <Smartphone className="h-4 w-4" />
-              App
+              <Smartphone className="h-3.5 w-3.5 text-blue-500" />
+              <span>Mobile App</span>
             </Button>
           )}
         </>
       )}
       
-      {customLinks.map((link) => (
+      {customLinks.slice(1).map((link) => (
         <Button
           key={link.id}
           variant="outline"
           size="sm"
           onClick={() => openCustomLink(link)}
-          className="gap-2"
+          className="h-8 rounded-full px-3.5 text-xs font-medium border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted transition-smooth hover-lift gap-1.5 flex items-center"
         >
-          <ExternalLink className="h-4 w-4" />
-          {link.bank_name}
+          <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+          <span>{link.bank_name}</span>
         </Button>
       ))}
       
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
         <DialogTrigger asChild>
-          <Button variant="ghost" size="sm" className="gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 rounded-full p-0 flex items-center justify-center transition-smooth hover-lift hover:bg-primary/15 text-muted-foreground hover:text-primary border border-dashed border-border/60 hover:border-primary/40 bg-background/20"
+            title="Add Custom Bank Link"
+          >
             <Plus className="h-4 w-4" />
           </Button>
         </DialogTrigger>
-        <DialogContent>
+        <DialogContent className="glass-effect border-white/10 dark:bg-card/90 max-w-sm rounded-xl animate-scale-in">
           <DialogHeader>
-            <DialogTitle>Add Custom Bank Link</DialogTitle>
-            <DialogDescription>
-              Add additional quick links to access your bank's services.
+            <DialogTitle className="gradient-text font-bold text-base flex items-center gap-2">
+              <Plus className="h-4 w-4 text-primary" />
+              Add Custom Link
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-xs">
+              Configure supplementary web portals or app links.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="bank_name">Link Name</Label>
+          <div className="space-y-3.5 pt-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="bank_name" className="text-xs font-semibold text-muted-foreground">Link Name</Label>
               <Input
                 id="bank_name"
+                placeholder="e.g. NetBanking, Customer Care"
+                className="h-9 bg-background/40 border-border/40 focus:border-primary/50 text-xs transition-smooth rounded-lg text-white"
                 value={newLink.bank_name}
                 onChange={(e) => setNewLink({ ...newLink, bank_name: e.target.value })}
               />
             </div>
-            <div>
-              <Label htmlFor="web_url">Website URL</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="web_url" className="text-xs font-semibold text-muted-foreground">Website URL</Label>
               <Input
                 id="web_url"
                 type="url"
-                placeholder="https://www.bank.com"
+                placeholder="https://www.bank.com/portal"
+                className="h-9 bg-background/40 border-border/40 focus:border-primary/50 text-xs transition-smooth rounded-lg text-white"
                 value={newLink.web_url}
                 onChange={(e) => setNewLink({ ...newLink, web_url: e.target.value })}
               />
             </div>
-            <div>
-              <Label htmlFor="ios_app_url">iOS App URL</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="ios_app_url" className="text-xs font-semibold text-muted-foreground">iOS App Store Link (Optional)</Label>
               <Input
                 id="ios_app_url"
                 type="url"
                 placeholder="https://apps.apple.com/..."
+                className="h-9 bg-background/40 border-border/40 focus:border-primary/50 text-xs transition-smooth rounded-lg text-white"
                 value={newLink.ios_app_url}
                 onChange={(e) => setNewLink({ ...newLink, ios_app_url: e.target.value })}
               />
             </div>
-            <div>
-              <Label htmlFor="android_app_url">Android App URL</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="android_app_url" className="text-xs font-semibold text-muted-foreground">Android Play Store Link (Optional)</Label>
               <Input
                 id="android_app_url"
                 type="url"
                 placeholder="https://play.google.com/..."
+                className="h-9 bg-background/40 border-border/40 focus:border-primary/50 text-xs transition-smooth rounded-lg text-white"
                 value={newLink.android_app_url}
                 onChange={(e) => setNewLink({ ...newLink, android_app_url: e.target.value })}
               />
             </div>
-            <div>
-              <Label htmlFor="notes">Notes (Optional)</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="notes" className="text-xs font-semibold text-muted-foreground">Notes (Optional)</Label>
               <Textarea
                 id="notes"
-                placeholder="Additional notes..."
+                placeholder="Add any helpful hints..."
+                className="bg-background/40 border-border/40 focus:border-primary/50 text-xs transition-smooth rounded-lg min-h-[60px] text-white"
                 value={newLink.notes}
                 onChange={(e) => setNewLink({ ...newLink, notes: e.target.value })}
               />
             </div>
-            <Button onClick={handleAddCustomLink} className="w-full">
-              Add Link
+            <Button onClick={handleAddCustomLink} className="w-full h-9 rounded-lg font-semibold text-xs shadow-primary hover:shadow-glow transition-smooth hover-lift mt-2 bg-primary hover:bg-primary/90 text-white">
+              Save Link
             </Button>
           </div>
         </DialogContent>
