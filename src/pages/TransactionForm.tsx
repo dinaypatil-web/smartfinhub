@@ -85,6 +85,7 @@ export default function TransactionForm() {
   const [ccAdvanceCreated, setCCAdvanceCreated] = useState(0);
   const [ccAdvanceUsed, setCCAdvanceUsed] = useState(0);
   const [ccAdvanceBalance, setCCAdvanceBalance] = useState(0);
+  const [ccLastAutoFilledTotal, setCCLastAutoFilledTotal] = useState<number | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -1178,14 +1179,19 @@ export default function TransactionForm() {
                   }
                 }}
                 onTotalSelectedChange={(total) => {
-                  // Auto-populate amount field with total selected
-                  if (total > 0) {
-                    setFormData(prev => ({ ...prev, amount: total.toString() }));
-                    // If using advance balance, also set advance consumed to total
-                    if (formData.from_account_id === 'advance_balance') {
-                      setCCAdvanceUsed(total);
-                      setCCAdvanceCreated(0);
+                  setFormData(prev => {
+                    const currentAmount = parseFloat(prev.amount) || 0;
+                    // Only auto-fill if empty, 0, or matches the last auto-filled total (meaning the user hasn't typed custom values)
+                    if (currentAmount === 0 || ccLastAutoFilledTotal === null || currentAmount === ccLastAutoFilledTotal) {
+                      setCCLastAutoFilledTotal(total);
+                      return { ...prev, amount: total > 0 ? total.toString() : '' };
                     }
+                    return prev;
+                  });
+                  // If using advance balance, also set advance consumed to total
+                  if (formData.from_account_id === 'advance_balance') {
+                    setCCAdvanceUsed(total);
+                    setCCAdvanceCreated(0);
                   }
                 }}
                 currency={formData.currency}

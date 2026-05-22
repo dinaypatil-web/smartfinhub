@@ -232,6 +232,17 @@ export const CreditCardStatementSelector: React.FC<CreditCardStatementSelectorPr
     setExpandedItems(newExpanded);
   };
 
+  const handleItemAmountChange = (itemId: string, newAmount: number) => {
+    setStatementItems(prev =>
+      prev.map(item => {
+        if (item.id === itemId) {
+          return { ...item, amount: newAmount };
+        }
+        return item;
+      })
+    );
+  };
+
   const selectedItemsList = Array.from(selectedItems).map(itemId =>
     statementItems.find(item => item.id === itemId)
   ).filter(Boolean) as StatementItem[];
@@ -300,9 +311,22 @@ export const CreditCardStatementSelector: React.FC<CreditCardStatementSelectorPr
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold text-gray-900">
-                          {currency} {parseFloat(item.amount.toString()).toFixed(2)}
-                        </p>
+                        {item.isEMI ? (
+                          <div className="flex items-center gap-1 justify-end">
+                            <span className="text-sm font-semibold text-gray-700">{currency}</span>
+                            <input
+                              type="number"
+                              className="w-[100px] text-right font-semibold text-gray-900 border-b border-dashed border-gray-300 hover:border-gray-500 focus:border-blue-500 focus:outline-none bg-transparent py-0 px-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              value={item.amount}
+                              onChange={(e) => handleItemAmountChange(item.id, Math.max(0, parseFloat(e.target.value) || 0))}
+                              title="Edit this month's EMI amount based on Written Down Value (WDV)"
+                            />
+                          </div>
+                        ) : (
+                          <p className="font-semibold text-gray-900">
+                            {currency} {parseFloat(item.amount.toString()).toFixed(2)}
+                          </p>
+                        )}
                         <p className="text-xs text-gray-500">
                           {item.status === 'partial' ? `Paid: ${currency} ${item.paid_amount}` : 'Pending'}
                         </p>
