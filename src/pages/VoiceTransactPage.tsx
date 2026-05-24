@@ -492,7 +492,7 @@ export default function VoiceTransactPage() {
                 key={acc.id}
                 variant="outline"
                 size="sm"
-                className="bg-card hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm"
+                className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm"
                 onClick={() => handleSelectField('from_account_id', acc.id, acc.account_name)}
               >
                 {acc.account_type === 'credit_card' ? '💳' : acc.account_type === 'cash' ? '💵' : '🏦'} {acc.account_name} (₹{acc.balance.toLocaleString('en-IN')})
@@ -526,7 +526,7 @@ export default function VoiceTransactPage() {
                 key={acc.id}
                 variant="outline"
                 size="sm"
-                className="bg-card hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm"
+                className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm"
                 onClick={() => handleSelectField('to_account_id', acc.id, acc.account_name)}
               >
                 {acc.account_type === 'credit_card' ? '💳' : acc.account_type === 'loan' ? '📈' : acc.account_type === 'cash' ? '💵' : '🏦'} {acc.account_name}
@@ -547,7 +547,7 @@ export default function VoiceTransactPage() {
                 key={cat.id}
                 variant="outline"
                 size="sm"
-                className="bg-card hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm"
+                className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm"
                 onClick={() => handleSelectField('category', cat.name, cat.name)}
               >
                 {cat.icon || '📁'} {cat.name}
@@ -568,7 +568,7 @@ export default function VoiceTransactPage() {
                 key={cat.key}
                 variant="outline"
                 size="sm"
-                className="bg-card hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm"
+                className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm"
                 onClick={() => handleSelectField('income_category', cat.key, cat.name)}
               >
                 {cat.icon} {cat.name}
