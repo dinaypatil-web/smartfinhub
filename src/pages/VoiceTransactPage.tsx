@@ -56,6 +56,7 @@ export default function VoiceTransactPage() {
   // Dynamic lists
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
+  const [transactions, setTransactions] = useState<any[]>([]);
   
   // UI & Chat states
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
@@ -67,6 +68,7 @@ export default function VoiceTransactPage() {
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isListening, setIsListening] = useState(false);
+  const [inputValueActive, setInputValueActive] = useState(''); // Keep track
   const [isLoading, setIsLoading] = useState(false);
   
   // Streaming text placeholder
@@ -103,12 +105,14 @@ export default function VoiceTransactPage() {
   const loadData = async () => {
     if (!user) return;
     try {
-      const [fetchedAccounts, fetchedCategories] = await Promise.all([
+      const [fetchedAccounts, fetchedCategories, fetchedTransactions] = await Promise.all([
         accountApi.getAccounts(user.id),
-        categoryApi.getCategories(user.id)
+        categoryApi.getCategories(user.id),
+        transactionApi.getTransactions(user.id)
       ]);
       setAccounts(fetchedAccounts);
       setCategories(fetchedCategories);
+      setTransactions(fetchedTransactions);
     } catch (e) {
       console.error('Failed to load data for AI Voice Transact:', e);
     }
@@ -232,6 +236,7 @@ export default function VoiceTransactPage() {
           command: commandText,
           accounts,
           categories,
+          transactions,
           chatHistory,
           currentDate: today
         },
@@ -243,8 +248,21 @@ export default function VoiceTransactPage() {
           setIsLoading(false);
           setStreamingText('');
           
-          // Clean up response if it has JSON structures inside chat bubbles
           let friendlyQuestion = parsedResult.clarificationQuestion;
+          const botMsgId = Math.random().toString();
+          
+          // If the AI processed this as a conversational query (balance, spending check)
+          if (parsedResult.isQuery) {
+            setChatMessages(prev => [
+              ...prev,
+              {
+                id: botMsgId,
+                role: 'model',
+                content: friendlyQuestion
+              }
+            ]);
+            return;
+          }
           
           // Apply extracted info to state
           const ext = parsedResult.extractedInfo;
@@ -267,9 +285,6 @@ export default function VoiceTransactPage() {
           
           setDraft(updatedDraft);
           setMissingFields(clientMissing);
-          
-          // Formulate bot reply
-          const botMsgId = Math.random().toString();
           
           // If complete, enable the interactive confirmation bubble
           const botMessage: ChatMessage = {
@@ -404,6 +419,9 @@ export default function VoiceTransactPage() {
       };
       
       await transactionApi.createTransaction(transactionPayload);
+      
+      // Reload accounts balances and recent transactions to ensure inquiries use updated figures
+      await loadData();
       
       setIsLoading(false);
       toast({

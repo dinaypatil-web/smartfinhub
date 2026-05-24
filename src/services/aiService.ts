@@ -399,7 +399,7 @@ Be realistic and practical. Focus on sustainable changes.`;
 
 export interface DraftTransactionResult {
   extractedInfo: {
-    transaction_type: 'income' | 'expense' | 'withdrawal' | 'transfer' | 'loan_payment' | 'credit_card_repayment' | null;
+    transaction_type: 'income' | 'expense' | 'withdrawal' | 'transfer' | 'loan_payment' | 'credit_card_repayment' | 'interest_charge' | null;
     amount: number | null;
     from_account_id: string | null;
     to_account_id: string | null;
@@ -411,6 +411,7 @@ export interface DraftTransactionResult {
   isComplete: boolean;
   missingFields: string[];
   clarificationQuestion: string;
+  isQuery?: boolean;
 }
 
 export async function parseTransactionCommand(
@@ -418,6 +419,7 @@ export async function parseTransactionCommand(
     command: string;
     accounts: any[];
     categories: any[];
+    transactions: any[];
     chatHistory: Array<{ role: 'user' | 'model'; content: string }>;
     currentDate: string;
   },
@@ -426,14 +428,22 @@ export async function parseTransactionCommand(
   onError: (error: string) => void
 ): Promise<void> {
   try {
-    const { command, accounts, categories, chatHistory, currentDate } = params;
+    const { command, accounts, categories, transactions, chatHistory, currentDate } = params;
 
     const accountsContext = accounts.map(a => `- ID: "${a.id}", Name: "${a.account_name}", Type: "${a.account_type}", Balance: ${a.balance}, Currency: "${a.currency}"`).join('\n');
     const categoriesContext = categories.map(c => `- Name: "${c.name}", Icon: "${c.icon}"`).join('\n');
-
-    const prompt = `You are a financial parsing assistant for SmartFinHub. Your job is to parse a natural language command (typed or spoken) into a structured transaction draft.
     
-    Here is the context of the user's accounts:
+    // Map transactions list to highly readable text for the LLM
+    const transactionsContext = transactions.slice(0, 100).map(t => {
+      const fromName = accounts.find(a => a.id === t.from_account_id)?.account_name || 'N/A';
+      const toName = accounts.find(a => a.id === t.to_account_id)?.account_name || 'N/A';
+      const catName = t.category || t.income_category || 'Uncategorized';
+      return `- Date: ${t.transaction_date}, Type: ${t.transaction_type}, Amount: ₹${t.amount}, Category: ${catName}, Description: "${t.description || ''}", From: "${fromName}", To: "${toName}"`;
+    }).join('\n');
+
+    const prompt = `You are a professional personal finance AI assistant for SmartFinHub. Your job is to parse conversational inputs and EITHER draft a new transaction OR answer a natural language inquiry about the user's accounts, balances, and spending trends.
+    
+    Here is the context of the user's accounts (balances and types):
     ${accountsContext}
     
     Here is the context of the user's available expense categories:
@@ -445,39 +455,51 @@ export async function parseTransactionCommand(
     - key: "family_income", Name: "Family Income"
     - key: "others", Name: "Others"
     
+    Here is the context of the user's recent transactions (last 100):
+    ${transactionsContext || 'No recent transactions recorded.'}
+    
     Today's date is: ${currentDate}
-    Default currency is INR.
+    Default currency is INR (₹).
     
-    Rules for matching accounts:
-    - "from_account_id" is the source of funds (e.g. from HDFC bank, cash, credit card).
-    - "to_account_id" is the destination of funds (e.g. into bank account for income, to loan account for loan payment, to credit card for cc repayment).
-    - If the user specifies an account, fuzzy match it to one of their accounts. If it matches, put the exact ID in "from_account_id" or "to_account_id". If they mention an account but you are not sure or it's not in the list, leave it null.
-    
-    Rules for Transaction Types:
-    1. "expense": Spent money. "from_account_id" is required (source account), "to_account_id" is null. "category" should match one of the expense categories. "income_category" is null.
-    2. "income": Received money. "to_account_id" is required (destination bank/cash account), "from_account_id" is null. "income_category" should be one of "salaries", "allowances", "family_income", "others". "category" is null.
-    3. "transfer": Transfer between user's own bank/cash accounts. Both "from_account_id" and "to_account_id" are required.
-    4. "withdrawal": Withdrawing cash from bank/card to cash. "from_account_id" is the bank, "to_account_id" is the cash account. Both are required.
-    5. "loan_payment": Paying a loan. "from_account_id" (bank/cash) and "to_account_id" (loan account) are both required.
-    6. "credit_card_repayment": Paying credit card bill. "from_account_id" (bank/cash) and "to_account_id" (credit card account) are both required.
-    
-    Required Fields validation:
-    - A transaction is complete ("isComplete": true) ONLY if we have:
-      - transaction_type
-      - amount (must be positive number)
-      - For "expense": from_account_id and category
-      - For "income": to_account_id and income_category
-      - For "transfer" / "withdrawal" / "loan_payment" / "credit_card_repayment": both from_account_id and to_account_id
-    
-    If any required fields are missing:
-    - Set "isComplete" to false.
-    - List the missing fields in the "missingFields" array. The possible missing fields are: ["transaction_type", "amount", "from_account_id", "to_account_id", "category", "income_category"].
-    - Formulate a clear, friendly, and brief conversational question in "clarificationQuestion" to ask the user for the missing fields (e.g. "Which account did you spend this from?" or "What category should we use for this expense?").
-    
-    If the transaction is complete:
-    - Set "isComplete" to true.
-    - Set "missingFields" to [].
-    - Set "clarificationQuestion" to a friendly success message (e.g. "I've drafted your transaction! Everything looks complete. Would you like to confirm and save it?").
+    DETERMINING USER INTENT:
+    Analyze the user's input.
+    1. If the user is asking a QUESTION/INQUIRY about their financial status (e.g. balance checks, spending inquiries, transaction queries):
+       - Set "isQuery" to true.
+       - Set all fields inside "extractedInfo" to null.
+       - Set "isComplete" to true.
+       - Set "missingFields" to [].
+       - Formulate a highly detailed, friendly, and complete conversational answer inside "clarificationQuestion". You must perform exact mathematical calculations (sums, filters) on the transactions context or lookup account balances directly from the accounts context. Always format currency amounts in INR (e.g., ₹2,500.00).
+       
+       Examples of inquiries:
+       - "What is my HDFC Bank balance?" -> AI scans accounts, finds HDFC, answers: "Your HDFC Bank balance is ₹45,230.50."
+       - "How much did I spend on Food & Dining this month?" -> AI scans the transaction history list, filters those of type "expense", matches "Food & Dining" category, sums them for the current month, and replies: "You spent a total of ₹4,250 on Food & Dining this month."
+       - "Did I buy anything yesterday?" -> scans yesterday's transactions and lists them.
+       
+    2. If the user is giving a COMMAND/STATEMENT to record a transaction (e.g. "spent 500 on groceries"):
+       - Set "isQuery" to false.
+       - Extract details into "extractedInfo" based on the parsing rules below:
+         - "transaction_type": "income" | "expense" | "withdrawal" | "transfer" | "loan_payment" | "credit_card_repayment" | null
+         - "amount": positive number or null
+         - "from_account_id": source of funds ID (fuzzy matched from the accounts list)
+         - "to_account_id": destination of funds ID (fuzzy matched from the accounts list)
+         - "category": expense category name (exact match from expense categories list)
+         - "income_category": income category key (salaries/allowances/family_income/others)
+         - "description": text description
+         - "transaction_date": date or null (defaults to today's date)
+         
+         Required Fields for transaction completeness:
+         - For "expense": from_account_id and category
+         - For "income": to_account_id and income_category
+         - For "transfer" / "withdrawal" / "loan_payment" / "credit_card_repayment": both from_account_id and to_account_id
+         
+       - If any required fields are missing:
+         - Set "isComplete" to false.
+         - List them in "missingFields".
+         - Write a friendly question in "clarificationQuestion" to ask for the missing field.
+       - If complete:
+         - Set "isComplete" to true.
+         - Set "missingFields" to [].
+         - Set "clarificationQuestion" to a friendly confirmation bubble.
     
     Current natural language input: "${command}"
     
@@ -496,7 +518,8 @@ export async function parseTransactionCommand(
       },
       "isComplete": boolean,
       "missingFields": string[],
-      "clarificationQuestion": string
+      "clarificationQuestion": string,
+      "isQuery": boolean
     }
     `;
 
