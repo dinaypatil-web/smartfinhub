@@ -10,105 +10,105 @@ All colors MUST be HSL.
 @layer base {
   :root {
     --radius: 0.75rem;
-    /* ICICI Bank Official Colors - Deep Saffron (#F99D27), Blue Sapphire (#005B75), American Red (#B02A30) */
-    --background: 38 100% 89%;
-    --foreground: 195 100% 23%;
-    --card: 0 0% 100%;
-    --card-foreground: 195 100% 23%;
+    /* Taskflow-pro Light Palette: Premium Indigo (#667eea), Violet (#764ba2), Cyan Accent (#4facfe), and Slate Backgrounds */
+    --background: 210 40% 98%;      /* slate-50 #f8fafc */
+    --foreground: 220 13% 18%;      /* slate-800 #1f2937 */
+    --card: 0 0% 100%;              /* pure white #ffffff */
+    --card-foreground: 220 13% 18%; /* slate-800 */
     --popover: 0 0% 100%;
-    --popover-foreground: 195 100% 23%;
-    --primary: 35 95% 57%;
+    --popover-foreground: 220 13% 18%;
+    --primary: 229 76% 66%;         /* Indigo #667eea */
     --primary-foreground: 0 0% 100%;
-    --primary-light: 35 95% 67%;
-    --primary-glow: 35 100% 77%;
-    --secondary: 195 100% 23%;
+    --primary-light: 229 76% 76%;
+    --primary-glow: 229 100% 86%;
+    --secondary: 270 37% 46%;       /* Violet #764ba2 */
     --secondary-foreground: 0 0% 100%;
-    --secondary-light: 195 100% 33%;
-    --success: 142 71% 45%;
+    --secondary-light: 270 37% 56%;
+    --success: 140 78% 59%;         /* Green #43e97b */
     --success-foreground: 0 0% 100%;
-    --warning: 35 95% 57%;
+    --warning: 341 94% 71%;         /* Sassy Orange-Pink #fa709a */
     --warning-foreground: 0 0% 100%;
-    --danger: 356 65% 42%;
+    --danger: 0 84% 60%;            /* Red #ef4444 */
     --danger-foreground: 0 0% 100%;
-    --muted: 0 0% 96%;
-    --muted-foreground: 195 10% 45%;
-    --accent: 35 95% 57%;
+    --muted: 210 40% 96.1%;         /* slate-100 */
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 208 99% 65%;          /* Cyan #4facfe */
     --accent-foreground: 0 0% 100%;
-    --destructive: 356 65% 42%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 90%;
-    --input: 0 0% 95%;
-    --ring: 35 95% 57%;
-    --chart-1: 35 95% 57%;
-    --chart-2: 195 100% 23%;
-    --chart-3: 142 71% 45%;
-    --chart-4: 356 65% 42%;
-    --chart-5: 35 80% 45%;
-    --sidebar-background: 0 0% 99%;
-    --sidebar-foreground: 195 100% 23%;
-    --sidebar-primary: 35 95% 57%;
+    --border: 214.3 31.8% 91.4%;    /* slate-200 */
+    --input: 214.3 31.8% 91.4%;
+    --ring: 229 76% 66%;
+    --chart-1: 229 76% 66%;         /* Indigo */
+    --chart-2: 270 37% 46%;         /* Violet */
+    --chart-3: 208 99% 65%;         /* Cyan */
+    --chart-4: 140 78% 59%;         /* Green */
+    --chart-5: 341 94% 71%;         /* Orange-Pink */
+    --sidebar-background: 210 40% 98%;
+    --sidebar-foreground: 220 13% 18%;
+    --sidebar-primary: 229 76% 66%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 0 0% 96%;
-    --sidebar-accent-foreground: 195 100% 23%;
-    --sidebar-border: 0 0% 90%;
-    --sidebar-ring: 35 95% 57%;
-    --gradient-primary: linear-gradient(135deg, hsl(35 95% 57%), hsl(35 100% 67%));
-    --gradient-secondary: linear-gradient(135deg, hsl(195 100% 23%), hsl(195 100% 33%));
-    --gradient-accent: linear-gradient(135deg, hsl(35 95% 57%), hsl(356 65% 42%));
-    --shadow-primary: 0 10px 40px -10px hsl(35 95% 57% / 0.4);
-    --shadow-glow: 0 0 30px hsl(35 100% 77% / 0.3);
-    --shadow-card: 0 4px 20px -2px hsl(195 20% 20% / 0.08);
+    --sidebar-accent: 210 40% 96.1%;
+    --sidebar-accent-foreground: 220 13% 18%;
+    --sidebar-border: 214.3 31.8% 91.4%;
+    --sidebar-ring: 229 76% 66%;
+    --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --gradient-secondary: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    --gradient-accent: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    --shadow-primary: 0 10px 40px -10px rgba(102, 126, 234, 0.4);
+    --shadow-glow: 0 0 30px rgba(102, 126, 234, 0.3);
+    --shadow-card: 0 8px 32px 0 rgba(31, 38, 135, 0.08);
   }
 
   .dark {
-    /* ICICI Bank dark mode - Deep Saffron with Blue Sapphire backgrounds */
-    --background: 195 50% 8%;
-    --foreground: 0 0% 95%;
-    --card: 195 40% 12%;
-    --card-foreground: 0 0% 95%;
-    --popover: 195 40% 12%;
-    --popover-foreground: 0 0% 95%;
-    --primary: 35 95% 60%;
+    /* Taskflow-pro Dark Palette: Deep Slate and Blue-Indigo accents */
+    --background: 222 47% 8%;       /* Slate-950 #0b0f19 */
+    --foreground: 210 40% 98%;      /* slate-50 */
+    --card: 222 47% 12%;            /* Slate-900 #111827 */
+    --card-foreground: 210 40% 98%;
+    --popover: 222 47% 12%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 229 76% 66%;         /* Indigo #667eea */
     --primary-foreground: 0 0% 100%;
-    --primary-light: 35 95% 70%;
-    --primary-glow: 35 100% 80%;
-    --secondary: 195 100% 35%;
+    --primary-light: 229 76% 76%;
+    --primary-glow: 229 100% 86%;
+    --secondary: 270 37% 56%;       /* Rich purple */
     --secondary-foreground: 0 0% 100%;
-    --secondary-light: 195 100% 45%;
-    --success: 142 71% 50%;
+    --secondary-light: 270 37% 66%;
+    --success: 140 78% 59%;
     --success-foreground: 0 0% 100%;
-    --warning: 35 95% 60%;
+    --warning: 341 94% 71%;
     --warning-foreground: 0 0% 100%;
-    --danger: 356 65% 50%;
+    --danger: 0 84% 60%;
     --danger-foreground: 0 0% 100%;
-    --muted: 195 30% 16%;
-    --muted-foreground: 195 10% 60%;
-    --accent: 35 95% 60%;
+    --muted: 222 47% 16%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 208 99% 65%;
     --accent-foreground: 0 0% 100%;
-    --destructive: 356 65% 50%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 195 30% 20%;
-    --input: 195 30% 18%;
-    --ring: 35 95% 60%;
-    --chart-1: 35 95% 60%;
-    --chart-2: 195 100% 35%;
-    --chart-3: 142 71% 50%;
-    --chart-4: 356 65% 50%;
-    --chart-5: 35 80% 50%;
-    --sidebar-background: 195 50% 10%;
-    --sidebar-foreground: 0 0% 95%;
-    --sidebar-primary: 35 95% 60%;
+    --border: 222 47% 18%;
+    --input: 222 47% 18%;
+    --ring: 229 76% 66%;
+    --chart-1: 229 76% 66%;
+    --chart-2: 270 37% 56%;
+    --chart-3: 208 99% 65%;
+    --chart-4: 140 78% 59%;
+    --chart-5: 341 94% 71%;
+    --sidebar-background: 222 47% 9%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 229 76% 66%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 195 30% 16%;
-    --sidebar-accent-foreground: 0 0% 95%;
-    --sidebar-border: 195 30% 20%;
-    --sidebar-ring: 35 95% 60%;
-    --gradient-primary: linear-gradient(135deg, hsl(35 95% 60%), hsl(35 100% 70%));
-    --gradient-secondary: linear-gradient(135deg, hsl(195 100% 35%), hsl(195 100% 45%));
-    --gradient-accent: linear-gradient(135deg, hsl(35 95% 60%), hsl(356 65% 50%));
-    --shadow-primary: 0 10px 40px -10px hsl(35 95% 60% / 0.5);
-    --shadow-glow: 0 0 40px hsl(35 100% 80% / 0.4);
-    --shadow-card: 0 4px 20px -2px hsl(0 0% 0% / 0.3);
+    --sidebar-accent: 222 47% 16%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 222 47% 18%;
+    --sidebar-ring: 229 76% 66%;
+    --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --gradient-secondary: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    --gradient-accent: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    --shadow-primary: 0 10px 40px -10px rgba(102, 126, 234, 0.5);
+    --shadow-glow: 0 0 40px rgba(102, 126, 234, 0.4);
+    --shadow-card: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
   }
 }
 
@@ -118,7 +118,11 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply antialiased transition-colors duration-300 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 text-foreground min-h-screen bg-fixed;
+  }
+
+  .dark body {
+    @apply bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950;
   }
 }
 
