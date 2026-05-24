@@ -396,3 +396,234 @@ Be realistic and practical. Focus on sustainable changes.`;
     onError(error instanceof Error ? error.message : 'Failed to generate optimization');
   }
 }
+
+export interface DraftTransactionResult {
+  extractedInfo: {
+    transaction_type: 'income' | 'expense' | 'withdrawal' | 'transfer' | 'loan_payment' | 'credit_card_repayment' | null;
+    amount: number | null;
+    from_account_id: string | null;
+    to_account_id: string | null;
+    category: string | null;
+    income_category: 'salaries' | 'allowances' | 'family_income' | 'others' | null;
+    description: string | null;
+    transaction_date: string | null;
+  };
+  isComplete: boolean;
+  missingFields: string[];
+  clarificationQuestion: string;
+}
+
+export async function parseTransactionCommand(
+  params: {
+    command: string;
+    accounts: any[];
+    categories: any[];
+    chatHistory: Array<{ role: 'user' | 'model'; content: string }>;
+    currentDate: string;
+  },
+  onChunk: (text: string) => void,
+  onComplete: (result: DraftTransactionResult) => void,
+  onError: (error: string) => void
+): Promise<void> {
+  try {
+    const { command, accounts, categories, chatHistory, currentDate } = params;
+
+    const accountsContext = accounts.map(a => `- ID: "${a.id}", Name: "${a.account_name}", Type: "${a.account_type}", Balance: ${a.balance}, Currency: "${a.currency}"`).join('\n');
+    const categoriesContext = categories.map(c => `- Name: "${c.name}", Icon: "${c.icon}"`).join('\n');
+
+    const prompt = `You are a financial parsing assistant for SmartFinHub. Your job is to parse a natural language command (typed or spoken) into a structured transaction draft.
+    
+    Here is the context of the user's accounts:
+    ${accountsContext}
+    
+    Here is the context of the user's available expense categories:
+    ${categoriesContext}
+    
+    Static Income Categories are:
+    - key: "salaries", Name: "Salaries"
+    - key: "allowances", Name: "Allowances"
+    - key: "family_income", Name: "Family Income"
+    - key: "others", Name: "Others"
+    
+    Today's date is: ${currentDate}
+    Default currency is INR.
+    
+    Rules for matching accounts:
+    - "from_account_id" is the source of funds (e.g. from HDFC bank, cash, credit card).
+    - "to_account_id" is the destination of funds (e.g. into bank account for income, to loan account for loan payment, to credit card for cc repayment).
+    - If the user specifies an account, fuzzy match it to one of their accounts. If it matches, put the exact ID in "from_account_id" or "to_account_id". If they mention an account but you are not sure or it's not in the list, leave it null.
+    
+    Rules for Transaction Types:
+    1. "expense": Spent money. "from_account_id" is required (source account), "to_account_id" is null. "category" should match one of the expense categories. "income_category" is null.
+    2. "income": Received money. "to_account_id" is required (destination bank/cash account), "from_account_id" is null. "income_category" should be one of "salaries", "allowances", "family_income", "others". "category" is null.
+    3. "transfer": Transfer between user's own bank/cash accounts. Both "from_account_id" and "to_account_id" are required.
+    4. "withdrawal": Withdrawing cash from bank/card to cash. "from_account_id" is the bank, "to_account_id" is the cash account. Both are required.
+    5. "loan_payment": Paying a loan. "from_account_id" (bank/cash) and "to_account_id" (loan account) are both required.
+    6. "credit_card_repayment": Paying credit card bill. "from_account_id" (bank/cash) and "to_account_id" (credit card account) are both required.
+    
+    Required Fields validation:
+    - A transaction is complete ("isComplete": true) ONLY if we have:
+      - transaction_type
+      - amount (must be positive number)
+      - For "expense": from_account_id and category
+      - For "income": to_account_id and income_category
+      - For "transfer" / "withdrawal" / "loan_payment" / "credit_card_repayment": both from_account_id and to_account_id
+    
+    If any required fields are missing:
+    - Set "isComplete" to false.
+    - List the missing fields in the "missingFields" array. The possible missing fields are: ["transaction_type", "amount", "from_account_id", "to_account_id", "category", "income_category"].
+    - Formulate a clear, friendly, and brief conversational question in "clarificationQuestion" to ask the user for the missing fields (e.g. "Which account did you spend this from?" or "What category should we use for this expense?").
+    
+    If the transaction is complete:
+    - Set "isComplete" to true.
+    - Set "missingFields" to [].
+    - Set "clarificationQuestion" to a friendly success message (e.g. "I've drafted your transaction! Everything looks complete. Would you like to confirm and save it?").
+    
+    Current natural language input: "${command}"
+    
+    You must respond with ONLY a valid JSON object in this exact schema. Do not output any markdown wrapper or explanation, just the JSON string itself.
+    
+    {
+      "extractedInfo": {
+        "transaction_type": "income" | "expense" | "withdrawal" | "transfer" | "loan_payment" | "credit_card_repayment" | null,
+        "amount": number | null,
+        "from_account_id": string | null,
+        "to_account_id": string | null,
+        "category": string | null,
+        "income_category": "salaries" | "allowances" | "family_income" | "others" | null,
+        "description": string | null,
+        "transaction_date": "YYYY-MM-DD" | null
+      },
+      "isComplete": boolean,
+      "missingFields": string[],
+      "clarificationQuestion": string
+    }
+    `;
+
+    // Incorporate chat history if available to understand context/clarifications
+    const contentsPayload = [];
+    for (const msg of chatHistory) {
+      contentsPayload.push({
+        role: msg.role,
+        parts: [{ text: msg.content }]
+      });
+    }
+    contentsPayload.push({
+      role: 'user' as const,
+      parts: [{ text: prompt }]
+    });
+
+    const payload = {
+      contents: contentsPayload,
+    };
+
+    if (!APP_ID) {
+      throw new Error('AI service not configured. Please set VITE_APP_ID in your .env file.');
+    }
+
+    const response = await fetch(AI_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-App-Id': APP_ID,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      if (errorData.status === 999) {
+        throw new Error(errorData.msg || 'API request failed');
+      }
+      throw new Error(`API request failed: ${response.statusText}`);
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('No response body');
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let completed = false;
+    let fullResponseText = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith('data: ')) continue;
+
+        const dataStr = trimmed.slice(6);
+        if (dataStr === '[DONE]') {
+          completed = true;
+          break;
+        }
+
+        try {
+          const parsedData = JSON.parse(dataStr);
+          const text = parsedData.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) {
+            fullResponseText += text;
+            onChunk(text);
+          }
+
+          const finishReason = parsedData.candidates?.[0]?.finishReason;
+          if (finishReason === 'STOP' && !completed) {
+            completed = true;
+            break;
+          }
+        } catch (e) {
+          console.error('Error parsing SSE line:', e, dataStr);
+        }
+      }
+
+      if (completed) {
+        break;
+      }
+    }
+
+    // Try to parse the accumulated full text as a JSON object
+    try {
+      // Sometimes models wrap JSON in markdown blocks (e.g. ```json ... ```). Clean it up.
+      let cleanedText = fullResponseText.trim();
+      if (cleanedText.startsWith('```')) {
+        const matches = cleanedText.match(/```(?:json)?([\s\S]*?)```/);
+        if (matches && matches[1]) {
+          cleanedText = matches[1].trim();
+        }
+      }
+      
+      const parsedResult: DraftTransactionResult = JSON.parse(cleanedText);
+      onComplete(parsedResult);
+    } catch (e) {
+      console.error('Failed to parse final AI output as JSON:', e, fullResponseText);
+      
+      // Return a structured error fallback
+      onComplete({
+        extractedInfo: {
+          transaction_type: null,
+          amount: null,
+          from_account_id: null,
+          to_account_id: null,
+          category: null,
+          income_category: null,
+          description: null,
+          transaction_date: null
+        },
+        isComplete: false,
+        missingFields: ['transaction_type', 'amount'],
+        clarificationQuestion: "I'm sorry, I encountered an issue parsing your request. Could you please specify your transaction type (income/expense) and the amount?"
+      });
+    }
+  } catch (error) {
+    console.error('AI Service Error:', error);
+    onError(error instanceof Error ? error.message : 'Failed to parse command');
+  }
+}

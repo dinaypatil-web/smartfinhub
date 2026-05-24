@@ -15,6 +15,7 @@ const BackupRestore = lazy(() => import('./pages/BackupRestore'));
 const AIAnalysisPage = lazy(() => import('./pages/AIAnalysisPage'));
 const LoanEMIHistory = lazy(() => import('./pages/LoanEMIHistory'));
 const LoanEMISimulator = lazy(() => import('./pages/LoanEMISimulator'));
+const VoiceTransactPage = lazy(() => import('./pages/VoiceTransactPage'));
 
 // Auth pages loaded immediately for faster initial access
 import Login from './pages/Login';
@@ -157,6 +158,13 @@ const routes: RouteConfig[] = [
     name: 'Backup & Restore',
     path: '/backup-restore',
     element: <ProtectedRoute><BackupRestore /></ProtectedRoute>,
+    visible: true,
+    protected: true,
+  },
+  {
+    name: 'Voice Transact',
+    path: '/voice-transact',
+    element: <ProtectedRoute><VoiceTransactPage /></ProtectedRoute>,
     visible: true,
     protected: true,
   },
