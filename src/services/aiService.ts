@@ -488,14 +488,15 @@ export async function parseTransactionCommand(
          - "transaction_date": date or null (defaults to today's date)
          
          Required Fields for transaction completeness:
-         - For "expense": from_account_id and category
-         - For "income": to_account_id and income_category
-         - For "transfer" / "withdrawal" / "loan_payment" / "credit_card_repayment": both from_account_id and to_account_id
+         - A transaction description ("description") is ALWAYS required for all transaction types to provide transaction context! If the user didn't specify a description, mark "description" as missing.
+         - For "expense": from_account_id, category, and description are required.
+         - For "income": to_account_id, income_category, and description are required.
+         - For "transfer" / "withdrawal" / "loan_payment" / "credit_card_repayment": both from_account_id, to_account_id, and description are required.
          
        - If any required fields are missing:
          - Set "isComplete" to false.
-         - List them in "missingFields".
-         - Write a friendly question in "clarificationQuestion" to ask for the missing field.
+         - List them in "missingFields" (which can include "description" alongside other missing fields).
+         - Write a friendly question in "clarificationQuestion" to ask for the missing fields (e.g. "What did you spend this on?" or "Could you give me a description for this transaction?").
        - If complete:
          - Set "isComplete" to true.
          - Set "missingFields" to [].

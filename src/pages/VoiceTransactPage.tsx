@@ -185,6 +185,10 @@ export default function VoiceTransactPage() {
       missing.push('amount');
     }
     
+    if (!currentDraft.description || !currentDraft.description.trim()) {
+      missing.push('description');
+    }
+    
     const type = currentDraft.transaction_type;
     
     if (type === 'expense') {
@@ -972,6 +976,20 @@ export default function VoiceTransactPage() {
                       )}
                     </div>
                   )}
+
+                  {/* Description Row */}
+                  <div className="flex justify-between items-center py-2 border-b border-muted/50">
+                    <span className="text-muted-foreground font-medium">Description</span>
+                    {draft.description ? (
+                      <span className="font-semibold text-foreground max-w-[60%] truncate text-right text-xs" title={draft.description}>
+                        {draft.description}
+                      </span>
+                    ) : (
+                      <span className="text-xs px-2.5 py-1 rounded-md border border-dashed border-amber-500/50 text-amber-500 bg-amber-500/5 font-medium flex items-center gap-1 animate-pulse">
+                        📝 Needs Description
+                      </span>
+                    )}
+                  </div>
 
                   {/* Transaction Date Row */}
                   <div className="flex justify-between items-center py-2 border-b border-muted/50">
