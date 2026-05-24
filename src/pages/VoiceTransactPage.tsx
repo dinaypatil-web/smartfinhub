@@ -197,6 +197,8 @@ export default function VoiceTransactPage() {
     } else if (type === 'income') {
       if (!currentDraft.to_account_id) missing.push('to_account_id');
       if (!currentDraft.income_category) missing.push('income_category');
+    } else if (type === 'interest_charge') {
+      if (!currentDraft.to_account_id) missing.push('to_account_id');
     } else if (['transfer', 'withdrawal', 'loan_payment', 'credit_card_repayment'].includes(type)) {
       if (!currentDraft.from_account_id) missing.push('from_account_id');
       if (!currentDraft.to_account_id) missing.push('to_account_id');
@@ -502,7 +504,7 @@ export default function VoiceTransactPage() {
     if (nextMissing === 'transaction_type') {
       return (
         <div className="space-y-2 mt-2 animate-in fade-in-50 duration-300">
-          <p className="text-xs text-muted-foreground font-semibold">Is this an expense or income?</p>
+          <p className="text-xs text-muted-foreground font-semibold">Select transaction type:</p>
           <div className="flex flex-wrap gap-2">
             <Button
               variant="outline"
@@ -527,6 +529,38 @@ export default function VoiceTransactPage() {
               onClick={() => handleSelectField('transaction_type', 'transfer', 'Transfer')}
             >
               🔄 Transfer
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="bg-card text-foreground hover:bg-orange-500/10 hover:text-orange-400 transition-all border border-muted hover:border-orange-500/30 text-xs rounded-full shadow-sm"
+              onClick={() => handleSelectField('transaction_type', 'withdrawal', 'Withdrawal')}
+            >
+              🪙 Withdrawal
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="bg-card text-foreground hover:bg-teal-500/10 hover:text-teal-400 transition-all border border-muted hover:border-teal-500/30 text-xs rounded-full shadow-sm"
+              onClick={() => handleSelectField('transaction_type', 'loan_payment', 'Loan Payment')}
+            >
+              📈 Loan Payment
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="bg-card text-foreground hover:bg-purple-500/10 hover:text-purple-400 transition-all border border-muted hover:border-purple-500/30 text-xs rounded-full shadow-sm"
+              onClick={() => handleSelectField('transaction_type', 'credit_card_repayment', 'Credit Card Repayment')}
+            >
+              💳 CC Repayment
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="bg-card text-foreground hover:bg-indigo-500/10 hover:text-indigo-400 transition-all border border-muted hover:border-indigo-500/30 text-xs rounded-full shadow-sm"
+              onClick={() => handleSelectField('transaction_type', 'interest_charge', 'Interest Charge')}
+            >
+              📊 Interest Charge
             </Button>
           </div>
         </div>
