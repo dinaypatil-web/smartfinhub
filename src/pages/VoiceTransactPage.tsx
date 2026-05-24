@@ -318,13 +318,31 @@ export default function VoiceTransactPage() {
   };
 
   // Handle manual selection from Chips (interactive quick-replies)
-  const handleSelectField = (field: 'from_account_id' | 'to_account_id' | 'category' | 'income_category', value: string, displayLabel: string) => {
+  const handleSelectField = (
+    field: 'transaction_type' | 'from_account_id' | 'to_account_id' | 'category' | 'income_category', 
+    value: string, 
+    displayLabel: string
+  ) => {
     const updatedDraft = {
       ...draft,
       [field]: value
     };
     
     // Adjust related parameters if type requires it
+    if (field === 'transaction_type') {
+      if (value === 'expense') {
+        updatedDraft.to_account_id = null;
+        updatedDraft.income_category = null;
+      } else if (value === 'income') {
+        updatedDraft.from_account_id = null;
+        updatedDraft.category = null;
+      } else if (value === 'transfer' || value === 'withdrawal' || value === 'loan_payment' || value === 'credit_card_repayment') {
+        // Keeps both accounts, clear category/income_category
+        updatedDraft.category = null;
+        updatedDraft.income_category = null;
+      }
+    }
+    
     if (field === 'category' && draft.transaction_type === 'expense') {
       updatedDraft.income_category = null;
     }
@@ -332,10 +350,10 @@ export default function VoiceTransactPage() {
       updatedDraft.category = null;
     }
     
-    const clientMissing = validateDraft(updatedDraft);
+    const clientMissing = validateDraft(updatedDraft as any);
     const isComplete = clientMissing.length === 0;
     
-    setDraft(updatedDraft);
+    setDraft(updatedDraft as any);
     setMissingFields(clientMissing);
     
     // Add conversational messages
@@ -347,9 +365,15 @@ export default function VoiceTransactPage() {
     };
     
     const botMsgId = Math.random().toString();
+    
+    let fieldName = field.toString();
+    if (field === 'transaction_type') fieldName = 'transaction type';
+    else if (field === 'from_account_id' || field === 'to_account_id') fieldName = 'account';
+    else if (field === 'category' || field === 'income_category') fieldName = 'category';
+    
     const friendlyQuestion = isComplete 
       ? "Awesome! Everything is ready now. Would you like to confirm and save this transaction?"
-      : `I've updated the ${field === 'from_account_id' || field === 'to_account_id' ? 'account' : 'category'} to ${displayLabel}. What was the details for other missing fields?`;
+      : `I've updated the ${fieldName} to ${displayLabel}. What was the details for other missing fields?`;
       
     const botMessage: ChatMessage = {
       id: botMsgId,
@@ -471,9 +495,43 @@ export default function VoiceTransactPage() {
 
   // Determine what type of quick reply chips to show
   const renderQuickReplyChips = () => {
-    if (isLoading || missingFields.length === 0 || !draft.transaction_type) return null;
+    if (isLoading || missingFields.length === 0) return null;
     
     const nextMissing = missingFields[0]; // Address first missing field
+    
+    if (nextMissing === 'transaction_type') {
+      return (
+        <div className="space-y-2 mt-2 animate-in fade-in-50 duration-300">
+          <p className="text-xs text-muted-foreground font-semibold">Is this an expense or income?</p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="bg-card text-foreground hover:bg-red-500/10 hover:text-red-400 transition-all border border-muted hover:border-red-500/30 text-xs rounded-full shadow-sm"
+              onClick={() => handleSelectField('transaction_type', 'expense', 'Expense')}
+            >
+              📤 Expense
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="bg-card text-foreground hover:bg-emerald-500/10 hover:text-emerald-400 transition-all border border-muted hover:border-emerald-500/30 text-xs rounded-full shadow-sm"
+              onClick={() => handleSelectField('transaction_type', 'income', 'Income')}
+            >
+              📥 Income
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="bg-card text-foreground hover:bg-blue-500/10 hover:text-blue-400 transition-all border border-muted hover:border-blue-500/30 text-xs rounded-full shadow-sm"
+              onClick={() => handleSelectField('transaction_type', 'transfer', 'Transfer')}
+            >
+              🔄 Transfer
+            </Button>
+          </div>
+        </div>
+      );
+    }
     
     if (nextMissing === 'from_account_id') {
       const filteredAccounts = accounts.filter(a => {
