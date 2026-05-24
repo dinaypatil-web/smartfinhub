@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatCurrency, formatAccountNumber } from '@/utils/format';
-import { Plus, Wallet, CreditCard, TrendingUp, TrendingDown, Building2, AlertCircle, Calculator, DollarSign, ExternalLink } from 'lucide-react';
+import { Plus, Wallet, CreditCard, TrendingUp, TrendingDown, Building2, AlertCircle, Calculator, DollarSign, ExternalLink, Mic, Sparkles } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { calculateEMI, calculateAccruedInterest } from '@/utils/loanCalculations';
@@ -1149,6 +1149,29 @@ export default function Dashboard() {
         onOpenChange={setStatementDialogOpen}
         currency={currency}
       />
+
+      {/* Floating Shortcut for Voice Transact */}
+      <div className="fixed bottom-6 right-6 z-50 group">
+        <Link to="/voice-transact">
+          <Button
+            size="lg"
+            className="h-14 w-14 rounded-full bg-gradient-to-r from-teal-500 via-primary to-indigo-600 hover:from-teal-600 hover:to-indigo-700 text-white shadow-2xl hover:shadow-primary/30 flex items-center justify-center border-none p-0 group relative overflow-hidden transition-all duration-300 hover:scale-110 active:scale-95"
+            title="AI Voice Transact"
+          >
+            {/* Visual sparkle aura */}
+            <span className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-full animate-ping pointer-events-none"></span>
+            
+            <div className="relative z-10 flex items-center justify-center font-bold">
+              <Mic className="h-6 w-6 animate-pulse" />
+              <Sparkles className="h-3.5 w-3.5 absolute -top-1.5 -right-1.5 text-yellow-300 animate-bounce duration-1000" />
+            </div>
+          </Button>
+        </Link>
+        {/* Sleek Tooltip/Label */}
+        <div className="absolute right-16 top-1/2 -translate-y-1/2 bg-card/90 backdrop-blur-md border border-muted px-3 py-1.5 rounded-xl shadow-lg text-xs font-semibold text-foreground whitespace-nowrap opacity-0 scale-90 translate-x-2 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-x-0 transition-all duration-300 pointer-events-none">
+          AI Voice Transact ✨
+        </div>
+      </div>
     </div>
   );
 }
