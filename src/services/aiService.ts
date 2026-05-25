@@ -397,24 +397,50 @@ Be realistic and practical. Focus on sustainable changes.`;
   }
 }
 
-export interface DraftTransactionResult {
+export interface SmartChatbotResult {
+  intent: 'transaction' | 'account' | 'budget' | 'financial_inquiry' | 'emi_calculator' | 'financial_analysis' | 'general_help';
   extractedInfo: {
-    transaction_type: 'income' | 'expense' | 'withdrawal' | 'transfer' | 'loan_payment' | 'credit_card_repayment' | 'interest_charge' | null;
-    amount: number | null;
-    from_account_id: string | null;
-    to_account_id: string | null;
-    category: string | null;
-    income_category: 'salaries' | 'allowances' | 'family_income' | 'others' | null;
-    description: string | null;
-    transaction_date: string | null;
+    // For transaction
+    transaction_type?: 'income' | 'expense' | 'withdrawal' | 'transfer' | 'loan_payment' | 'credit_card_repayment' | 'interest_charge' | null;
+    amount?: number | null;
+    from_account_id?: string | null;
+    to_account_id?: string | null;
+    category?: string | null;
+    income_category?: 'salaries' | 'allowances' | 'family_income' | 'others' | null;
+    description?: string | null;
+    transaction_date?: string | null;
+
+    // For account
+    account_type?: 'cash' | 'bank' | 'credit_card' | 'loan' | null;
+    account_name?: string | null;
+    balance?: number | null;
+    currency?: string | null;
+    institution_name?: string | null;
+    last_4_digits?: string | null;
+    credit_limit?: number | null;
+    loan_principal?: number | null;
+    loan_tenure_months?: number | null;
+    current_interest_rate?: number | null;
+
+    // For budget
+    month?: number | null;
+    year?: number | null;
+    budgeted_income?: number | null;
+    budgeted_expenses?: number | null;
+    category_budgets?: Record<string, number> | null;
+
+    // For emi_calculator
+    principal?: number | null;
+    annual_rate?: number | null;
+    tenure_months?: number | null;
   };
   isComplete: boolean;
   missingFields: string[];
   clarificationQuestion: string;
-  isQuery?: boolean;
+  extraContext?: any;
 }
 
-export async function parseTransactionCommand(
+export async function parseSmartChatbotCommand(
   params: {
     command: string;
     accounts: any[];
@@ -424,7 +450,7 @@ export async function parseTransactionCommand(
     currentDate: string;
   },
   onChunk: (text: string) => void,
-  onComplete: (result: DraftTransactionResult) => void,
+  onComplete: (result: SmartChatbotResult) => void,
   onError: (error: string) => void
 ): Promise<void> {
   try {
@@ -441,9 +467,17 @@ export async function parseTransactionCommand(
       return `- Date: ${t.transaction_date}, Type: ${t.transaction_type}, Amount: ₹${t.amount}, Category: ${catName}, Description: "${t.description || ''}", From: "${fromName}", To: "${toName}"`;
     }).join('\n');
 
-    const prompt = `You are a professional personal finance AI assistant for SmartFinHub. Your job is to parse conversational inputs and EITHER draft a new transaction OR answer a natural language inquiry about the user's accounts, balances, and spending trends.
+    const prompt = `You are a highly intelligent Smart AI Chatbot for the SmartFinHub personal finance app.
+    Your job is to parse the user's natural language input (chat or voice) and perform one of the following operations:
+    1. Manage Transactions (intent: "transaction")
+    2. Manage Accounts (intent: "account")
+    3. Manage Budgets (intent: "budget")
+    4. Solve Loan EMI Payment Calculations (intent: "emi_calculator")
+    5. Answer Financial Inquiries about balances, spending, or audits (intent: "financial_inquiry")
+    6. Generate Financial Analysis reports (intent: "financial_analysis")
+    7. Provide general support instructions (intent: "general_help")
     
-    Here is the context of the user's accounts (balances and types):
+    Here is the context of the user's existing accounts:
     ${accountsContext}
     
     Here is the context of the user's available expense categories:
@@ -460,67 +494,89 @@ export async function parseTransactionCommand(
     
     Today's date is: ${currentDate}
     Default currency is INR (₹).
+
+    RULES FOR DETECTING INTENTS & REQUIRED FIELDS:
     
-    DETERMINING USER INTENT:
-    Analyze the user's input.
-    1. If the user is asking a QUESTION/INQUIRY about their financial status (e.g. balance checks, spending inquiries, transaction queries):
-       - Set "isQuery" to true.
-       - Set all fields inside "extractedInfo" to null.
-       - Set "isComplete" to true.
-       - Set "missingFields" to [].
-       - Formulate a highly detailed, friendly, and complete conversational answer inside "clarificationQuestion". You must perform exact mathematical calculations (sums, filters) on the transactions context or lookup account balances directly from the accounts context. Always format currency amounts in INR (e.g., ₹2,500.00).
+    1. intent: "transaction"
+       - Triggered if the user wants to record spent money, salary received, transfer funds, cash withdrawal, credit card bill repayment, or loan payment.
+       - Required fields: "transaction_type", "amount" (positive number), "description".
+       - Specific required fields by type:
+         - expense: from_account_id (matched from accounts), category (matched from categories).
+         - income: to_account_id (matched from accounts), income_category (salaries/allowances/family_income/others).
+         - transfer / withdrawal / loan_payment / credit_card_repayment: both from_account_id and to_account_id.
+         - interest_charge: to_account_id.
+       - Missing fields go in "missingFields". Ask for them in "clarificationQuestion".
        
-       Examples of inquiries:
-       - "What is my HDFC Bank balance?" -> AI scans accounts, finds HDFC, answers: "Your HDFC Bank balance is ₹45,230.50."
-       - "How much did I spend on Food & Dining this month?" -> AI scans the transaction history list, filters those of type "expense", matches "Food & Dining" category, sums them for the current month, and replies: "You spent a total of ₹4,250 on Food & Dining this month."
-       - "Did I buy anything yesterday?" -> scans yesterday's transactions and lists them.
+    2. intent: "account"
+       - Triggered if the user wants to add/create a new account, card, cash wallet, or loan profile. E.g. "Create a new bank account named HDFC Savings with balance 10000" or "Add a new credit card named SBI Card with limit 150000".
+       - Extracted fields: "account_type" ('cash' | 'bank' | 'credit_card' | 'loan'), "account_name" (e.g. HDFC Savings), "balance" (initial balance, default 0), "currency" (default "INR"), "institution_name" (e.g. HDFC Bank), "last_4_digits" (4 digit string or null), "credit_limit" (number, required if card), "loan_principal" (number, required if loan), "loan_tenure_months" (number, required if loan), "current_interest_rate" (number, required if loan).
+       - Required fields for ALL accounts: "account_type", "account_name".
+       - Extra required if credit_card: "credit_limit".
+       - Extra required if loan: "loan_principal", "loan_tenure_months", "current_interest_rate".
+       - If any required fields are missing: set isComplete to false, list in missingFields, ask for them in clarificationQuestion (e.g. "What is the account type? (cash/bank/credit card/loan)").
        
-    2. If the user is giving a COMMAND/STATEMENT to record a transaction (e.g. "spent 500 on groceries"):
-       - Set "isQuery" to false.
-       - Extract details into "extractedInfo" based on the parsing rules below:
-         - "transaction_type": "income" | "expense" | "withdrawal" | "transfer" | "loan_payment" | "credit_card_repayment" | null
-         - "amount": positive number or null
-         - "from_account_id": source of funds ID (fuzzy matched from the accounts list)
-         - "to_account_id": destination of funds ID (fuzzy matched from the accounts list)
-         - "category": expense category name (exact match from expense categories list)
-         - "income_category": income category key (salaries/allowances/family_income/others)
-         - "description": text description
-         - "transaction_date": date or null (defaults to today's date)
-         
-         Required Fields for transaction completeness:
-         - A transaction description ("description") is ALWAYS required for all transaction types to provide transaction context! If the user didn't specify a description, mark "description" as missing.
-         - For "expense": from_account_id, category, and description are required.
-         - For "income": to_account_id, income_category, and description are required.
-         - For "transfer" / "withdrawal" / "loan_payment" / "credit_card_repayment": both from_account_id, to_account_id, and description are required.
-         
-       - If any required fields are missing:
-         - Set "isComplete" to false.
-         - List them in "missingFields" (which can include "description" alongside other missing fields).
-         - Write a friendly question in "clarificationQuestion" to ask for the missing fields (e.g. "What did you spend this on?" or "Could you give me a description for this transaction?").
-       - If complete:
-         - Set "isComplete" to true.
-         - Set "missingFields" to [].
-         - Set "clarificationQuestion" to a friendly confirmation bubble.
-    
+    3. intent: "budget"
+       - Triggered if the user wants to set a monthly budget or category budget. E.g. "Set a budget of 5000 for groceries in June 2026" or "Setup monthly expenses budget of 40000 for next month".
+       - Extracted fields: "month" (number 1-12, default to current month), "year" (4-digit number, default to current year), "budgeted_income" (number), "budgeted_expenses" (overall monthly expense budget), "category_budgets" (JSON object representing category name keys and budget numbers, e.g. {"Groceries": 5000}).
+       - Required fields: "month", "year". Must specify at least one budget limit (overall budgeted_expenses or category_budgets).
+       
+    4. intent: "emi_calculator"
+       - Triggered if the user wants to calculate, simulate, or compare loan payments. E.g. "What is the monthly payment for a loan of 500000 at 9.5% interest for 5 years?".
+       - Extracted fields: "principal" (loan amount), "annual_rate" (annual interest rate percentage), "tenure_months" (total loan tenure in months. Note: convert "5 years" to "60 months").
+       - Required fields: "principal", "annual_rate", "tenure_months".
+       - Calculation: If all fields are complete, perform the exact monthly EMI calculation: EMI = [P x r x (1+r)^n] / [(1+r)^n - 1] where P = principal, r = annual_rate/12/100, n = tenure_months. Put the calculated EMI, total interest, and a friendly summary inside "clarificationQuestion" and return the calculation details inside "extraContext" as: {"monthly_emi": X, "total_interest": Y, "total_payable": Z}.
+       
+    5. intent: "financial_inquiry"
+       - Triggered if the user asks a question about balances, spent totals, or recent audits. E.g. "What is my ICICI Bank balance?" or "How much did I spend on Food & Dining this month?".
+       - Scan the accounts context or filter and sum transactions context for the current month. Return the calculated answer in "clarificationQuestion". Set "isComplete" to true.
+       
+    6. intent: "financial_analysis"
+       - Triggered if the user wants a full AI analysis, budget report, or optimization advice. Perform the summary, and return a beautiful markdown analysis report in "clarificationQuestion".
+       
+    7. intent: "general_help"
+       - Triggered if the user asks "What can you do?" or general help. Explain in a detailed, friendly way how they can operate transactions, accounts, budgets, and EMI calculations in "clarificationQuestion".
+
     Current natural language input: "${command}"
     
     You must respond with ONLY a valid JSON object in this exact schema. Do not output any markdown wrapper or explanation, just the JSON string itself.
     
     {
+      "intent": "transaction" | "account" | "budget" | "financial_inquiry" | "emi_calculator" | "financial_analysis" | "general_help",
       "extractedInfo": {
-        "transaction_type": "income" | "expense" | "withdrawal" | "transfer" | "loan_payment" | "credit_card_repayment" | null,
+        "transaction_type": "income" | "expense" | "withdrawal" | "transfer" | "loan_payment" | "credit_card_repayment" | "interest_charge" | null,
         "amount": number | null,
         "from_account_id": string | null,
         "to_account_id": string | null,
         "category": string | null,
         "income_category": "salaries" | "allowances" | "family_income" | "others" | null,
         "description": string | null,
-        "transaction_date": "YYYY-MM-DD" | null
+        "transaction_date": "YYYY-MM-DD" | null,
+        
+        "account_type": "cash" | "bank" | "credit_card" | "loan" | null,
+        "account_name": string | null,
+        "balance": number | null,
+        "currency": string | null,
+        "institution_name": string | null,
+        "last_4_digits": string | null,
+        "credit_limit": number | null,
+        "loan_principal": number | null,
+        "loan_tenure_months": number | null,
+        "current_interest_rate": number | null,
+        
+        "month": number | null,
+        "year": number | null,
+        "budgeted_income": number | null,
+        "budgeted_expenses": number | null,
+        "category_budgets": object | null,
+        
+        "principal": number | null,
+        "annual_rate": number | null,
+        "tenure_months": number | null
       },
       "isComplete": boolean,
       "missingFields": string[],
       "clarificationQuestion": string,
-      "isQuery": boolean
+      "extraContext": any
     }
     `;
 
@@ -615,7 +671,7 @@ export async function parseTransactionCommand(
 
     // Try to parse the accumulated full text as a JSON object
     try {
-      // Sometimes models wrap JSON in markdown blocks (e.g. ```json ... ```). Clean it up.
+      // Clean up JSON block formatting if present
       let cleanedText = fullResponseText.trim();
       if (cleanedText.startsWith('```')) {
         const matches = cleanedText.match(/```(?:json)?([\s\S]*?)```/);
@@ -624,26 +680,18 @@ export async function parseTransactionCommand(
         }
       }
       
-      const parsedResult: DraftTransactionResult = JSON.parse(cleanedText);
+      const parsedResult: SmartChatbotResult = JSON.parse(cleanedText);
       onComplete(parsedResult);
     } catch (e) {
       console.error('Failed to parse final AI output as JSON:', e, fullResponseText);
       
       // Return a structured error fallback
       onComplete({
-        extractedInfo: {
-          transaction_type: null,
-          amount: null,
-          from_account_id: null,
-          to_account_id: null,
-          category: null,
-          income_category: null,
-          description: null,
-          transaction_date: null
-        },
+        intent: 'general_help',
+        extractedInfo: {},
         isComplete: false,
-        missingFields: ['transaction_type', 'amount'],
-        clarificationQuestion: "I'm sorry, I encountered an issue parsing your request. Could you please specify your transaction type (income/expense) and the amount?"
+        missingFields: [],
+        clarificationQuestion: fullResponseText || "I'm here to help you manage Transactions, Accounts, Budgets, and simulate EMIs! What would you like to operate today?"
       });
     }
   } catch (error) {

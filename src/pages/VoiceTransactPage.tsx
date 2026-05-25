@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useHybridAuth } from '@/contexts/HybridAuthContext';
-import { transactionApi, accountApi, categoryApi } from '@/db/api';
-import { parseTransactionCommand, type DraftTransactionResult } from '@/services/aiService';
+import { transactionApi, accountApi, categoryApi, budgetApi } from '@/db/api';
+import { parseSmartChatbotCommand, type SmartChatbotResult } from '@/services/aiService';
 import { INCOME_CATEGORIES, getIncomeCategoryName } from '@/constants/incomeCategories';
 import type { Account, ExpenseCategory } from '@/types/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,7 +27,8 @@ import {
   Coins, 
   Loader2,
   Trash2,
-  Volume2
+  Volume2,
+  Bot
 } from 'lucide-react';
 
 interface ChatMessage {
@@ -49,6 +50,36 @@ interface DraftTransaction {
   transaction_date: string | null;
 }
 
+interface DraftAccount {
+  account_type: 'cash' | 'bank' | 'credit_card' | 'loan' | null;
+  account_name: string | null;
+  balance: number | null;
+  currency: string | null;
+  institution_name: string | null;
+  last_4_digits: string | null;
+  credit_limit: number | null;
+  loan_principal: number | null;
+  loan_tenure_months: number | null;
+  current_interest_rate: number | null;
+}
+
+interface DraftBudget {
+  month: number | null;
+  year: number | null;
+  budgeted_income: number | null;
+  budgeted_expenses: number | null;
+  category_budgets: Record<string, number> | null;
+}
+
+interface DraftEMI {
+  principal: number | null;
+  annual_rate: number | null;
+  tenure_months: number | null;
+  monthly_emi?: number | null;
+  total_interest?: number | null;
+  total_payable?: number | null;
+}
+
 export default function VoiceTransactPage() {
   const { user } = useHybridAuth();
   const { toast } = useToast();
@@ -59,11 +90,12 @@ export default function VoiceTransactPage() {
   const [transactions, setTransactions] = useState<any[]>([]);
   
   // UI & Chat states
+  const [currentIntent, setCurrentIntent] = useState<'transaction' | 'account' | 'budget' | 'financial_inquiry' | 'emi_calculator' | 'financial_analysis' | 'general_help'>('general_help');
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',
       role: 'model',
-      content: "Hello! I am your SmartFinHub AI Assistant. Tell or speak to me about any financial transaction, and I'll draft it for you instantly! E.g. \"Spent 450 on dinner from HDFC Bank\" or \"Received salary of 50000\"."
+      content: "Hello! I am your Smart AI Chatbot—the central operational hub of SmartFinHub. I can help you record Transactions, add/manage Accounts, configure Budgets, simulate Loan EMIs, and answer any financial audits or spending inquiries! E.g. \"Create a new cash account named Cash Pocket with balance 500\" or \"How much did I spend on Food & Dining this month?\""
     }
   ]);
   const [inputValue, setInputValue] = useState('');
@@ -78,7 +110,7 @@ export default function VoiceTransactPage() {
   const [recognitionSupported, setRecognitionSupported] = useState(false);
   const recognitionRef = useRef<any>(null);
   
-  // Transaction Draft State
+  // Active drafts
   const [draft, setDraft] = useState<DraftTransaction>({
     transaction_type: null,
     amount: null,
@@ -88,6 +120,36 @@ export default function VoiceTransactPage() {
     income_category: null,
     description: null,
     transaction_date: null
+  });
+
+  const [draftAccount, setDraftAccount] = useState<DraftAccount>({
+    account_type: null,
+    account_name: null,
+    balance: null,
+    currency: 'INR',
+    institution_name: null,
+    last_4_digits: null,
+    credit_limit: null,
+    loan_principal: null,
+    loan_tenure_months: null,
+    current_interest_rate: null
+  });
+
+  const [draftBudget, setDraftBudget] = useState<DraftBudget>({
+    month: null,
+    year: null,
+    budgeted_income: null,
+    budgeted_expenses: null,
+    category_budgets: null
+  });
+
+  const [draftEMI, setDraftEMI] = useState<DraftEMI>({
+    principal: null,
+    annual_rate: null,
+    tenure_months: null,
+    monthly_emi: null,
+    total_interest: null,
+    total_payable: null
   });
   
   const [missingFields, setMissingFields] = useState<string[]>([]);
@@ -174,34 +236,67 @@ export default function VoiceTransactPage() {
   };
 
   // Helper: validate missing fields on the client side
-  const validateDraft = (currentDraft: DraftTransaction): string[] => {
+  const validateCurrentDraft = (intent: string, activeDraft: any): string[] => {
     const missing: string[] = [];
-    if (!currentDraft.transaction_type) {
-      missing.push('transaction_type');
-      return missing; // Rest of validation depends on type
-    }
-    
-    if (!currentDraft.amount || currentDraft.amount <= 0) {
-      missing.push('amount');
-    }
-    
-    if (!currentDraft.description || !currentDraft.description.trim()) {
-      missing.push('description');
-    }
-    
-    const type = currentDraft.transaction_type;
-    
-    if (type === 'expense') {
-      if (!currentDraft.from_account_id) missing.push('from_account_id');
-      if (!currentDraft.category) missing.push('category');
-    } else if (type === 'income') {
-      if (!currentDraft.to_account_id) missing.push('to_account_id');
-      if (!currentDraft.income_category) missing.push('income_category');
-    } else if (type === 'interest_charge') {
-      if (!currentDraft.to_account_id) missing.push('to_account_id');
-    } else if (['transfer', 'withdrawal', 'loan_payment', 'credit_card_repayment'].includes(type)) {
-      if (!currentDraft.from_account_id) missing.push('from_account_id');
-      if (!currentDraft.to_account_id) missing.push('to_account_id');
+    if (intent === 'transaction') {
+      const d = activeDraft as DraftTransaction;
+      if (!d.transaction_type) {
+        missing.push('transaction_type');
+        return missing; // Rest of validation depends on type
+      }
+      
+      if (!d.amount || d.amount <= 0) {
+        missing.push('amount');
+      }
+      
+      if (!d.description || !d.description.trim()) {
+        missing.push('description');
+      }
+      
+      const type = d.transaction_type;
+      
+      if (type === 'expense') {
+        if (!d.from_account_id) missing.push('from_account_id');
+        if (!d.category) missing.push('category');
+      } else if (type === 'income') {
+        if (!d.to_account_id) missing.push('to_account_id');
+        if (!d.income_category) missing.push('income_category');
+      } else if (type === 'interest_charge') {
+        if (!d.to_account_id) missing.push('to_account_id');
+      } else if (['transfer', 'withdrawal', 'loan_payment', 'credit_card_repayment'].includes(type)) {
+        if (!d.from_account_id) missing.push('from_account_id');
+        if (!d.to_account_id) missing.push('to_account_id');
+      }
+    } else if (intent === 'account') {
+      const d = activeDraft as DraftAccount;
+      if (!d.account_type) {
+        missing.push('account_type');
+        return missing;
+      }
+      if (!d.account_name || !d.account_name.trim()) {
+        missing.push('account_name');
+      }
+      if (d.account_type === 'credit_card') {
+        if (d.credit_limit === null || d.credit_limit === undefined || d.credit_limit <= 0) {
+          missing.push('credit_limit');
+        }
+      } else if (d.account_type === 'loan') {
+        if (!d.loan_principal || d.loan_principal <= 0) missing.push('loan_principal');
+        if (!d.loan_tenure_months || d.loan_tenure_months <= 0) missing.push('loan_tenure_months');
+        if (d.current_interest_rate === null || d.current_interest_rate === undefined) missing.push('current_interest_rate');
+      }
+    } else if (intent === 'budget') {
+      const d = activeDraft as DraftBudget;
+      if (!d.month) missing.push('month');
+      if (!d.year) missing.push('year');
+      if (!d.budgeted_expenses && (!d.category_budgets || Object.keys(d.category_budgets).length === 0)) {
+        missing.push('budget_limit');
+      }
+    } else if (intent === 'emi_calculator') {
+      const d = activeDraft as DraftEMI;
+      if (!d.principal || d.principal <= 0) missing.push('principal');
+      if (!d.annual_rate || d.annual_rate <= 0) missing.push('annual_rate');
+      if (!d.tenure_months || d.tenure_months <= 0) missing.push('tenure_months');
     }
     
     return missing;
@@ -213,7 +308,7 @@ export default function VoiceTransactPage() {
     
     setInputValue('');
     
-    // 1. Add user message
+    // Add user message
     const userMsgId = Math.random().toString();
     const newUserMsg: ChatMessage = {
       id: userMsgId,
@@ -226,10 +321,8 @@ export default function VoiceTransactPage() {
     setStreamingText('');
     
     try {
-      // Setup currentDate
       const today = new Date().toISOString().slice(0, 10);
       
-      // Feed chat history (max 6 items for context speed)
       const chatHistory = chatMessages.slice(-6).map(m => ({
         role: m.role,
         content: m.content
@@ -237,7 +330,7 @@ export default function VoiceTransactPage() {
       
       let gatheredText = '';
       
-      await parseTransactionCommand(
+      await parseSmartChatbotCommand(
         {
           command: commandText,
           accounts,
@@ -250,15 +343,114 @@ export default function VoiceTransactPage() {
           gatheredText += chunk;
           setStreamingText(gatheredText);
         },
-        (parsedResult: DraftTransactionResult) => {
+        (parsedResult: SmartChatbotResult) => {
           setIsLoading(false);
           setStreamingText('');
           
           let friendlyQuestion = parsedResult.clarificationQuestion;
           const botMsgId = Math.random().toString();
           
-          // If the AI processed this as a conversational query (balance, spending check)
-          if (parsedResult.isQuery) {
+          // Switch current intent
+          setCurrentIntent(parsedResult.intent);
+          
+          // Apply extracted info to state
+          const ext = parsedResult.extractedInfo;
+          
+          if (parsedResult.intent === 'transaction') {
+            const updatedDraft: DraftTransaction = {
+              transaction_type: ext.transaction_type || draft.transaction_type,
+              amount: ext.amount || draft.amount,
+              from_account_id: ext.from_account_id || draft.from_account_id,
+              to_account_id: ext.to_account_id || draft.to_account_id,
+              category: ext.category || draft.category,
+              income_category: ext.income_category || draft.income_category,
+              description: ext.description || draft.description,
+              transaction_date: ext.transaction_date || draft.transaction_date || today
+            };
+            
+            const clientMissing = validateCurrentDraft('transaction', updatedDraft);
+            setDraft(updatedDraft);
+            setMissingFields(clientMissing);
+            
+            const botMessage: ChatMessage = {
+              id: botMsgId,
+              role: 'model',
+              content: friendlyQuestion,
+              isInteractive: clientMissing.length === 0
+            };
+            setChatMessages(prev => [...prev, botMessage]);
+          }
+          else if (parsedResult.intent === 'account') {
+            const updatedAccount: DraftAccount = {
+              account_type: ext.account_type || draftAccount.account_type,
+              account_name: ext.account_name || draftAccount.account_name,
+              balance: ext.balance !== undefined && ext.balance !== null ? ext.balance : draftAccount.balance,
+              currency: ext.currency || draftAccount.currency || 'INR',
+              institution_name: ext.institution_name || draftAccount.institution_name,
+              last_4_digits: ext.last_4_digits || draftAccount.last_4_digits,
+              credit_limit: ext.credit_limit || draftAccount.credit_limit,
+              loan_principal: ext.loan_principal || draftAccount.loan_principal,
+              loan_tenure_months: ext.loan_tenure_months || draftAccount.loan_tenure_months,
+              current_interest_rate: ext.current_interest_rate !== undefined && ext.current_interest_rate !== null ? ext.current_interest_rate : draftAccount.current_interest_rate
+            };
+            
+            const clientMissing = validateCurrentDraft('account', updatedAccount);
+            setDraftAccount(updatedAccount);
+            setMissingFields(clientMissing);
+            
+            const botMessage: ChatMessage = {
+              id: botMsgId,
+              role: 'model',
+              content: friendlyQuestion,
+              isInteractive: clientMissing.length === 0
+            };
+            setChatMessages(prev => [...prev, botMessage]);
+          }
+          else if (parsedResult.intent === 'budget') {
+            const updatedBudget: DraftBudget = {
+              month: ext.month || draftBudget.month || new Date().getMonth() + 1,
+              year: ext.year || draftBudget.year || new Date().getFullYear(),
+              budgeted_income: ext.budgeted_income || draftBudget.budgeted_income,
+              budgeted_expenses: ext.budgeted_expenses || draftBudget.budgeted_expenses,
+              category_budgets: ext.category_budgets || draftBudget.category_budgets
+            };
+            
+            const clientMissing = validateCurrentDraft('budget', updatedBudget);
+            setDraftBudget(updatedBudget);
+            setMissingFields(clientMissing);
+            
+            const botMessage: ChatMessage = {
+              id: botMsgId,
+              role: 'model',
+              content: friendlyQuestion,
+              isInteractive: clientMissing.length === 0
+            };
+            setChatMessages(prev => [...prev, botMessage]);
+          }
+          else if (parsedResult.intent === 'emi_calculator') {
+            const updatedEMI: DraftEMI = {
+              principal: ext.principal || draftEMI.principal,
+              annual_rate: ext.annual_rate || draftEMI.annual_rate,
+              tenure_months: ext.tenure_months || draftEMI.tenure_months,
+              monthly_emi: parsedResult.extraContext?.monthly_emi || null,
+              total_interest: parsedResult.extraContext?.total_interest || null,
+              total_payable: parsedResult.extraContext?.total_payable || null
+            };
+            
+            const clientMissing = validateCurrentDraft('emi_calculator', updatedEMI);
+            setDraftEMI(updatedEMI);
+            setMissingFields(clientMissing);
+            
+            const botMessage: ChatMessage = {
+              id: botMsgId,
+              role: 'model',
+              content: friendlyQuestion,
+              isInteractive: false
+            };
+            setChatMessages(prev => [...prev, botMessage]);
+          }
+          else {
+            setMissingFields([]);
             setChatMessages(prev => [
               ...prev,
               {
@@ -267,40 +459,7 @@ export default function VoiceTransactPage() {
                 content: friendlyQuestion
               }
             ]);
-            return;
           }
-          
-          // Apply extracted info to state
-          const ext = parsedResult.extractedInfo;
-          
-          // Deep merge or update draft
-          const updatedDraft: DraftTransaction = {
-            transaction_type: ext.transaction_type || draft.transaction_type,
-            amount: ext.amount || draft.amount,
-            from_account_id: ext.from_account_id || draft.from_account_id,
-            to_account_id: ext.to_account_id || draft.to_account_id,
-            category: ext.category || draft.category,
-            income_category: ext.income_category || draft.income_category,
-            description: ext.description || draft.description,
-            transaction_date: ext.transaction_date || draft.transaction_date || today
-          };
-          
-          // Re-validate strictly on client-side
-          const clientMissing = validateDraft(updatedDraft);
-          const isComplete = clientMissing.length === 0;
-          
-          setDraft(updatedDraft);
-          setMissingFields(clientMissing);
-          
-          // If complete, enable the interactive confirmation bubble
-          const botMessage: ChatMessage = {
-            id: botMsgId,
-            role: 'model',
-            content: friendlyQuestion,
-            isInteractive: isComplete
-          };
-          
-          setChatMessages(prev => [...prev, botMessage]);
         },
         (error) => {
           setIsLoading(false);
@@ -321,42 +480,82 @@ export default function VoiceTransactPage() {
 
   // Handle manual selection from Chips (interactive quick-replies)
   const handleSelectField = (
-    field: 'transaction_type' | 'from_account_id' | 'to_account_id' | 'category' | 'income_category', 
-    value: string, 
+    field: string, 
+    value: any, 
     displayLabel: string
   ) => {
-    const updatedDraft = {
-      ...draft,
-      [field]: value
-    };
-    
-    // Adjust related parameters if type requires it
-    if (field === 'transaction_type') {
-      if (value === 'expense') {
-        updatedDraft.to_account_id = null;
-        updatedDraft.income_category = null;
-      } else if (value === 'income') {
-        updatedDraft.from_account_id = null;
-        updatedDraft.category = null;
-      } else if (value === 'transfer' || value === 'withdrawal' || value === 'loan_payment' || value === 'credit_card_repayment') {
-        // Keeps both accounts, clear category/income_category
-        updatedDraft.category = null;
+    let friendlyQuestion = '';
+    let isComplete = false;
+    let fieldName = field.replace('_id', '').replace('_', ' ');
+
+    if (currentIntent === 'transaction') {
+      const updatedDraft = {
+        ...draft,
+        [field]: value
+      };
+      
+      if (field === 'transaction_type') {
+        if (value === 'expense') {
+          updatedDraft.to_account_id = null;
+          updatedDraft.income_category = null;
+        } else if (value === 'income') {
+          updatedDraft.from_account_id = null;
+          updatedDraft.category = null;
+        } else if (['transfer', 'withdrawal', 'loan_payment', 'credit_card_repayment'].includes(value)) {
+          updatedDraft.category = null;
+          updatedDraft.income_category = null;
+        }
+      }
+      
+      if (field === 'category' && draft.transaction_type === 'expense') {
         updatedDraft.income_category = null;
       }
+      if (field === 'income_category' && draft.transaction_type === 'income') {
+        updatedDraft.category = null;
+      }
+      
+      const clientMissing = validateCurrentDraft('transaction', updatedDraft);
+      isComplete = clientMissing.length === 0;
+      
+      setDraft(updatedDraft);
+      setMissingFields(clientMissing);
+      
+      friendlyQuestion = isComplete 
+        ? "Awesome! Everything is ready now. Would you like to confirm and save this transaction?"
+        : `I've updated the ${fieldName} to ${displayLabel}. What was the details for other missing fields?`;
     }
-    
-    if (field === 'category' && draft.transaction_type === 'expense') {
-      updatedDraft.income_category = null;
+    else if (currentIntent === 'account') {
+      const updatedAccount = {
+        ...draftAccount,
+        [field]: value
+      };
+      
+      const clientMissing = validateCurrentDraft('account', updatedAccount);
+      isComplete = clientMissing.length === 0;
+      
+      setDraftAccount(updatedAccount);
+      setMissingFields(clientMissing);
+      
+      friendlyQuestion = isComplete 
+        ? "Great! The account is ready to be created. Would you like to confirm and save it now?"
+        : `I've updated the ${fieldName} to ${displayLabel}. Please provide the remaining details.`;
     }
-    if (field === 'income_category' && draft.transaction_type === 'income') {
-      updatedDraft.category = null;
+    else if (currentIntent === 'budget') {
+      const updatedBudget = {
+        ...draftBudget,
+        [field]: value
+      };
+      
+      const clientMissing = validateCurrentDraft('budget', updatedBudget);
+      isComplete = clientMissing.length === 0;
+      
+      setDraftBudget(updatedBudget);
+      setMissingFields(clientMissing);
+      
+      friendlyQuestion = isComplete 
+        ? "Awesome! The budget is ready. Confirm to set it now?"
+        : `I've updated the ${fieldName} to ${displayLabel}. What are the other missing details?`;
     }
-    
-    const clientMissing = validateDraft(updatedDraft as any);
-    const isComplete = clientMissing.length === 0;
-    
-    setDraft(updatedDraft as any);
-    setMissingFields(clientMissing);
     
     // Add conversational messages
     const userMsgId = Math.random().toString();
@@ -367,16 +566,6 @@ export default function VoiceTransactPage() {
     };
     
     const botMsgId = Math.random().toString();
-    
-    let fieldName = field.toString();
-    if (field === 'transaction_type') fieldName = 'transaction type';
-    else if (field === 'from_account_id' || field === 'to_account_id') fieldName = 'account';
-    else if (field === 'category' || field === 'income_category') fieldName = 'category';
-    
-    const friendlyQuestion = isComplete 
-      ? "Awesome! Everything is ready now. Would you like to confirm and save this transaction?"
-      : `I've updated the ${fieldName} to ${displayLabel}. What was the details for other missing fields?`;
-      
     const botMessage: ChatMessage = {
       id: botMsgId,
       role: 'model',
@@ -389,16 +578,40 @@ export default function VoiceTransactPage() {
 
   // Cancel current draft
   const handleResetDraft = () => {
-    setDraft({
-      transaction_type: null,
-      amount: null,
-      from_account_id: null,
-      to_account_id: null,
-      category: null,
-      income_category: null,
-      description: null,
-      transaction_date: null
-    });
+    if (currentIntent === 'transaction') {
+      setDraft({
+        transaction_type: null,
+        amount: null,
+        from_account_id: null,
+        to_account_id: null,
+        category: null,
+        income_category: null,
+        description: null,
+        transaction_date: null
+      });
+    } else if (currentIntent === 'account') {
+      setDraftAccount({
+        account_type: null,
+        account_name: null,
+        balance: null,
+        currency: 'INR',
+        institution_name: null,
+        last_4_digits: null,
+        credit_limit: null,
+        loan_principal: null,
+        loan_tenure_months: null,
+        current_interest_rate: null
+      });
+    } else if (currentIntent === 'budget') {
+      setDraftBudget({
+        month: null,
+        year: null,
+        budgeted_income: null,
+        budgeted_expenses: null,
+        category_budgets: null
+      });
+    }
+    
     setMissingFields([]);
     
     const botMsgId = Math.random().toString();
@@ -407,27 +620,26 @@ export default function VoiceTransactPage() {
       {
         id: botMsgId,
         role: 'model',
-        content: "Draft discarded. What transaction would you like to record next?"
+        content: `Draft for ${currentIntent} discarded. What would you like to operate next?`
       }
     ]);
     
     toast({
       title: 'Draft discarded',
-      description: 'The transaction draft has been cleared.'
+      description: `The ${currentIntent} draft has been cleared.`
     });
   };
 
   // Save draft to database
   const handleSaveTransaction = async () => {
-    if (!user || missingFields.length > 0) return;
+    if (!user || validateCurrentDraft('transaction', draft).length > 0) return;
     
-    // Mark as saving in chat history to disable double clicking
     const confirmMessageIndex = chatMessages.findIndex(m => m.isInteractive);
     if (confirmMessageIndex !== -1) {
       const updatedMessages = [...chatMessages];
       updatedMessages[confirmMessageIndex] = {
         ...updatedMessages[confirmMessageIndex],
-        isInteractive: false // Clear interactive
+        isInteractive: false
       };
       setChatMessages(updatedMessages);
     }
@@ -449,8 +661,6 @@ export default function VoiceTransactPage() {
       };
       
       await transactionApi.createTransaction(transactionPayload);
-      
-      // Reload accounts balances and recent transactions to ensure inquiries use updated figures
       await loadData();
       
       setIsLoading(false);
@@ -460,7 +670,6 @@ export default function VoiceTransactPage() {
         variant: 'default'
       });
       
-      // Push success message into chat
       const successBotMsgId = Math.random().toString();
       setChatMessages(prev => [
         ...prev,
@@ -471,7 +680,6 @@ export default function VoiceTransactPage() {
         }
       ]);
       
-      // Clear draft
       setDraft({
         transaction_type: null,
         amount: null,
@@ -495,188 +703,395 @@ export default function VoiceTransactPage() {
     }
   };
 
+  const handleSaveAccount = async () => {
+    if (!user || validateCurrentDraft('account', draftAccount).length > 0) return;
+    
+    const confirmMessageIndex = chatMessages.findIndex(m => m.isInteractive);
+    if (confirmMessageIndex !== -1) {
+      const updatedMessages = [...chatMessages];
+      updatedMessages[confirmMessageIndex] = {
+        ...updatedMessages[confirmMessageIndex],
+        isInteractive: false
+      };
+      setChatMessages(updatedMessages);
+    }
+    
+    setIsLoading(true);
+    
+    try {
+      const accountPayload = {
+        user_id: user.id,
+        account_name: draftAccount.account_name!,
+        account_type: draftAccount.account_type!,
+        balance: Number(draftAccount.balance || 0),
+        currency: draftAccount.currency || 'INR',
+        institution_name: draftAccount.institution_name || draftAccount.account_name!,
+        last_4_digits: draftAccount.last_4_digits || null,
+        credit_limit: draftAccount.credit_limit,
+        loan_principal: draftAccount.loan_principal,
+        loan_tenure_months: draftAccount.loan_tenure_months,
+        current_interest_rate: draftAccount.current_interest_rate
+      };
+      
+      await accountApi.createAccount(accountPayload);
+      await loadData();
+      
+      setIsLoading(false);
+      toast({
+        title: 'Account Created Successfully!',
+        description: `Created account "${draftAccount.account_name}" of type ${draftAccount.account_type}.`,
+        variant: 'default'
+      });
+      
+      const successBotMsgId = Math.random().toString();
+      setChatMessages(prev => [
+        ...prev,
+        {
+          id: successBotMsgId,
+          role: 'model',
+          content: `🎉 Success! I have successfully created your new ${draftAccount.account_type} account "${draftAccount.account_name}" with a balance of ₹${Number(draftAccount.balance || 0).toLocaleString('en-IN')}. Your database is updated! What else can I do for you?`
+        }
+      ]);
+      
+      setDraftAccount({
+        account_type: null,
+        account_name: null,
+        balance: null,
+        currency: 'INR',
+        institution_name: null,
+        last_4_digits: null,
+        credit_limit: null,
+        loan_principal: null,
+        loan_tenure_months: null,
+        current_interest_rate: null
+      });
+      setMissingFields([]);
+      
+    } catch (e) {
+      setIsLoading(false);
+      console.error(e);
+      toast({
+        title: 'Failed to Create Account',
+        description: e instanceof Error ? e.message : 'Unknown database error',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleSaveBudget = async () => {
+    if (!user || validateCurrentDraft('budget', draftBudget).length > 0) return;
+    
+    const confirmMessageIndex = chatMessages.findIndex(m => m.isInteractive);
+    if (confirmMessageIndex !== -1) {
+      const updatedMessages = [...chatMessages];
+      updatedMessages[confirmMessageIndex] = {
+        ...updatedMessages[confirmMessageIndex],
+        isInteractive: false
+      };
+      setChatMessages(updatedMessages);
+    }
+    
+    setIsLoading(true);
+    
+    try {
+      const budgetPayload = {
+        user_id: user.id,
+        month: Number(draftBudget.month!),
+        year: Number(draftBudget.year!),
+        budgeted_income: Number(draftBudget.budgeted_income || 0),
+        budgeted_expenses: Number(draftBudget.budgeted_expenses || 0),
+        category_budgets: draftBudget.category_budgets || {}
+      };
+      
+      await budgetApi.createOrUpdateBudget(budgetPayload);
+      await loadData();
+      
+      setIsLoading(false);
+      const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      const monthName = monthNames[draftBudget.month! - 1];
+      
+      toast({
+        title: 'Budget Saved Successfully!',
+        description: `Set budget for ${monthName} ${draftBudget.year}.`,
+        variant: 'default'
+      });
+      
+      const successBotMsgId = Math.random().toString();
+      setChatMessages(prev => [
+        ...prev,
+        {
+          id: successBotMsgId,
+          role: 'model',
+          content: `🎉 Success! I have successfully set your budget for ${monthName} ${draftBudget.year} with overall expenses limit of ₹${Number(draftBudget.budgeted_expenses || 0).toLocaleString('en-IN')}. Your budgets are synchronized! What next?`
+        }
+      ]);
+      
+      setDraftBudget({
+        month: null,
+        year: null,
+        budgeted_income: null,
+        budgeted_expenses: null,
+        category_budgets: null
+      });
+      setMissingFields([]);
+      
+    } catch (e) {
+      setIsLoading(false);
+      console.error(e);
+      toast({
+        title: 'Failed to Save Budget',
+        description: e instanceof Error ? e.message : 'Unknown database error',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleConfirmSaveDraft = async () => {
+    if (currentIntent === 'transaction') {
+      await handleSaveTransaction();
+    } else if (currentIntent === 'account') {
+      await handleSaveAccount();
+    } else if (currentIntent === 'budget') {
+      await handleSaveBudget();
+    }
+  };
+
   // Determine what type of quick reply chips to show
   const renderQuickReplyChips = () => {
     if (isLoading || missingFields.length === 0) return null;
     
     const nextMissing = missingFields[0]; // Address first missing field
     
-    if (nextMissing === 'transaction_type') {
-      return (
-        <div className="space-y-2 mt-2 animate-in fade-in-50 duration-300">
-          <p className="text-xs text-muted-foreground font-semibold">Select transaction type:</p>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="bg-card text-foreground hover:bg-red-500/10 hover:text-red-400 transition-all border border-muted hover:border-red-500/30 text-xs rounded-full shadow-sm"
-              onClick={() => handleSelectField('transaction_type', 'expense', 'Expense')}
-            >
-              📤 Expense
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="bg-card text-foreground hover:bg-emerald-500/10 hover:text-emerald-400 transition-all border border-muted hover:border-emerald-500/30 text-xs rounded-full shadow-sm"
-              onClick={() => handleSelectField('transaction_type', 'income', 'Income')}
-            >
-              📥 Income
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="bg-card text-foreground hover:bg-blue-500/10 hover:text-blue-400 transition-all border border-muted hover:border-blue-500/30 text-xs rounded-full shadow-sm"
-              onClick={() => handleSelectField('transaction_type', 'transfer', 'Transfer')}
-            >
-              🔄 Transfer
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="bg-card text-foreground hover:bg-orange-500/10 hover:text-orange-400 transition-all border border-muted hover:border-orange-500/30 text-xs rounded-full shadow-sm"
-              onClick={() => handleSelectField('transaction_type', 'withdrawal', 'Withdrawal')}
-            >
-              🪙 Withdrawal
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="bg-card text-foreground hover:bg-teal-500/10 hover:text-teal-400 transition-all border border-muted hover:border-teal-500/30 text-xs rounded-full shadow-sm"
-              onClick={() => handleSelectField('transaction_type', 'loan_payment', 'Loan Payment')}
-            >
-              📈 Loan Payment
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="bg-card text-foreground hover:bg-purple-500/10 hover:text-purple-400 transition-all border border-muted hover:border-purple-500/30 text-xs rounded-full shadow-sm"
-              onClick={() => handleSelectField('transaction_type', 'credit_card_repayment', 'Credit Card Repayment')}
-            >
-              💳 CC Repayment
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="bg-card text-foreground hover:bg-indigo-500/10 hover:text-indigo-400 transition-all border border-muted hover:border-indigo-500/30 text-xs rounded-full shadow-sm"
-              onClick={() => handleSelectField('transaction_type', 'interest_charge', 'Interest Charge')}
-            >
-              📊 Interest Charge
-            </Button>
+    if (currentIntent === 'transaction') {
+      if (nextMissing === 'transaction_type') {
+        return (
+          <div className="space-y-2 mt-2 animate-in fade-in-50 duration-300">
+            <p className="text-xs text-muted-foreground font-semibold">Select transaction type:</p>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { type: 'expense', label: '📤 Expense', colorClass: 'hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30' },
+                { type: 'income', label: '📥 Income', colorClass: 'hover:bg-emerald-500/10 hover:text-emerald-400 hover:border-emerald-500/30' },
+                { type: 'transfer', label: '🔄 Transfer', colorClass: 'hover:bg-blue-500/10 hover:text-blue-400 hover:border-blue-500/30' },
+                { type: 'withdrawal', label: '🪙 Withdrawal', colorClass: 'hover:bg-orange-500/10 hover:text-orange-400 hover:border-orange-500/30' },
+                { type: 'loan_payment', label: '📈 Loan Payment', colorClass: 'hover:bg-teal-500/10 hover:text-teal-400 hover:border-teal-500/30' },
+                { type: 'credit_card_repayment', label: '💳 CC Repayment', colorClass: 'hover:bg-purple-500/10 hover:text-purple-400 hover:border-purple-500/30' },
+                { type: 'interest_charge', label: '📊 Interest Charge', colorClass: 'hover:bg-indigo-500/10 hover:text-indigo-400 hover:border-indigo-500/30' }
+              ].map(item => (
+                <Button
+                  key={item.type}
+                  variant="outline"
+                  size="sm"
+                  className={`bg-card text-foreground transition-all border border-muted text-xs rounded-full shadow-sm ${item.colorClass}`}
+                  onClick={() => handleSelectField('transaction_type', item.type, item.label)}
+                >
+                  {item.label}
+                </Button>
+              ))}
+            </div>
           </div>
-        </div>
-      );
-    }
-    
-    if (nextMissing === 'from_account_id') {
-      const filteredAccounts = accounts.filter(a => {
-        // Filter logical accounts for expenses, CC repayment sources, transfers
-        if (draft.transaction_type === 'expense') {
-          return ['cash', 'bank', 'credit_card'].includes(a.account_type);
-        }
-        if (draft.transaction_type === 'credit_card_repayment') {
-          return ['bank', 'cash'].includes(a.account_type);
-        }
-        return a.account_type !== 'loan';
-      });
+        );
+      }
       
-      return (
-        <div className="space-y-2 mt-2 animate-in fade-in-50 duration-300">
-          <p className="text-xs text-muted-foreground font-semibold">Select paying account:</p>
-          <div className="flex flex-wrap gap-2">
-            {filteredAccounts.map(acc => (
-              <Button
-                key={acc.id}
-                variant="outline"
-                size="sm"
-                className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm"
-                onClick={() => handleSelectField('from_account_id', acc.id, acc.account_name)}
-              >
-                {acc.account_type === 'credit_card' ? '💳' : acc.account_type === 'cash' ? '💵' : '🏦'} {acc.account_name} (₹{acc.balance.toLocaleString('en-IN')})
-              </Button>
-            ))}
+      if (nextMissing === 'from_account_id') {
+        const filteredAccounts = accounts.filter(a => {
+          if (draft.transaction_type === 'expense') {
+            return ['cash', 'bank', 'credit_card'].includes(a.account_type);
+          }
+          if (draft.transaction_type === 'credit_card_repayment') {
+            return ['bank', 'cash'].includes(a.account_type);
+          }
+          return a.account_type !== 'loan';
+        });
+        
+        return (
+          <div className="space-y-2 mt-2 animate-in fade-in-50 duration-300">
+            <p className="text-xs text-muted-foreground font-semibold">Select paying account:</p>
+            <div className="flex flex-wrap gap-2">
+              {filteredAccounts.map(acc => (
+                <Button
+                  key={acc.id}
+                  variant="outline"
+                  size="sm"
+                  className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                  onClick={() => handleSelectField('from_account_id', acc.id, acc.account_name)}
+                >
+                  {acc.account_type === 'credit_card' ? '💳' : acc.account_type === 'cash' ? '💵' : '🏦'} {acc.account_name} (₹{acc.balance.toLocaleString('en-IN')})
+                </Button>
+              ))}
+            </div>
           </div>
-        </div>
-      );
-    }
-    
-    if (nextMissing === 'to_account_id') {
-      const filteredAccounts = accounts.filter(a => {
-        if (draft.transaction_type === 'income') {
-          return ['bank', 'cash'].includes(a.account_type);
-        }
-        if (draft.transaction_type === 'loan_payment') {
-          return a.account_type === 'loan';
-        }
-        if (draft.transaction_type === 'credit_card_repayment') {
-          return a.account_type === 'credit_card';
-        }
-        return true;
-      });
+        );
+      }
       
-      return (
-        <div className="space-y-2 mt-2 animate-in fade-in-50 duration-300">
-          <p className="text-xs text-muted-foreground font-semibold">Select receiving account:</p>
-          <div className="flex flex-wrap gap-2">
-            {filteredAccounts.map(acc => (
-              <Button
-                key={acc.id}
-                variant="outline"
-                size="sm"
-                className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm"
-                onClick={() => handleSelectField('to_account_id', acc.id, acc.account_name)}
-              >
-                {acc.account_type === 'credit_card' ? '💳' : acc.account_type === 'loan' ? '📈' : acc.account_type === 'cash' ? '💵' : '🏦'} {acc.account_name}
-              </Button>
-            ))}
+      if (nextMissing === 'to_account_id') {
+        const filteredAccounts = accounts.filter(a => {
+          if (draft.transaction_type === 'income') {
+            return ['bank', 'cash'].includes(a.account_type);
+          }
+          if (draft.transaction_type === 'loan_payment') {
+            return a.account_type === 'loan';
+          }
+          if (draft.transaction_type === 'credit_card_repayment') {
+            return a.account_type === 'credit_card';
+          }
+          return true;
+        });
+        
+        return (
+          <div className="space-y-2 mt-2 animate-in fade-in-50 duration-300">
+            <p className="text-xs text-muted-foreground font-semibold">Select receiving account:</p>
+            <div className="flex flex-wrap gap-2">
+              {filteredAccounts.map(acc => (
+                <Button
+                  key={acc.id}
+                  variant="outline"
+                  size="sm"
+                  className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                  onClick={() => handleSelectField('to_account_id', acc.id, acc.account_name)}
+                >
+                  {acc.account_type === 'credit_card' ? '💳' : acc.account_type === 'loan' ? '📈' : acc.account_type === 'cash' ? '💵' : '🏦'} {acc.account_name}
+                </Button>
+              ))}
+            </div>
           </div>
-        </div>
-      );
+        );
+      }
+      
+      if (nextMissing === 'category') {
+        return (
+          <div className="space-y-2 mt-2 animate-in fade-in-50 duration-300">
+            <p className="text-xs text-muted-foreground font-semibold">Select expense category:</p>
+            <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-1 bg-muted/30 rounded-lg">
+              {categories.map(cat => (
+                <Button
+                  key={cat.id}
+                  variant="outline"
+                  size="sm"
+                  className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                  onClick={() => handleSelectField('category', cat.name, cat.name)}
+                >
+                  {cat.icon || '📁'} {cat.name}
+                </Button>
+              ))}
+            </div>
+          </div>
+        );
+      }
+      
+      if (nextMissing === 'income_category') {
+        return (
+          <div className="space-y-2 mt-2 animate-in fade-in-50 duration-300">
+            <p className="text-xs text-muted-foreground font-semibold">Select income category:</p>
+            <div className="flex flex-wrap gap-2">
+              {INCOME_CATEGORIES.map(cat => (
+                <Button
+                  key={cat.key}
+                  variant="outline"
+                  size="sm"
+                  className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                  onClick={() => handleSelectField('income_category', cat.key, cat.name)}
+                >
+                  {cat.icon} {cat.name}
+                </Button>
+              ))}
+            </div>
+          </div>
+        );
+      }
     }
-    
-    if (nextMissing === 'category') {
-      return (
-        <div className="space-y-2 mt-2 animate-in fade-in-50 duration-300">
-          <p className="text-xs text-muted-foreground font-semibold">Select expense category:</p>
-          <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-1 bg-muted/30 rounded-lg">
-            {categories.map(cat => (
-              <Button
-                key={cat.id}
-                variant="outline"
-                size="sm"
-                className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm"
-                onClick={() => handleSelectField('category', cat.name, cat.name)}
-              >
-                {cat.icon || '📁'} {cat.name}
-              </Button>
-            ))}
+
+    if (currentIntent === 'account') {
+      if (nextMissing === 'account_type') {
+        return (
+          <div className="space-y-2 mt-2 animate-in fade-in-50 duration-300">
+            <p className="text-xs text-muted-foreground font-semibold">Select account type:</p>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { type: 'cash', label: '💵 Cash Wallet', colorClass: 'hover:bg-amber-500/10 hover:text-amber-400 hover:border-amber-500/30' },
+                { type: 'bank', label: '🏦 Bank Account', colorClass: 'hover:bg-blue-500/10 hover:text-blue-400 hover:border-blue-500/30' },
+                { type: 'credit_card', label: '💳 Credit Card', colorClass: 'hover:bg-purple-500/10 hover:text-purple-400 hover:border-purple-500/30' },
+                { type: 'loan', label: '📈 Loan Account', colorClass: 'hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30' }
+              ].map(item => (
+                <Button
+                  key={item.type}
+                  variant="outline"
+                  size="sm"
+                  className={`bg-card text-foreground transition-all border border-muted text-xs rounded-full shadow-sm ${item.colorClass}`}
+                  onClick={() => handleSelectField('account_type', item.type, item.label)}
+                >
+                  {item.label}
+                </Button>
+              ))}
+            </div>
           </div>
-        </div>
-      );
+        );
+      }
+      
+      if (nextMissing === 'currency') {
+        return (
+          <div className="space-y-2 mt-2 animate-in fade-in-50 duration-300">
+            <p className="text-xs text-muted-foreground font-semibold">Select currency:</p>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { code: 'INR', symbol: '₹ INR (Indian Rupee)' },
+                { code: 'USD', symbol: '$ USD (US Dollar)' },
+                { code: 'EUR', symbol: '€ EUR (Euro)' }
+              ].map(curr => (
+                <Button
+                  key={curr.code}
+                  variant="outline"
+                  size="sm"
+                  className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                  onClick={() => handleSelectField('currency', curr.code, curr.code)}
+                >
+                  {curr.symbol}
+                </Button>
+              ))}
+            </div>
+          </div>
+        );
+      }
     }
-    
-    if (nextMissing === 'income_category') {
-      return (
-        <div className="space-y-2 mt-2 animate-in fade-in-50 duration-300">
-          <p className="text-xs text-muted-foreground font-semibold">Select income category:</p>
-          <div className="flex flex-wrap gap-2">
-            {INCOME_CATEGORIES.map(cat => (
-              <Button
-                key={cat.key}
-                variant="outline"
-                size="sm"
-                className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm"
-                onClick={() => handleSelectField('income_category', cat.key, cat.name)}
-              >
-                {cat.icon} {cat.name}
-              </Button>
-            ))}
+
+    if (currentIntent === 'budget') {
+      if (nextMissing === 'month') {
+        return (
+          <div className="space-y-2 mt-2 animate-in fade-in-50 duration-300">
+            <p className="text-xs text-muted-foreground font-semibold">Select budget month:</p>
+            <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-1 bg-muted/30 rounded-lg">
+              {[
+                { val: 1, label: 'January' },
+                { val: 2, label: 'February' },
+                { val: 3, label: 'March' },
+                { val: 4, label: 'April' },
+                { val: 5, label: 'May' },
+                { val: 6, label: 'June' },
+                { val: 7, label: 'July' },
+                { val: 8, label: 'August' },
+                { val: 9, label: 'September' },
+                { val: 10, label: 'October' },
+                { val: 11, label: 'November' },
+                { val: 12, label: 'December' }
+              ].map(m => (
+                <Button
+                  key={m.val}
+                  variant="outline"
+                  size="sm"
+                  className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                  onClick={() => handleSelectField('month', m.val, m.label)}
+                >
+                  {m.label}
+                </Button>
+              ))}
+            </div>
           </div>
-        </div>
-      );
+        );
+      }
     }
     
     return null;
   };
+
 
   // Lookup account name helper
   const getAccountName = (accountId: string | null) => {
@@ -692,16 +1107,31 @@ export default function VoiceTransactPage() {
     return acc ? acc.balance : null;
   };
 
+  const getPanelHeader = () => {
+    switch (currentIntent) {
+      case 'transaction':
+        return { title: 'Draft Receipt', subtitle: 'Live interactive receipt preview' };
+      case 'account':
+        return { title: 'Bank Passbook', subtitle: 'New account preview' };
+      case 'budget':
+        return { title: 'Budget Tracker', subtitle: 'Monthly limit preview' };
+      case 'emi_calculator':
+        return { title: 'Amortization Simulator', subtitle: 'Loan EMI simulation details' };
+      default:
+        return { title: 'AI Report Pad', subtitle: 'Insights and help summary' };
+    }
+  };
+
   return (
     <div className="container mx-auto p-6 max-w-7xl">
       {/* Title Header */}
       <div className="mb-6">
         <h1 className="text-3xl font-bold bg-gradient-to-r from-teal-400 via-primary to-indigo-500 bg-clip-text text-transparent flex items-center gap-2">
-          <Sparkles className="h-8 w-8 text-primary animate-pulse" />
-          AI Voice & Chat Transact
+          <Bot className="h-8 w-8 text-primary animate-pulse" />
+          Smart AI Chatbot
         </h1>
         <p className="text-muted-foreground mt-1">
-          Draft and save transactions instantly by typing or speaking in natural language.
+          Operate each and every process in SmartFinHub instantly through voice commands or interactive chat.
         </p>
       </div>
 
@@ -900,7 +1330,7 @@ export default function VoiceTransactPage() {
           </div>
         </div>
 
-        {/* Right Side: Receipt/Credit Card Draft Preview (40% width) */}
+        {/* Right Side: Morphing Draft & Report Panel (40% width) */}
         <div className="lg:col-span-5 flex flex-col justify-start">
           
           <Card className="border border-muted bg-card/40 backdrop-blur-lg shadow-xl overflow-hidden flex flex-col h-full rounded-2xl">
@@ -908,26 +1338,76 @@ export default function VoiceTransactPage() {
               <div className="flex justify-between items-center">
                 <div>
                   <CardTitle className="text-lg font-bold flex items-center gap-1.5 text-foreground">
-                    Draft Receipt
+                    {getPanelHeader().title}
                   </CardTitle>
-                  <CardDescription className="text-xs">Live interactive preview</CardDescription>
+                  <CardDescription className="text-xs">{getPanelHeader().subtitle}</CardDescription>
                 </div>
                 <div>
-                  {draft.transaction_type ? (
-                    missingFields.length === 0 ? (
-                      <Badge className="bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 font-semibold text-xs border border-emerald-500/30 flex items-center gap-1">
-                        <Check className="h-3 w-3" />
-                        READY TO SAVE
-                      </Badge>
+                  {currentIntent === 'transaction' && (
+                    draft.transaction_type ? (
+                      missingFields.length === 0 ? (
+                        <Badge className="bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 font-semibold text-xs border border-emerald-500/30 flex items-center gap-1">
+                          <Check className="h-3 w-3" />
+                          READY TO SAVE
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 font-semibold text-xs border border-amber-500/30 flex items-center gap-1 animate-pulse">
+                          <AlertCircle className="h-3 w-3" />
+                          DRAFTING ({missingFields.length} missing)
+                        </Badge>
+                      )
                     ) : (
-                      <Badge className="bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 font-semibold text-xs border border-amber-500/30 flex items-center gap-1 animate-pulse">
-                        <AlertCircle className="h-3 w-3" />
-                        DRAFTING ({missingFields.length} missing)
+                      <Badge variant="outline" className="text-muted-foreground border-muted text-xs">
+                        WAITING INPUT
                       </Badge>
                     )
-                  ) : (
-                    <Badge variant="outline" className="text-muted-foreground border-muted text-xs">
-                      WAITING INPUT
+                  )}
+                  {currentIntent === 'account' && (
+                    draftAccount.account_type ? (
+                      missingFields.length === 0 ? (
+                        <Badge className="bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 font-semibold text-xs border border-emerald-500/30 flex items-center gap-1">
+                          <Check className="h-3 w-3" />
+                          READY TO SAVE
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 font-semibold text-xs border border-amber-500/30 flex items-center gap-1 animate-pulse">
+                          <AlertCircle className="h-3 w-3" />
+                          DRAFTING ({missingFields.length} missing)
+                        </Badge>
+                      )
+                    ) : (
+                      <Badge variant="outline" className="text-muted-foreground border-muted text-xs">
+                        WAITING INPUT
+                      </Badge>
+                    )
+                  )}
+                  {currentIntent === 'budget' && (
+                    draftBudget.month ? (
+                      missingFields.length === 0 ? (
+                        <Badge className="bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 font-semibold text-xs border border-emerald-500/30 flex items-center gap-1">
+                          <Check className="h-3 w-3" />
+                          READY TO SAVE
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 font-semibold text-xs border border-amber-500/30 flex items-center gap-1 animate-pulse">
+                          <AlertCircle className="h-3 w-3" />
+                          DRAFTING ({missingFields.length} missing)
+                        </Badge>
+                      )
+                    ) : (
+                      <Badge variant="outline" className="text-muted-foreground border-muted text-xs">
+                        WAITING INPUT
+                      </Badge>
+                    )
+                  )}
+                  {currentIntent === 'emi_calculator' && (
+                    <Badge className="bg-blue-500/20 text-blue-400 border border-blue-500/30 font-semibold text-xs">
+                      EMI SIMULATED
+                    </Badge>
+                  )}
+                  {!['transaction', 'account', 'budget', 'emi_calculator'].includes(currentIntent) && (
+                    <Badge className="bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 font-semibold text-xs">
+                      AI REPORT
                     </Badge>
                   )}
                 </div>
@@ -936,222 +1416,384 @@ export default function VoiceTransactPage() {
 
             <CardContent className="p-6 flex-grow flex flex-col justify-between space-y-6">
               
-              {/* Main Receipt Details Area */}
-              <div className="space-y-6">
+              {/* Intent-based Morphing Details Area */}
+              <div className="space-y-6 flex-grow">
                 
-                {/* Visual Header / Amount representation */}
-                <div className="bg-gradient-to-br from-indigo-950/40 via-muted/40 to-card border border-muted/80 rounded-xl p-5 flex flex-col items-center justify-center text-center space-y-2 relative overflow-hidden group shadow-inner">
-                  {/* Transaction Type Indicator */}
-                  {draft.transaction_type && (
-                    <div className="absolute top-2 right-2">
-                      {draft.transaction_type === 'expense' && <Badge className="bg-red-500/10 text-red-400 border border-red-500/20 text-[10px]">Expense</Badge>}
-                      {draft.transaction_type === 'income' && <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px]">Income</Badge>}
-                      {draft.transaction_type === 'transfer' && <Badge className="bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[10px]">Transfer</Badge>}
-                      {draft.transaction_type === 'withdrawal' && <Badge className="bg-orange-500/10 text-orange-400 border border-orange-500/20 text-[10px]">Withdrawal</Badge>}
-                      {draft.transaction_type === 'loan_payment' && <Badge className="bg-teal-500/10 text-teal-400 border border-teal-500/20 text-[10px]">Loan Payment</Badge>}
-                      {draft.transaction_type === 'credit_card_repayment' && <Badge className="bg-purple-500/10 text-purple-400 border border-purple-500/20 text-[10px]">CC Repayment</Badge>}
-                    </div>
-                  )}
-
-                  <span className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">Amount</span>
-                  <div className="flex items-baseline justify-center text-foreground font-bold">
-                    <span className="text-2xl mr-1 text-muted-foreground">₹</span>
-                    <span className={`text-4xl tracking-tight transition-all duration-300 ${draft.amount ? 'text-foreground' : 'text-muted-foreground/30 animate-pulse'}`}>
-                      {draft.amount ? draft.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}
-                    </span>
-                  </div>
-
-                  {draft.description && (
-                    <p className="text-xs text-muted-foreground italic truncate max-w-[90%]">
-                      "{draft.description}"
-                    </p>
-                  )}
-                </div>
-
-                {/* Line details */}
-                <div className="space-y-4 text-sm">
-                  
-                  {/* Transaction Type Row */}
-                  <div className="flex justify-between items-center py-2 border-b border-muted/50">
-                    <span className="text-muted-foreground font-medium">Transaction Type</span>
-                    <span className={`font-semibold capitalize flex items-center gap-1.5 ${
-                      draft.transaction_type === 'income' ? 'text-emerald-400' : draft.transaction_type === 'expense' ? 'text-red-400' : 'text-primary'
-                    }`}>
-                      {draft.transaction_type ? (
-                        <>
-                          {draft.transaction_type === 'expense' && <ArrowUpRight className="h-4 w-4" />}
-                          {draft.transaction_type === 'income' && <ArrowDownLeft className="h-4 w-4" />}
-                          {draft.transaction_type === 'transfer' && <ArrowLeftRight className="h-4 w-4" />}
-                          {draft.transaction_type === 'withdrawal' && <Coins className="h-4 w-4" />}
-                          {draft.transaction_type === 'loan_payment' && <ArrowUpRight className="h-4 w-4" />}
-                          {draft.transaction_type === 'credit_card_repayment' && <ArrowUpRight className="h-4 w-4" />}
-                          {draft.transaction_type.replace('_', ' ')}
-                        </>
-                      ) : (
-                        <span className="text-amber-500 flex items-center gap-1 font-normal text-xs animate-pulse">
-                          <AlertCircle className="h-3 w.5" />
-                          Unspecified
-                        </span>
+                {/* 1. TRANSACTION PREVIEW */}
+                {currentIntent === 'transaction' && (
+                  <div className="space-y-6">
+                    {/* Visual Header / Amount representation */}
+                    <div className="bg-gradient-to-br from-indigo-950/40 via-muted/40 to-card border border-muted/80 rounded-xl p-5 flex flex-col items-center justify-center text-center space-y-2 relative overflow-hidden group shadow-inner">
+                      {draft.transaction_type && (
+                        <div className="absolute top-2 right-2">
+                          <Badge className="bg-primary/10 text-primary border border-primary/20 text-[10px] capitalize">
+                            {draft.transaction_type.replace('_', ' ')}
+                          </Badge>
+                        </div>
                       )}
-                    </span>
-                  </div>
 
-                  {/* From Account Row */}
-                  {(!draft.transaction_type || draft.transaction_type !== 'income') && (
-                    <div className="flex justify-between items-center py-2 border-b border-muted/50">
-                      <span className="text-muted-foreground font-medium">Paid From</span>
-                      {draft.from_account_id ? (
-                        <div className="text-right">
-                          <p className="font-semibold text-foreground">{getAccountName(draft.from_account_id)}</p>
-                          {getAccountBalance(draft.from_account_id) !== null && (
-                            <p className="text-[10px] text-muted-foreground">Bal: ₹{getAccountBalance(draft.from_account_id)?.toLocaleString('en-IN')}</p>
+                      <span className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">Amount</span>
+                      <div className="flex items-baseline justify-center text-foreground font-bold font-mono">
+                        <span className="text-2xl mr-1 text-muted-foreground font-mono">₹</span>
+                        <span className={`text-4xl tracking-tight transition-all duration-300 ${draft.amount ? 'text-foreground' : 'text-muted-foreground/30 animate-pulse'}`}>
+                          {draft.amount ? draft.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}
+                        </span>
+                      </div>
+
+                      {draft.description && (
+                        <p className="text-xs text-muted-foreground italic truncate max-w-[90%]">
+                          "{draft.description}"
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Line details */}
+                    <div className="space-y-4 text-sm">
+                      <div className="flex justify-between items-center py-2 border-b border-muted/50">
+                        <span className="text-muted-foreground font-medium">Transaction Type</span>
+                        <span className="font-semibold capitalize text-primary">
+                          {draft.transaction_type ? draft.transaction_type.replace('_', ' ') : 'Unspecified'}
+                        </span>
+                      </div>
+
+                      {(!draft.transaction_type || draft.transaction_type !== 'income') && (
+                        <div className="flex justify-between items-center py-2 border-b border-muted/50">
+                          <span className="text-muted-foreground font-medium">Paid From</span>
+                          {draft.from_account_id ? (
+                            <div className="text-right">
+                              <p className="font-semibold text-foreground">{getAccountName(draft.from_account_id)}</p>
+                              {getAccountBalance(draft.from_account_id) !== null && (
+                                <p className="text-[10px] text-muted-foreground">Bal: ₹{getAccountBalance(draft.from_account_id)?.toLocaleString('en-IN')}</p>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-xs px-2.5 py-1 rounded-md border border-dashed border-amber-500/50 text-amber-500 bg-amber-500/5 font-medium flex items-center gap-1.5 animate-pulse">
+                              <CreditCard className="h-3.5 w-3.5" />
+                              Needs Selection
+                            </span>
                           )}
                         </div>
-                      ) : (
-                        <span className={`text-xs px-2.5 py-1 rounded-md border border-dashed font-medium flex items-center gap-1.5 transition-all ${
-                          draft.transaction_type ? 'border-amber-500/50 text-amber-500 bg-amber-500/5 animate-pulse' : 'border-muted text-muted-foreground'
-                        }`}>
-                          <CreditCard className="h-3.5 w-3.5" />
-                          Needs Selection
-                        </span>
                       )}
-                    </div>
-                  )}
 
-                  {/* To Account Row */}
-                  {draft.transaction_type && draft.transaction_type !== 'expense' && (
-                    <div className="flex justify-between items-center py-2 border-b border-muted/50">
-                      <span className="text-muted-foreground font-medium">Received In / Destination</span>
-                      {draft.to_account_id ? (
-                        <div className="text-right">
-                          <p className="font-semibold text-foreground">{getAccountName(draft.to_account_id)}</p>
-                          {getAccountBalance(draft.to_account_id) !== null && (
-                            <p className="text-[10px] text-muted-foreground">Bal: ₹{getAccountBalance(draft.to_account_id)?.toLocaleString('en-IN')}</p>
+                      {draft.transaction_type && draft.transaction_type !== 'expense' && (
+                        <div className="flex justify-between items-center py-2 border-b border-muted/50">
+                          <span className="text-muted-foreground font-medium">Received In / Destination</span>
+                          {draft.to_account_id ? (
+                            <div className="text-right">
+                              <p className="font-semibold text-foreground">{getAccountName(draft.to_account_id)}</p>
+                              {getAccountBalance(draft.to_account_id) !== null && (
+                                <p className="text-[10px] text-muted-foreground">Bal: ₹{getAccountBalance(draft.to_account_id)?.toLocaleString('en-IN')}</p>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-xs px-2.5 py-1 rounded-md border border-dashed border-amber-500/50 text-amber-500 bg-amber-500/5 font-medium flex items-center gap-1.5 animate-pulse">
+                              <CreditCard className="h-3.5 w-3.5" />
+                              Needs Selection
+                            </span>
                           )}
                         </div>
-                      ) : (
-                        <span className="text-xs px-2.5 py-1 rounded-md border border-dashed border-amber-500/50 text-amber-500 bg-amber-500/5 font-medium flex items-center gap-1.5 animate-pulse">
-                          <CreditCard className="h-3.5 w-3.5" />
-                          Needs Selection
-                        </span>
                       )}
-                    </div>
-                  )}
 
-                  {/* Category / Income Category Row */}
-                  {draft.transaction_type === 'expense' && (
-                    <div className="flex justify-between items-center py-2 border-b border-muted/50">
-                      <span className="text-muted-foreground font-medium">Expense Category</span>
-                      {draft.category ? (
-                        <span className="font-semibold bg-muted/60 text-foreground px-2.5 py-1 rounded-full border text-xs flex items-center gap-1 shadow-sm">
-                          📁 {draft.category}
-                        </span>
-                      ) : (
-                        <span className="text-xs px-2.5 py-1 rounded-md border border-dashed border-amber-500/50 text-amber-500 bg-amber-500/5 font-medium flex items-center gap-1 animate-pulse">
-                          📁 Select Category
-                        </span>
+                      {draft.transaction_type === 'expense' && (
+                        <div className="flex justify-between items-center py-2 border-b border-muted/50">
+                          <span className="text-muted-foreground font-medium">Expense Category</span>
+                          {draft.category ? (
+                            <span className="font-semibold bg-muted/60 text-foreground px-2.5 py-1 rounded-full border text-xs shadow-sm">
+                              📁 {draft.category}
+                            </span>
+                          ) : (
+                            <span className="text-xs px-2.5 py-1 rounded-md border border-dashed border-amber-500/50 text-amber-500 bg-amber-500/5 font-medium animate-pulse">
+                              📁 Select Category
+                            </span>
+                          )}
+                        </div>
                       )}
-                    </div>
-                  )}
 
-                  {draft.transaction_type === 'income' && (
-                    <div className="flex justify-between items-center py-2 border-b border-muted/50">
-                      <span className="text-muted-foreground font-medium">Income Category</span>
-                      {draft.income_category ? (
-                        <span className="font-semibold bg-muted/60 text-foreground px-2.5 py-1 rounded-full border text-xs flex items-center gap-1 shadow-sm capitalize">
-                          📊 {getIncomeCategoryName(draft.income_category)}
-                        </span>
-                      ) : (
-                        <span className="text-xs px-2.5 py-1 rounded-md border border-dashed border-amber-500/50 text-amber-500 bg-amber-500/5 font-medium flex items-center gap-1 animate-pulse">
-                          📊 Select Category
-                        </span>
+                      {draft.transaction_type === 'income' && (
+                        <div className="flex justify-between items-center py-2 border-b border-muted/50">
+                          <span className="text-muted-foreground font-medium">Income Category</span>
+                          {draft.income_category ? (
+                            <span className="font-semibold bg-muted/60 text-foreground px-2.5 py-1 rounded-full border text-xs shadow-sm capitalize">
+                              📊 {getIncomeCategoryName(draft.income_category)}
+                            </span>
+                          ) : (
+                            <span className="text-xs px-2.5 py-1 rounded-md border border-dashed border-amber-500/50 text-amber-500 bg-amber-500/5 font-medium animate-pulse">
+                              📊 Select Category
+                            </span>
+                          )}
+                        </div>
                       )}
+
+                      <div className="flex justify-between items-center py-2 border-b border-muted/50">
+                        <span className="text-muted-foreground font-medium">Description</span>
+                        {draft.description ? (
+                          <span className="font-semibold text-foreground max-w-[60%] truncate text-right text-xs">
+                            {draft.description}
+                          </span>
+                        ) : (
+                          <span className="text-xs px-2.5 py-1 rounded-md border border-dashed border-amber-500/50 text-amber-500 bg-amber-500/5 font-medium animate-pulse">
+                            📝 Needs Description
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex justify-between items-center py-2 border-b border-muted/50">
+                        <span className="text-muted-foreground font-medium">Date</span>
+                        <span className="font-semibold text-foreground flex items-center gap-1">
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                          {draft.transaction_date || 'Today'}
+                        </span>
+                      </div>
                     </div>
-                  )}
-
-                  {/* Description Row */}
-                  <div className="flex justify-between items-center py-2 border-b border-muted/50">
-                    <span className="text-muted-foreground font-medium">Description</span>
-                    {draft.description ? (
-                      <span className="font-semibold text-foreground max-w-[60%] truncate text-right text-xs" title={draft.description}>
-                        {draft.description}
-                      </span>
-                    ) : (
-                      <span className="text-xs px-2.5 py-1 rounded-md border border-dashed border-amber-500/50 text-amber-500 bg-amber-500/5 font-medium flex items-center gap-1 animate-pulse">
-                        📝 Needs Description
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Transaction Date Row */}
-                  <div className="flex justify-between items-center py-2 border-b border-muted/50">
-                    <span className="text-muted-foreground font-medium">Date</span>
-                    <span className="font-semibold flex items-center gap-1.5 text-foreground">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      {draft.transaction_date ? new Date(draft.transaction_date).toLocaleDateString('en-IN', {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric'
-                      }) : 'Today'}
-                    </span>
-                  </div>
-
-                </div>
-
-              </div>
-
-              {/* Card Save Buttons */}
-              <div className="space-y-3 pt-6">
-                
-                {missingFields.length > 0 && draft.transaction_type && (
-                  <div className="text-xs text-amber-400 bg-amber-950/20 border border-amber-500/20 rounded-lg p-3 flex gap-2">
-                    <AlertCircle className="h-4 w-4 shrink-0 text-amber-500 mt-0.5" />
-                    <span>
-                      Draft cannot be saved yet. Please specify the missing details: <strong>{missingFields.map(f => f.replace('_id', '').replace('_', ' ')).join(', ')}</strong>.
-                    </span>
                   </div>
                 )}
 
-                <div className="flex gap-2">
-                  {draft.transaction_type && (
+                {/* 2. ACCOUNT PASSBOOK PREVIEW */}
+                {currentIntent === 'account' && (
+                  <div className="space-y-6 animate-in fade-in-50 duration-300">
+                    <div className="relative h-48 w-full bg-gradient-to-br from-indigo-900 via-purple-900 to-slate-900 rounded-2xl p-5 text-white flex flex-col justify-between shadow-2xl border border-white/10 overflow-hidden">
+                      <div className="absolute -top-10 -right-10 w-32 h-32 bg-primary/20 rounded-full blur-2xl"></div>
+                      
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <span className="text-[10px] uppercase tracking-widest text-indigo-300 font-bold">
+                            {draftAccount.account_type ? `${draftAccount.account_type} account` : 'new account draft'}
+                          </span>
+                          <h3 className="text-xl font-bold mt-1 tracking-wide truncate max-w-[200px]">
+                            {draftAccount.account_name || 'Untitled Account'}
+                          </h3>
+                          {draftAccount.institution_name && (
+                            <p className="text-[10px] text-indigo-200 mt-0.5">{draftAccount.institution_name}</p>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <span className="text-2xl font-bold bg-white/10 px-3 py-1 rounded-lg border border-white/10">
+                            {draftAccount.account_type === 'credit_card' ? '💳' : draftAccount.account_type === 'loan' ? '📈' : '🏦'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-between items-end">
+                        <div>
+                          <span className="text-[10px] text-indigo-300 block uppercase font-bold">
+                            {draftAccount.account_type === 'credit_card' ? 'Credit Limit' : draftAccount.account_type === 'loan' ? 'Principal Amount' : 'Initial Balance'}
+                          </span>
+                          <span className="text-2xl font-mono font-bold tracking-tight">
+                            {draftAccount.account_type === 'credit_card' 
+                              ? `₹${(draftAccount.credit_limit || 0).toLocaleString('en-IN')}` 
+                              : draftAccount.account_type === 'loan'
+                                ? `₹${(draftAccount.loan_principal || 0).toLocaleString('en-IN')}` 
+                                : `₹${(draftAccount.balance || 0).toLocaleString('en-IN')}`}
+                          </span>
+                        </div>
+                        {draftAccount.last_4_digits && (
+                          <div className="text-right font-mono text-xs tracking-wider text-indigo-200">
+                            •••• {draftAccount.last_4_digits}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-4 text-sm mt-4">
+                      <div className="flex justify-between items-center py-2 border-b border-muted/50">
+                        <span className="text-muted-foreground font-medium">Account Type</span>
+                        <span className="font-semibold capitalize text-primary">
+                          {draftAccount.account_type || 'Unspecified'}
+                        </span>
+                      </div>
+                      
+                      <div className="flex justify-between items-center py-2 border-b border-muted/50">
+                        <span className="text-muted-foreground font-medium">Currency</span>
+                        <span className="font-semibold text-foreground">
+                          {draftAccount.currency || 'INR'}
+                        </span>
+                      </div>
+
+                      {draftAccount.account_type === 'loan' && (
+                        <>
+                          <div className="flex justify-between items-center py-2 border-b border-muted/50">
+                            <span className="text-muted-foreground font-medium">Interest Rate</span>
+                            <span className="font-semibold text-foreground">
+                              {draftAccount.current_interest_rate !== null ? `${draftAccount.current_interest_rate}% p.a.` : 'N/A'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center py-2 border-b border-muted/50">
+                            <span className="text-muted-foreground font-medium">Tenure Months</span>
+                            <span className="font-semibold text-foreground">
+                              {draftAccount.loan_tenure_months ? `${draftAccount.loan_tenure_months} Months (${(draftAccount.loan_tenure_months / 12).toFixed(1)} yrs)` : 'N/A'}
+                            </span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. BUDGET PLANNER PREVIEW */}
+                {currentIntent === 'budget' && (
+                  <div className="space-y-6 animate-in fade-in-50 duration-300">
+                    <div className="bg-gradient-to-br from-teal-950/40 via-muted/40 to-card border border-muted/80 rounded-xl p-5 flex flex-col space-y-4 relative overflow-hidden group shadow-inner">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <span className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">Overall Budget Limit</span>
+                          <div className="flex items-baseline text-foreground font-bold mt-1">
+                            <span className="text-xl mr-1 text-muted-foreground font-mono">₹</span>
+                            <span className="text-3xl tracking-tight text-white font-mono">
+                              {(draftBudget.budgeted_expenses || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="bg-teal-500/10 text-teal-400 p-2.5 rounded-xl border border-teal-500/20 text-2xl">
+                          📅
+                        </div>
+                      </div>
+                      
+                      <div className="border-t border-muted/50 pt-3 text-xs flex justify-between text-muted-foreground font-semibold">
+                        <span>Budget Month</span>
+                        <span className="text-foreground">
+                          {draftBudget.month ? new Date(2000, draftBudget.month - 1).toLocaleString('default', { month: 'long' }) : 'N/A'} {draftBudget.year || 'N/A'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {draftBudget.category_budgets && Object.keys(draftBudget.category_budgets).length > 0 && (
+                      <div className="space-y-3">
+                        <h4 className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Category Limits</h4>
+                        <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                          {Object.entries(draftBudget.category_budgets).map(([cat, amt]) => (
+                            <div key={cat} className="bg-muted/40 border border-muted/50 rounded-lg p-2.5 flex justify-between items-center text-xs">
+                              <span className="font-semibold text-foreground">{cat}</span>
+                              <span className="font-mono text-foreground font-bold">₹{amt.toLocaleString('en-IN')}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 4. EMI CALCULATOR SIMULATOR PREVIEW */}
+                {currentIntent === 'emi_calculator' && (
+                  <div className="space-y-6 animate-in fade-in-50 duration-300">
+                    <div className="bg-gradient-to-br from-indigo-950/40 via-muted/40 to-card border border-muted/80 rounded-xl p-5 flex flex-col space-y-4 relative overflow-hidden group shadow-inner">
+                      <div className="text-center">
+                        <span className="text-xs text-indigo-300 uppercase font-semibold tracking-wider">Monthly Loan EMI</span>
+                        <div className="flex items-baseline justify-center text-foreground font-bold mt-1">
+                          <span className="text-xl mr-1 text-indigo-400 font-mono">₹</span>
+                          <span className="text-3xl tracking-tight text-white font-mono">
+                            {draftEMI.monthly_emi ? draftEMI.monthly_emi.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4 text-xs pt-3 border-t border-muted/50">
+                        <div className="text-center bg-muted/30 p-2 rounded-lg border border-muted/50">
+                          <span className="text-muted-foreground block mb-0.5">Total Interest</span>
+                          <span className="font-bold text-foreground font-mono">
+                            {draftEMI.total_interest ? `₹${draftEMI.total_interest.toLocaleString('en-IN')}` : '₹0.00'}
+                          </span>
+                        </div>
+                        <div className="text-center bg-muted/30 p-2 rounded-lg border border-muted/50">
+                          <span className="text-muted-foreground block mb-0.5">Total Payable</span>
+                          <span className="font-bold text-white font-mono">
+                            {draftEMI.total_payable ? `₹${draftEMI.total_payable.toLocaleString('en-IN')}` : '₹0.00'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4 text-sm mt-4">
+                      <div className="flex justify-between items-center py-2 border-b border-muted/50">
+                        <span className="text-muted-foreground font-medium">Loan Principal</span>
+                        <span className="font-semibold text-foreground font-mono">
+                          {draftEMI.principal ? `₹${draftEMI.principal.toLocaleString('en-IN')}` : '₹0.00'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center py-2 border-b border-muted/50">
+                        <span className="text-muted-foreground font-medium">Annual Interest Rate</span>
+                        <span className="font-semibold text-foreground">
+                          {draftEMI.annual_rate ? `${draftEMI.annual_rate}% p.a.` : '0.0%'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center py-2 border-b border-muted/50">
+                        <span className="text-muted-foreground font-medium">Tenure (Months)</span>
+                        <span className="font-semibold text-foreground">
+                          {draftEMI.tenure_months ? `${draftEMI.tenure_months} Months (${(draftEMI.tenure_months / 12).toFixed(1)} yrs)` : '0 Months'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 5. AI REPORT PAD / AUDIT INSIGHTS */}
+                {!['transaction', 'account', 'budget', 'emi_calculator'].includes(currentIntent) && (
+                  <div className="space-y-4 animate-in fade-in-50 duration-300 flex flex-col h-full">
+                    <div className="bg-gradient-to-br from-indigo-950/30 via-muted/20 to-card border border-muted/60 rounded-xl p-5 flex flex-col h-full min-h-[300px] shadow-inner">
+                      <div className="flex items-center gap-2 border-b border-muted/40 pb-3 mb-3">
+                        <Sparkles className="h-5 w-5 text-indigo-400" />
+                        <span className="text-xs font-bold text-foreground uppercase tracking-wide">AI Financial Report Pad</span>
+                      </div>
+                      
+                      <div className="flex-grow overflow-y-auto max-h-[320px] pr-2 text-xs leading-relaxed text-foreground select-text whitespace-pre-wrap font-medium">
+                        {chatMessages.filter(m => m.role === 'model').slice(-1)[0]?.content || "No report generated yet. Type an inquiry or ask for an audit to see detailed analysis reports here!"}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+              </div>
+
+              {/* Card Save / Reset Buttons for Interactive Intents */}
+              {['transaction', 'account', 'budget'].includes(currentIntent) && (
+                <div className="space-y-3 pt-6 border-t border-muted/40">
+                  
+                  {missingFields.length > 0 && (
+                    <div className="text-xs text-amber-400 bg-amber-950/20 border border-amber-500/20 rounded-lg p-3 flex gap-2">
+                      <AlertCircle className="h-4 w-4 shrink-0 text-amber-500 mt-0.5" />
+                      <span>
+                        Draft cannot be saved yet. Please specify the missing details: <strong>{missingFields.map(f => f.replace('_id', '').replace('_', ' ')).join(', ')}</strong>.
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
                     <Button
                       variant="outline"
-                      className="border-muted hover:bg-destructive/10 hover:text-destructive shrink-0 w-12 h-12 rounded-xl"
+                      className="border-muted hover:bg-destructive/10 hover:text-destructive shrink-0 w-12 h-12 rounded-xl text-foreground"
                       onClick={handleResetDraft}
                       title="Discard current draft"
                     >
-                      <Trash2 className="h-5 w-5" />
+                      <Trash2 className="h-5 w-5 animate-none text-foreground" />
                     </Button>
-                  )}
-                  <Button
-                    className={`flex-grow h-12 text-sm font-semibold rounded-xl shadow-lg transition-all duration-300 ${
-                      missingFields.length === 0 && draft.transaction_type
-                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-950/30'
-                        : 'bg-muted text-muted-foreground cursor-not-allowed border'
-                    }`}
-                    disabled={missingFields.length > 0 || !draft.transaction_type || isLoading}
-                    onClick={handleSaveTransaction}
-                  >
-                    {isLoading ? (
-                      <span className="flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Saving to Database...
-                      </span>
-                    ) : (
-                      <span className="flex items-center justify-center gap-1.5">
-                        <Check className="h-5 w-5" />
-                        Confirm & Save Draft
-                      </span>
-                    )}
-                  </Button>
+                    
+                    <Button
+                      className={`flex-grow h-12 text-sm font-semibold rounded-xl shadow-lg transition-all duration-300 ${
+                        missingFields.length === 0
+                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-950/30'
+                          : 'bg-muted text-muted-foreground cursor-not-allowed border'
+                      }`}
+                      disabled={missingFields.length > 0 || isLoading}
+                      onClick={handleConfirmSaveDraft}
+                    >
+                      {isLoading ? (
+                        <span className="flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin text-white" />
+                          Saving to Database...
+                        </span>
+                      ) : (
+                        <span className="flex items-center justify-center gap-1.5 text-white">
+                          <Check className="h-5 w-5 text-white" />
+                          Confirm & Save Draft
+                        </span>
+                      )}
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              )}
 
             </CardContent>
           </Card>
-
         </div>
-
       </div>
     </div>
   );

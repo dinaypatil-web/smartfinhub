@@ -162,7 +162,7 @@ const routes: RouteConfig[] = [
     protected: true,
   },
   {
-    name: 'Voice Transact',
+    name: 'AI Chatbot',
     path: '/voice-transact',
     element: <ProtectedRoute><VoiceTransactPage /></ProtectedRoute>,
     visible: true,
