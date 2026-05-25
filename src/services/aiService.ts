@@ -415,12 +415,15 @@ export interface SmartChatbotResult {
     account_name?: string | null;
     balance?: number | null;
     currency?: string | null;
+    country?: string | null;
     institution_name?: string | null;
     last_4_digits?: string | null;
     credit_limit?: number | null;
     loan_principal?: number | null;
     loan_tenure_months?: number | null;
     current_interest_rate?: number | null;
+    loan_start_date?: string | null;
+    due_date?: number | null;
 
     // For budget
     month?: number | null;
@@ -509,11 +512,26 @@ export async function parseSmartChatbotCommand(
        
     2. intent: "account"
        - Triggered if the user wants to add/create a new account, card, cash wallet, or loan profile. E.g. "Create a new bank account named HDFC Savings with balance 10000" or "Add a new credit card named SBI Card with limit 150000".
-       - Extracted fields: "account_type" ('cash' | 'bank' | 'credit_card' | 'loan'), "account_name" (e.g. HDFC Savings), "balance" (initial balance, default 0), "currency" (default "INR"), "institution_name" (e.g. HDFC Bank), "last_4_digits" (4 digit string or null), "credit_limit" (number, required if card), "loan_principal" (number, required if loan), "loan_tenure_months" (number, required if loan), "current_interest_rate" (number, required if loan).
-       - Required fields for ALL accounts: "account_type", "account_name".
-       - Extra required if credit_card: "credit_limit".
-       - Extra required if loan: "loan_principal", "loan_tenure_months", "current_interest_rate".
-       - If any required fields are missing: set isComplete to false, list in missingFields, ask for them in clarificationQuestion (e.g. "What is the account type? (cash/bank/credit card/loan)").
+       - Extracted fields:
+         - "account_type" ('cash' | 'bank' | 'credit_card' | 'loan')
+         - "account_name" (e.g. HDFC Savings)
+         - "balance" (initial balance, default 0)
+         - "currency" (default "INR")
+         - "country" (e.g. 'IN', 'US', 'GB', 'EU'. Default to 'IN' if Indian banks like SBI/HDFC are mentioned, or 'US' if US banks are mentioned, otherwise ask).
+         - "institution_name" (e.g. HDFC Bank, SBI Bank, Chase, Citibank. Required for bank/credit_card/loan).
+         - "last_4_digits" (4 digit string or null, optional)
+         - "credit_limit" (number, required if card/credit_card)
+         - "loan_principal" (number, required if loan)
+         - "loan_tenure_months" (number, required if loan)
+         - "current_interest_rate" (number, required if loan)
+         - "loan_start_date" (string 'YYYY-MM-DD', required if loan)
+         - "due_date" (number, day of month 1-31, required if loan indicating EMI payment due day)
+       - Required fields by type:
+         - cash: "account_type", "account_name".
+         - bank: "account_type", "account_name", "country", "currency", "institution_name".
+         - credit_card: "account_type", "account_name", "country", "currency", "institution_name", "credit_limit".
+         - loan: "account_type", "account_name", "country", "currency", "institution_name", "loan_principal", "loan_tenure_months", "current_interest_rate", "loan_start_date", "due_date".
+       - If any required fields are missing: set isComplete to false, list them in missingFields, and prompt for them conversationally in clarificationQuestion.
        
     3. intent: "budget"
        - Triggered if the user wants to set a monthly budget or category budget. E.g. "Set a budget of 5000 for groceries in June 2026" or "Setup monthly expenses budget of 40000 for next month".
@@ -556,12 +574,15 @@ export async function parseSmartChatbotCommand(
         "account_name": string | null,
         "balance": number | null,
         "currency": string | null,
+        "country": string | null,
         "institution_name": string | null,
         "last_4_digits": string | null,
         "credit_limit": number | null,
         "loan_principal": number | null,
         "loan_tenure_months": number | null,
         "current_interest_rate": number | null,
+        "loan_start_date": "YYYY-MM-DD" | null,
+        "due_date": number | null,
         
         "month": number | null,
         "year": number | null,

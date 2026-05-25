@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useHybridAuth } from '@/contexts/HybridAuthContext';
-import { transactionApi, accountApi, categoryApi, budgetApi } from '@/db/api';
+import { transactionApi, accountApi, categoryApi, budgetApi, interestRateApi } from '@/db/api';
 import { parseSmartChatbotCommand, type SmartChatbotResult } from '@/services/aiService';
 import { INCOME_CATEGORIES, getIncomeCategoryName } from '@/constants/incomeCategories';
+import { countries } from '@/utils/countries';
+import { getBanksByCountry, getBankLogo } from '@/utils/banks';
 import type { Account, ExpenseCategory } from '@/types/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -55,12 +57,15 @@ interface DraftAccount {
   account_name: string | null;
   balance: number | null;
   currency: string | null;
+  country: string | null;
   institution_name: string | null;
   last_4_digits: string | null;
   credit_limit: number | null;
   loan_principal: number | null;
   loan_tenure_months: number | null;
   current_interest_rate: number | null;
+  loan_start_date: string | null;
+  due_date: number | null;
 }
 
 interface DraftBudget {
@@ -127,12 +132,15 @@ export default function VoiceTransactPage() {
     account_name: null,
     balance: null,
     currency: 'INR',
+    country: null,
     institution_name: null,
     last_4_digits: null,
     credit_limit: null,
     loan_principal: null,
     loan_tenure_months: null,
-    current_interest_rate: null
+    current_interest_rate: null,
+    loan_start_date: null,
+    due_date: null
   });
 
   const [draftBudget, setDraftBudget] = useState<DraftBudget>({
@@ -276,6 +284,14 @@ export default function VoiceTransactPage() {
       if (!d.account_name || !d.account_name.trim()) {
         missing.push('account_name');
       }
+      if (d.account_type !== 'cash') {
+        if (!d.country) {
+          missing.push('country');
+        }
+        if (!d.institution_name || !d.institution_name.trim()) {
+          missing.push('institution_name');
+        }
+      }
       if (d.account_type === 'credit_card') {
         if (d.credit_limit === null || d.credit_limit === undefined || d.credit_limit <= 0) {
           missing.push('credit_limit');
@@ -284,6 +300,8 @@ export default function VoiceTransactPage() {
         if (!d.loan_principal || d.loan_principal <= 0) missing.push('loan_principal');
         if (!d.loan_tenure_months || d.loan_tenure_months <= 0) missing.push('loan_tenure_months');
         if (d.current_interest_rate === null || d.current_interest_rate === undefined) missing.push('current_interest_rate');
+        if (!d.loan_start_date) missing.push('loan_start_date');
+        if (d.due_date === null || d.due_date === undefined || d.due_date < 1 || d.due_date > 31) missing.push('due_date');
       }
     } else if (intent === 'budget') {
       const d = activeDraft as DraftBudget;
@@ -386,12 +404,15 @@ export default function VoiceTransactPage() {
               account_name: ext.account_name || draftAccount.account_name,
               balance: ext.balance !== undefined && ext.balance !== null ? ext.balance : draftAccount.balance,
               currency: ext.currency || draftAccount.currency || 'INR',
+              country: ext.country || draftAccount.country,
               institution_name: ext.institution_name || draftAccount.institution_name,
               last_4_digits: ext.last_4_digits || draftAccount.last_4_digits,
               credit_limit: ext.credit_limit || draftAccount.credit_limit,
               loan_principal: ext.loan_principal || draftAccount.loan_principal,
               loan_tenure_months: ext.loan_tenure_months || draftAccount.loan_tenure_months,
-              current_interest_rate: ext.current_interest_rate !== undefined && ext.current_interest_rate !== null ? ext.current_interest_rate : draftAccount.current_interest_rate
+              current_interest_rate: ext.current_interest_rate !== undefined && ext.current_interest_rate !== null ? ext.current_interest_rate : draftAccount.current_interest_rate,
+              loan_start_date: ext.loan_start_date || draftAccount.loan_start_date,
+              due_date: ext.due_date !== undefined && ext.due_date !== null ? ext.due_date : draftAccount.due_date
             };
             
             const clientMissing = validateCurrentDraft('account', updatedAccount);
@@ -595,12 +616,15 @@ export default function VoiceTransactPage() {
         account_name: null,
         balance: null,
         currency: 'INR',
+        country: null,
         institution_name: null,
         last_4_digits: null,
         credit_limit: null,
         loan_principal: null,
         loan_tenure_months: null,
-        current_interest_rate: null
+        current_interest_rate: null,
+        loan_start_date: null,
+        due_date: null
       });
     } else if (currentIntent === 'budget') {
       setDraftBudget({
@@ -725,15 +749,28 @@ export default function VoiceTransactPage() {
         account_type: draftAccount.account_type!,
         balance: Number(draftAccount.balance || 0),
         currency: draftAccount.currency || 'INR',
-        institution_name: draftAccount.institution_name || draftAccount.account_name!,
+        country: draftAccount.country || 'IN',
+        institution_name: draftAccount.account_type === 'cash' ? 'Cash' : (draftAccount.institution_name || draftAccount.account_name!),
+        institution_logo: draftAccount.account_type === 'cash' ? null : getBankLogo(draftAccount.institution_name || draftAccount.account_name!),
         last_4_digits: draftAccount.last_4_digits || null,
-        credit_limit: draftAccount.credit_limit,
-        loan_principal: draftAccount.loan_principal,
-        loan_tenure_months: draftAccount.loan_tenure_months,
-        current_interest_rate: draftAccount.current_interest_rate
+        credit_limit: draftAccount.account_limit || draftAccount.credit_limit || null,
+        loan_principal: draftAccount.loan_principal || null,
+        loan_tenure_months: draftAccount.loan_tenure_months || null,
+        loan_start_date: draftAccount.account_type === 'loan' ? draftAccount.loan_start_date : null,
+        current_interest_rate: draftAccount.current_interest_rate || null,
+        due_date: draftAccount.account_type === 'loan' ? Number(draftAccount.due_date) : null
       };
       
-      await accountApi.createAccount(accountPayload);
+      const newAccount = await accountApi.createAccount(accountPayload as any);
+      
+      if (draftAccount.account_type === 'loan' && draftAccount.current_interest_rate && draftAccount.loan_start_date) {
+        await interestRateApi.addInterestRate({
+          account_id: newAccount.id,
+          interest_rate: Number(draftAccount.current_interest_rate),
+          effective_date: draftAccount.loan_start_date,
+        });
+      }
+      
       await loadData();
       
       setIsLoading(false);
@@ -758,12 +795,15 @@ export default function VoiceTransactPage() {
         account_name: null,
         balance: null,
         currency: 'INR',
+        country: null,
         institution_name: null,
         last_4_digits: null,
         credit_limit: null,
         loan_principal: null,
         loan_tenure_months: null,
-        current_interest_rate: null
+        current_interest_rate: null,
+        loan_start_date: null,
+        due_date: null
       });
       setMissingFields([]);
       
@@ -1027,6 +1067,81 @@ export default function VoiceTransactPage() {
         );
       }
       
+      if (nextMissing === 'country') {
+        const countryOptions = [
+          { code: 'IN', label: '🇮🇳 India', name: 'India' },
+          { code: 'US', label: '🇺🇸 United States', name: 'United States' },
+          { code: 'GB', label: '🇬🇧 United Kingdom', name: 'United Kingdom' },
+          { code: 'EU', label: '🇪🇺 European Union', name: 'European Union' },
+          { code: 'SG', label: '🇸🇬 Singapore', name: 'Singapore' },
+          { code: 'CA', label: '🇨🇦 Canada', name: 'Canada' },
+          { code: 'AU', label: '🇦🇺 Australia', name: 'Australia' }
+        ];
+        return (
+          <div className="space-y-2 mt-2 animate-in fade-in-50 duration-300">
+            <p className="text-xs text-muted-foreground font-semibold">Select Country:</p>
+            <div className="flex flex-wrap gap-2">
+              {countryOptions.map(c => (
+                <Button
+                  key={c.code}
+                  variant="outline"
+                  size="sm"
+                  className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                  onClick={() => {
+                    const matchingCountryObj = countries.find(co => co.code === c.code);
+                    if (matchingCountryObj) {
+                      setDraftAccount(prev => ({
+                        ...prev,
+                        country: c.code,
+                        currency: matchingCountryObj.currency
+                      }));
+                    }
+                    handleSelectField('country', c.code, c.name);
+                  }}
+                >
+                  {c.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+        );
+      }
+      
+      if (nextMissing === 'institution_name') {
+        const countryBanks = getBanksByCountry(draftAccount.country || 'IN').slice(0, 10);
+        return (
+          <div className="space-y-2 mt-2 animate-in fade-in-50 duration-300">
+            <p className="text-xs text-muted-foreground font-semibold">Select Popular Bank:</p>
+            <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-1 bg-muted/30 rounded-lg">
+              {countryBanks.map(bank => (
+                <Button
+                  key={bank.name}
+                  variant="outline"
+                  size="sm"
+                  className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                  onClick={() => handleSelectField('institution_name', bank.name, bank.name)}
+                >
+                  {bank.name}
+                </Button>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-dashed hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                onClick={() => {
+                  const customName = prompt("Enter bank/institution name:");
+                  if (customName && customName.trim()) {
+                    handleSelectField('institution_name', customName.trim(), customName.trim());
+                  }
+                }}
+              >
+                ➕ Other / Custom Bank
+              </Button>
+            </div>
+          </div>
+        );
+      }
+      
       if (nextMissing === 'currency') {
         return (
           <div className="space-y-2 mt-2 animate-in fade-in-50 duration-300">
@@ -1045,6 +1160,69 @@ export default function VoiceTransactPage() {
                   onClick={() => handleSelectField('currency', curr.code, curr.code)}
                 >
                   {curr.symbol}
+                </Button>
+              ))}
+            </div>
+          </div>
+        );
+      }
+
+      if (nextMissing === 'loan_start_date') {
+        const todayStr = new Date().toISOString().slice(0, 10);
+        return (
+          <div className="space-y-2 mt-2 animate-in fade-in-50 duration-300">
+            <p className="text-xs text-muted-foreground font-semibold">Select Loan Start Date:</p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                onClick={() => handleSelectField('loan_start_date', todayStr, `Today (${todayStr})`)}
+              >
+                📅 Today ({todayStr})
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-dashed hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                onClick={() => {
+                  const customDate = prompt("Enter Loan Start Date (YYYY-MM-DD):", todayStr);
+                  if (customDate && /^\d{4}-\d{2}-\d{2}$/.test(customDate)) {
+                    handleSelectField('loan_start_date', customDate, customDate);
+                  } else if (customDate) {
+                    alert("Invalid date format. Please use YYYY-MM-DD.");
+                  }
+                }}
+              >
+                📅 Custom Date
+              </Button>
+            </div>
+          </div>
+        );
+      }
+
+      if (nextMissing === 'due_date') {
+        const dueDays = [
+          { val: 1, label: '1st of month' },
+          { val: 5, label: '5th of month' },
+          { val: 10, label: '10th of month' },
+          { val: 15, label: '15th of month' },
+          { val: 20, label: '20th of month' },
+          { val: 25, label: '25th of month' }
+        ];
+        return (
+          <div className="space-y-2 mt-2 animate-in fade-in-50 duration-300">
+            <p className="text-xs text-muted-foreground font-semibold">Select EMI Payment Due Day:</p>
+            <div className="flex flex-wrap gap-2">
+              {dueDays.map(d => (
+                <Button
+                  key={d.val}
+                  variant="outline"
+                  size="sm"
+                  className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                  onClick={() => handleSelectField('due_date', d.val, d.label)}
+                >
+                  📅 {d.label}
                 </Button>
               ))}
             </div>
@@ -1563,13 +1741,34 @@ export default function VoiceTransactPage() {
                             {draftAccount.account_name || 'Untitled Account'}
                           </h3>
                           {draftAccount.institution_name && (
-                            <p className="text-[10px] text-indigo-200 mt-0.5">{draftAccount.institution_name}</p>
+                            <div className="flex items-center gap-1.5 mt-1">
+                              {draftAccount.account_type !== 'cash' && (
+                                <img 
+                                  src={getBankLogo(draftAccount.institution_name)} 
+                                  alt={draftAccount.institution_name}
+                                  className="w-4 h-4 rounded-full bg-white object-contain"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).style.display = 'none';
+                                  }}
+                                />
+                              )}
+                              <p className="text-[10px] text-indigo-200">{draftAccount.institution_name}</p>
+                            </div>
                           )}
                         </div>
-                        <div className="text-right">
+                        <div className="text-right flex flex-col items-end gap-1">
                           <span className="text-2xl font-bold bg-white/10 px-3 py-1 rounded-lg border border-white/10">
-                            {draftAccount.account_type === 'credit_card' ? '💳' : draftAccount.account_type === 'loan' ? '📈' : '🏦'}
+                            {draftAccount.account_type === 'credit_card' ? '💳' : draftAccount.account_type === 'loan' ? '📈' : draftAccount.account_type === 'cash' ? '💵' : '🏦'}
                           </span>
+                          {draftAccount.country && (
+                            <Badge className="bg-white/10 text-white border-none text-[9px] uppercase tracking-wider scale-90 origin-right">
+                              {draftAccount.country === 'IN' ? '🇮🇳 IN' : 
+                               draftAccount.country === 'US' ? '🇺🇸 US' : 
+                               draftAccount.country === 'GB' ? '🇬🇧 GB' : 
+                               draftAccount.country === 'EU' ? '🇪🇺 EU' : 
+                               `${draftAccount.country}`}
+                            </Badge>
+                          )}
                         </div>
                       </div>
 
@@ -1602,6 +1801,34 @@ export default function VoiceTransactPage() {
                         </span>
                       </div>
                       
+                      {draftAccount.account_type !== 'cash' && (
+                        <>
+                          <div className="flex justify-between items-center py-2 border-b border-muted/50">
+                            <span className="text-muted-foreground font-medium">Country</span>
+                            <span className="font-semibold text-foreground">
+                              {draftAccount.country ? (
+                                draftAccount.country === 'IN' ? '🇮🇳 India' :
+                                draftAccount.country === 'US' ? '🇺🇸 United States' :
+                                draftAccount.country === 'GB' ? '🇬🇧 United Kingdom' :
+                                draftAccount.country === 'EU' ? '🇪🇺 European Union' :
+                                draftAccount.country
+                              ) : (
+                                <span className="text-xs text-amber-500 font-medium animate-pulse">Needs Country</span>
+                              )}
+                            </span>
+                          </div>
+                          
+                          <div className="flex justify-between items-center py-2 border-b border-muted/50">
+                            <span className="text-muted-foreground font-medium">Bank Name</span>
+                            <span className="font-semibold text-foreground">
+                              {draftAccount.institution_name || (
+                                <span className="text-xs text-amber-500 font-medium animate-pulse">Needs Bank Name</span>
+                              )}
+                            </span>
+                          </div>
+                        </>
+                      )}
+
                       <div className="flex justify-between items-center py-2 border-b border-muted/50">
                         <span className="text-muted-foreground font-medium">Currency</span>
                         <span className="font-semibold text-foreground">
@@ -1609,8 +1836,23 @@ export default function VoiceTransactPage() {
                         </span>
                       </div>
 
+                      {draftAccount.account_type === 'credit_card' && (
+                        <div className="flex justify-between items-center py-2 border-b border-muted/50">
+                          <span className="text-muted-foreground font-medium">Credit Limit</span>
+                          <span className="font-semibold text-foreground font-mono">
+                            {draftAccount.credit_limit ? `₹${Number(draftAccount.credit_limit).toLocaleString('en-IN')}` : '₹0.00'}
+                          </span>
+                        </div>
+                      )}
+
                       {draftAccount.account_type === 'loan' && (
                         <>
+                          <div className="flex justify-between items-center py-2 border-b border-muted/50">
+                            <span className="text-muted-foreground font-medium">Principal Amount</span>
+                            <span className="font-semibold text-foreground font-mono">
+                              {draftAccount.loan_principal ? `₹${Number(draftAccount.loan_principal).toLocaleString('en-IN')}` : '₹0.00'}
+                            </span>
+                          </div>
                           <div className="flex justify-between items-center py-2 border-b border-muted/50">
                             <span className="text-muted-foreground font-medium">Interest Rate</span>
                             <span className="font-semibold text-foreground">
@@ -1621,6 +1863,26 @@ export default function VoiceTransactPage() {
                             <span className="text-muted-foreground font-medium">Tenure Months</span>
                             <span className="font-semibold text-foreground">
                               {draftAccount.loan_tenure_months ? `${draftAccount.loan_tenure_months} Months (${(draftAccount.loan_tenure_months / 12).toFixed(1)} yrs)` : 'N/A'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center py-2 border-b border-muted/50">
+                            <span className="text-muted-foreground font-medium">Loan Start Date</span>
+                            <span className="font-semibold text-foreground">
+                              {draftAccount.loan_start_date ? (
+                                <span className="flex items-center gap-1"><Calendar className="h-4 w-4 text-muted-foreground" /> {draftAccount.loan_start_date}</span>
+                              ) : (
+                                <span className="text-xs text-amber-500 font-medium animate-pulse">Needs Start Date</span>
+                              )}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center py-2 border-b border-muted/50">
+                            <span className="text-muted-foreground font-medium">Payment Due Day</span>
+                            <span className="font-semibold text-foreground">
+                              {draftAccount.due_date ? (
+                                `Day ${draftAccount.due_date} of month`
+                              ) : (
+                                <span className="text-xs text-amber-500 font-medium animate-pulse">Needs Due Day</span>
+                              )}
                             </span>
                           </div>
                         </>
