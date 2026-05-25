@@ -86,7 +86,7 @@ interface DraftEMI {
 }
 
 export default function VoiceTransactPage() {
-  const { user } = useHybridAuth();
+  const { user, profile } = useHybridAuth();
   const { toast } = useToast();
   
   // Dynamic lists
@@ -131,8 +131,8 @@ export default function VoiceTransactPage() {
     account_type: null,
     account_name: null,
     balance: null,
-    currency: 'INR',
-    country: null,
+    currency: profile?.default_currency || 'INR',
+    country: profile?.default_country || null,
     institution_name: null,
     last_4_digits: null,
     credit_limit: null,
@@ -142,6 +142,17 @@ export default function VoiceTransactPage() {
     loan_start_date: null,
     due_date: null
   });
+
+  // Automatically sync profile country/currency when loaded
+  useEffect(() => {
+    if (profile) {
+      setDraftAccount(prev => ({
+        ...prev,
+        country: prev.country || profile.default_country || 'IN',
+        currency: prev.currency === 'INR' && profile.default_currency ? profile.default_currency : prev.currency
+      }));
+    }
+  }, [profile]);
 
   const [draftBudget, setDraftBudget] = useState<DraftBudget>({
     month: null,
@@ -615,8 +626,8 @@ export default function VoiceTransactPage() {
         account_type: null,
         account_name: null,
         balance: null,
-        currency: 'INR',
-        country: null,
+        currency: profile?.default_currency || 'INR',
+        country: profile?.default_country || 'IN',
         institution_name: null,
         last_4_digits: null,
         credit_limit: null,
@@ -794,8 +805,8 @@ export default function VoiceTransactPage() {
         account_type: null,
         account_name: null,
         balance: null,
-        currency: 'INR',
-        country: null,
+        currency: profile?.default_currency || 'INR',
+        country: profile?.default_country || 'IN',
         institution_name: null,
         last_4_digits: null,
         credit_limit: null,
