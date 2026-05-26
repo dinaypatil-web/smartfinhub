@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, ArrowLeft, TrendingDown, AlertCircle, RefreshCw, Trash2 } from 'lucide-react';
+import { Loader2, ArrowLeft, TrendingDown, AlertCircle, RefreshCw, Trash2, Sparkles } from 'lucide-react';
 import { formatCurrency } from '@/utils/format';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
@@ -115,15 +115,25 @@ export default function LoanEMIHistory() {
                 <ArrowLeft className="h-5 w-5" />
               </Button>
               <h1 className="text-3xl font-bold text-slate-900 dark:text-white">EMI Payment History</h1>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigate('/loan-emi-simulator')}
-                className="ml-auto"
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                EMI Simulator
-              </Button>
+              <div className="ml-auto flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate('/voice-transact?intent=emi_calculator')}
+                  className="border-primary/50 text-primary hover:bg-primary/5 dark:hover:bg-primary/10"
+                >
+                  <Sparkles className="h-4 w-4 mr-2 text-primary animate-pulse" />
+                  Ask AI Assistant
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate('/loan-emi-simulator')}
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  EMI Simulator
+                </Button>
+              </div>
             </div>
             <p className="text-slate-600 dark:text-slate-400">Track principal and interest payments for your loans</p>
           </div>

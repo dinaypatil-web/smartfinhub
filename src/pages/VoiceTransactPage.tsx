@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useHybridAuth } from '@/contexts/HybridAuthContext';
 import { transactionApi, accountApi, categoryApi, budgetApi, interestRateApi, emiApi, userCustomBankLinksApi } from '@/db/api';
 import { parseSmartChatbotCommand, type SmartChatbotResult } from '@/services/aiService';
@@ -93,6 +94,7 @@ interface DraftEMI {
 export default function VoiceTransactPage() {
   const { user, profile } = useHybridAuth();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
   
   // Dynamic lists
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -455,6 +457,105 @@ export default function VoiceTransactPage() {
 
     return '';
   };
+
+  // Handle URL deep linking for intents
+  useEffect(() => {
+    const intentParam = searchParams.get('intent');
+    if (!intentParam) return;
+    
+    const validIntents = ['transaction', 'account', 'budget', 'emi_calculator'];
+    if (validIntents.includes(intentParam)) {
+      const intent = intentParam as 'transaction' | 'account' | 'budget' | 'emi_calculator';
+      setCurrentIntent(intent);
+      
+      let welcomeMsg = '';
+      let initialMissing: string[] = [];
+      const botMsgId = 'deep-link-' + Math.random().toString();
+      const today = new Date().toISOString().split('T')[0];
+      
+      if (intent === 'transaction') {
+        const initialDraft: DraftTransaction = {
+          transaction_type: null,
+          amount: null,
+          from_account_id: null,
+          to_account_id: null,
+          category: null,
+          income_category: null,
+          description: null,
+          transaction_date: today,
+          is_emi: null,
+          emi_months: null,
+          bank_charges: null
+        };
+        setDraft(initialDraft);
+        initialMissing = validateCurrentDraft('transaction', initialDraft);
+        welcomeMsg = "Welcome to the AI Transaction Assistant! Let's record a transaction. Please tell me what type of transaction you want to make (income or expense) and we'll go from there, or specify details like: \"Spent 500 on Food using my bank account\"";
+      } else if (intent === 'account') {
+        const initialAccount: DraftAccount = {
+          account_type: null,
+          account_name: null,
+          balance: 0,
+          currency: profile?.default_currency || 'INR',
+          country: profile?.default_country || 'IN',
+          institution_name: null,
+          last_4_digits: null,
+          credit_limit: null,
+          loan_principal: null,
+          loan_tenure_months: null,
+          current_interest_rate: null,
+          loan_start_date: null,
+          due_date: null,
+          statement_day: null,
+          due_day: null,
+          web_url: null,
+          ios_app_url: null,
+          android_app_url: null,
+          institution_logo: null
+        };
+        setDraftAccount(initialAccount);
+        initialMissing = validateCurrentDraft('account', initialAccount);
+        welcomeMsg = "Welcome to the AI Account Assistant! Let's create a new account. Please specify the account type (cash, bank, credit card, or loan) and its name, or describe it in plain text, e.g.: \"Create a new cash account named Pocket Cash with starting balance 200\"";
+      } else if (intent === 'budget') {
+        const initialBudget: DraftBudget = {
+          month: new Date().getMonth() + 1,
+          year: new Date().getFullYear(),
+          budgeted_income: null,
+          budgeted_expenses: null,
+          category_budgets: null
+        };
+        setDraftBudget(initialBudget);
+        initialMissing = validateCurrentDraft('budget', initialBudget);
+        welcomeMsg = "Welcome to the AI Budget Assistant! Let's configure a monthly budget limit. Please specify the target month/year and limits, e.g.: \"Set a monthly budget of 50000 for May 2026\"";
+      } else if (intent === 'emi_calculator') {
+        const initialEMI: DraftEMI = {
+          principal: null,
+          annual_rate: null,
+          tenure_months: null,
+          monthly_emi: null,
+          total_interest: null,
+          total_payable: null
+        };
+        setDraftEMI(initialEMI);
+        initialMissing = validateCurrentDraft('emi_calculator', initialEMI);
+        welcomeMsg = "Welcome to the AI Loan EMI Simulator! Please specify: the loan principal, annual interest rate, and tenure in months to compute your payments, e.g.: \"Calculate EMI for a loan of 500000 at 8.5% interest rate for 60 months\"";
+      }
+      
+      setMissingFields(initialMissing);
+      setChatMessages([
+        {
+          id: 'welcome',
+          role: 'model',
+          content: "Hello! I am your Smart AI Chatbot—the central operational hub of SmartFinHub."
+        },
+        {
+          id: botMsgId,
+          role: 'model',
+          content: welcomeMsg + generateFunctionsAndLogicsDetails(intent),
+          isInteractive: initialMissing.length === 0 && intent !== 'emi_calculator'
+        }
+      ]);
+    }
+  }, [searchParams, profile]);
 
   const handleSendCommand = async (commandToSend?: string) => {
     const commandText = commandToSend || inputValue;

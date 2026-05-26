@@ -25,7 +25,8 @@ import {
   CheckCircle2,
   HelpCircle,
   Pencil,
-  RotateCcw
+  RotateCcw,
+  Sparkles
 } from 'lucide-react';
 import { formatCurrency } from '@/utils/format';
 import { calculateEMI } from '@/utils/loanCalculations';
@@ -485,23 +486,33 @@ export default function LoanEMISimulator() {
               </p>
             </div>
           </div>
-          <Button
-            onClick={exportToCSV}
-            disabled={unifiedRepaymentSchedule.length === 0}
-            className="bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-600 dark:hover:bg-blue-700 font-semibold shadow-md transition-all self-start md:self-auto"
-          >
-            <Download className="mr-2 h-4 w-4" />
-            Export Schedule (CSV)
-          </Button>
-          <Button
-            variant="outline"
-            className="ml-2 hover:bg-slate-100 dark:hover:bg-slate-800"
-            onClick={exportToXLSX}
-            disabled={unifiedRepaymentSchedule.length === 0 || !xlsxLoaded}
-          >
-            {!xlsxLoaded && <Loader2 className="mr-2 h-4 w-4 animate-spin text-blue-600 dark:text-blue-400" />}
-            Export Schedule (XLSX)
-          </Button>
+          <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+            <Button
+              variant="outline"
+              className="border-primary/50 text-primary hover:bg-primary/5 dark:hover:bg-primary/10"
+              onClick={() => navigate('/voice-transact?intent=emi_calculator')}
+            >
+              <Sparkles className="mr-2 h-4 w-4 text-primary animate-pulse" />
+              Ask AI EMI Simulator
+            </Button>
+            <Button
+              onClick={exportToCSV}
+              disabled={unifiedRepaymentSchedule.length === 0}
+              className="bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-600 dark:hover:bg-blue-700 font-semibold shadow-md transition-all"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Export CSV
+            </Button>
+            <Button
+              variant="outline"
+              className="hover:bg-slate-100 dark:hover:bg-slate-800"
+              onClick={exportToXLSX}
+              disabled={unifiedRepaymentSchedule.length === 0 || !xlsxLoaded}
+            >
+              {!xlsxLoaded && <Loader2 className="mr-2 h-4 w-4 animate-spin text-blue-600 dark:text-blue-400" />}
+              Export XLSX
+            </Button>
+          </div>
         </div>
 
         {loading ? (

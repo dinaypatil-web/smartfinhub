@@ -10,6 +10,7 @@ import {
   Trash2,
   TrendingDown,
   Wallet,
+  Sparkles,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -323,12 +324,20 @@ export default function Accounts() {
           <h1 className="text-3xl font-bold">Accounts</h1>
           <p className="text-muted-foreground">Manage your financial accounts</p>
         </div>
-        <Link to="/accounts/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Account
-          </Button>
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link to="/voice-transact?intent=account">
+            <Button variant="outline" className="border-primary/50 text-primary hover:bg-primary/5 dark:hover:bg-primary/10">
+              <Sparkles className="mr-2 h-4 w-4 text-primary animate-pulse" />
+              Ask AI Account Assistant
+            </Button>
+          </Link>
+          <Link to="/accounts/new">
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Account
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <Dialog open={scheduleDialogOpen} onOpenChange={setScheduleDialogOpen}>

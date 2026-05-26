@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatCurrency, formatAccountNumber } from '@/utils/format';
-import { Plus, Wallet, CreditCard, TrendingUp, TrendingDown, Building2, AlertCircle, Calculator, DollarSign, ExternalLink, Mic, Sparkles, Bot, MessageSquare } from 'lucide-react';
+import { Plus, Wallet, CreditCard, TrendingUp, TrendingDown, Building2, AlertCircle, Calculator, DollarSign, ExternalLink, Sparkles, Bot } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { calculateEMI, calculateAccruedInterest } from '@/utils/loanCalculations';
@@ -421,6 +421,12 @@ export default function Dashboard() {
           <p className="text-xs text-muted-foreground">Today: {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
         </div>
         <div className="flex gap-2 flex-wrap">
+          <Link to="/voice-transact">
+            <Button variant="outline" size="sm" className="md:size-default border-primary/50 text-primary hover:bg-primary/5 dark:hover:bg-primary/10">
+              <Sparkles className="mr-2 h-4 w-4 text-primary animate-pulse" />
+              Ask AI Assistant
+            </Button>
+          </Link>
           <Link to="/accounts/new">
             <Button size="sm" className="md:size-default shadow-elegant hover:shadow-glow transition-smooth">
               <Plus className="mr-2 h-4 w-4" />

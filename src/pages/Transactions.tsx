@@ -26,8 +26,7 @@ import {
   Search,
   SlidersHorizontal,
   X,
-  ArrowUpDown,
-  Calendar,
+  Sparkles,
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
@@ -52,7 +51,7 @@ import {
 } from '@/components/ui/table';
 
 export default function Transactions() {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -75,7 +74,6 @@ export default function Transactions() {
   const [sortBy, setSortBy] = useState<string>('date-desc');
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(false);
 
-  const currency = profile?.default_currency || 'INR';
 
   useEffect(() => {
     if (user) {
@@ -347,12 +345,20 @@ export default function Transactions() {
           <h1 className="text-3xl font-bold">Transactions</h1>
           <p className="text-muted-foreground">View and manage your transactions</p>
         </div>
-        <Link to="/transactions/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Transaction
-          </Button>
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link to="/voice-transact?intent=transaction">
+            <Button variant="outline" className="border-primary/50 text-primary hover:bg-primary/5 dark:hover:bg-primary/10">
+              <Sparkles className="mr-2 h-4 w-4 text-primary animate-pulse" />
+              Ask AI Transaction Assistant
+            </Button>
+          </Link>
+          <Link to="/transactions/new">
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Transaction
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {transactions.length === 0 ? (

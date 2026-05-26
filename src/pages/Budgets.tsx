@@ -8,7 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, TrendingUp, TrendingDown, Plus, Trash2, Edit2 } from 'lucide-react';
+import { Loader2, TrendingUp, TrendingDown, Plus, Trash2, Sparkles } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { formatCurrency, getMonthName, getCurrentMonthYear } from '@/utils/format';
 import { Progress } from '@/components/ui/progress';
 import { INCOME_CATEGORIES } from '@/constants/incomeCategories';
@@ -186,13 +187,6 @@ export default function Budgets() {
     }));
   };
 
-  const removeCategoryBudget = (categoryId: string) => {
-    setCategoryBudgets(prev => {
-      const newBudgets = { ...prev };
-      delete newBudgets[categoryId];
-      return newBudgets;
-    });
-  };
 
   const getTotalCategoryBudgets = () => {
     return Object.values(categoryBudgets).reduce((sum, val) => {
@@ -285,9 +279,17 @@ export default function Budgets() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Budget Management</h1>
-        <p className="text-muted-foreground">Plan and track your monthly budget by category</p>
+      <div className="flex justify-between items-center flex-wrap gap-4">
+        <div>
+          <h1 className="text-3xl font-bold">Budget Management</h1>
+          <p className="text-muted-foreground">Plan and track your monthly budget by category</p>
+        </div>
+        <Link to="/voice-transact?intent=budget">
+          <Button variant="outline" className="border-primary/50 text-primary hover:bg-primary/5 dark:hover:bg-primary/10">
+            <Sparkles className="mr-2 h-4 w-4 text-primary animate-pulse" />
+            Ask AI Budget Assistant
+          </Button>
+        </Link>
       </div>
 
       <div className="flex gap-4">
