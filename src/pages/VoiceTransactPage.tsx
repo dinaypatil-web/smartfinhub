@@ -344,6 +344,104 @@ export default function VoiceTransactPage() {
     return missing;
   };
 
+  // Helper: Generates a premium details card of background system functions, APIs, and logics
+  const generateFunctionsAndLogicsDetails = (intent: string, field?: string) => {
+    let functions = '';
+    let apis = '';
+    let logics = '';
+
+    if (intent === 'transaction') {
+      functions = '`validateCurrentDraft("transaction", draft)` to assess state completeness.';
+      apis = '`transactionApi.createTransaction()` when transaction is completed and saved.';
+      
+      if (field) {
+        const friendlyField = field.replace('_id', '').replace('_', ' ');
+        if (field === 'transaction_type') {
+          logics = `Checks if transaction is 'expense', 'income', etc. Standardizes state logic: if 'expense', clears receipt destination; if 'income', clears payment sources.`;
+        } else if (field === 'amount') {
+          logics = `Normalizes decimal values. If credit card EMI is checked, pre-triggers calculation functions.`;
+          functions += '\n- `@/utils/emiCalculations:calculateMonthlyEMI()` for live installment estimates.';
+        } else if (['from_account_id', 'to_account_id'].includes(field)) {
+          logics = `Checks transaction consistency. Verifies balance records in local state array \`accounts\`. Transfer sequences verify source and destination accounts.`;
+        } else if (field === 'category') {
+          logics = `Maps standard expense keys (e.g. food, rent) to target budget envelopes in \`category_budgets\`.`;
+        } else if (field === 'income_category') {
+          logics = `Maps income entries into specific channels (salaries, allowances, others) to calculate automated income totals.`;
+        } else if (field === 'emi_months' || field === 'bank_charges') {
+          logics = `Triggers credit card EMI calculations. Compiles amortization schedules based on bank charges fee vectors.`;
+          apis += '\n- `emiApi.createEMI()` when transaction is saved.';
+        } else {
+          logics = `Standardizes text details or date values.`;
+        }
+        return `\n\n> ⚙️ **System Logics & Functions (Input: ${friendlyField}):**\n> - **Business Logics**: ${logics}\n> - **Math & Helpers**: ${functions}\n> - **APIs & DB Ops**: ${apis}`;
+      } else {
+        logics = `Standard transaction ledger state. Supports dynamic switching between incomes, expenses, transfers, withdrawals, interest charges, and debt repayments. Handles liquid constraints and EMI amortization vectors.`;
+        functions += '\n- `@/utils/emiCalculations:calculateMonthlyEMI()` to compute installment splittings.';
+        apis += '\n- `emiApi.createEMI()` to save credit card split records.';
+        return `\n\n> ⚙️ **Module Logics & Functions (Transaction):**\n> - **Business Logics**: ${logics}\n> - **Math & Helpers**: ${functions}\n> - **APIs & DB Ops**: ${apis}`;
+      }
+    } 
+    else if (intent === 'account') {
+      functions = '`validateCurrentDraft("account", draftAccount)` to check missing properties.';
+      apis = '`accountApi.createAccount()` upon user confirmation.';
+
+      if (field) {
+        const friendlyField = field.replace('_id', '').replace('_', ' ');
+        if (field === 'account_type') {
+          logics = `Initializes custom fields depending on type: Credit Cards check credit limit, Loans check interest and principal, Cash ignores country/institution names.`;
+        } else if (field === 'account_name' || field === 'balance') {
+          logics = `Configures ledger balance entries. Sets default currencies and states.`;
+        } else if (field === 'institution_name') {
+          logics = `Retrieves standard institution visual tokens.`;
+          functions += '\n- `getBankLogo()` to fetch public bank logo links.';
+          apis += '\n- `userCustomBankLinksApi.createCustomBankLink()` to store external app & web links.';
+        } else if (['web_url', 'ios_app_url', 'android_app_url'].includes(field)) {
+          logics = `Links quick navigation assets with the bank profile.`;
+          apis += '\n- `userCustomBankLinksApi.createCustomBankLink()` to register custom portal URLs.';
+        } else if (field === 'current_interest_rate' || field === 'loan_start_date') {
+          logics = `Defines initial APR rates and interest calculation start points.`;
+          apis += '\n- `interestRateApi.addInterestRate()` to record rate history.';
+        } else if (field === 'credit_limit') {
+          logics = `Applies card limits. Activates real-time utilization triggers (warnings at >80% and blocks at >100%).`;
+          functions += '\n- `calculateCreditUtilization()` & `getCreditLimitWarningLevel()` to calculate limits and flags.';
+        } else if (field === 'loan_principal' || field === 'loan_tenure_months' || field === 'due_date') {
+          logics = `Establishes principal assets and monthly installment triggers for loan schedules.`;
+        } else {
+          logics = `Updates bank metadata (country, currency, last 4 digits).`;
+        }
+        return `\n\n> ⚙️ **System Logics & Functions (Input: ${friendlyField}):**\n> - **Business Logics**: ${logics}\n> - **Math & Helpers**: ${functions}\n> - **APIs & DB Ops**: ${apis}`;
+      } else {
+        logics = `Maintains individual sub-ledgers. Differentiates processing states for asset pools (Cash/Banks) and liability classes (Loans/Credit Cards). Overrides institution logos dynamically.`;
+        functions += '\n- `getBankLogo()` to resolve logo brand files.\n- `calculateCreditUtilization()` to trace limit flags.';
+        apis += '\n- `interestRateApi.addInterestRate()` to seed APR metrics.\n- `userCustomBankLinksApi.createCustomBankLink()` to link quick portal assets.';
+        return `\n\n> ⚙️ **Module Logics & Functions (Account):**\n> - **Business Logics**: ${logics}\n> - **Math & Helpers**: ${functions}\n> - **APIs & DB Ops**: ${apis}`;
+      }
+    } 
+    else if (intent === 'budget') {
+      functions = '`validateCurrentDraft("budget", draftBudget)` to verify envelopes.';
+      apis = '`budgetApi.createOrUpdateBudget()` to save monthly caps.';
+      logics = `Sets overall expense envelopes and links custom categories to prevent overspending alerts. Category values map to standard budget ledger records.`;
+      if (field) {
+        const friendlyField = field.replace('_id', '').replace('_', ' ');
+        return `\n\n> ⚙️ **System Logics & Functions (Input: ${friendlyField}):**\n> - **Business Logics**: ${logics}\n> - **Math & Helpers**: ${functions}\n> - **APIs & DB Ops**: ${apis}`;
+      } else {
+        return `\n\n> ⚙️ **Module Logics & Functions (Budget):**\n> - **Business Logics**: ${logics}\n> - **Math & Helpers**: ${functions}\n> - **APIs & DB Ops**: ${apis}`;
+      }
+    } 
+    else if (intent === 'emi_calculator') {
+      functions = '`calculateEMIDetails()` (imported from `@/utils/emiCalculations`) to run dynamic projections.';
+      logics = `Uses compound interest loan formulas: Monthly EMI = [P * r * (1+r)^n] / [(1+r)^n - 1]. Computes total cumulative interest and final payable amounts dynamically.`;
+      if (field) {
+        const friendlyField = field.replace('_id', '').replace('_', ' ');
+        return `\n\n> ⚙️ **System Logics & Functions (Input: ${friendlyField}):**\n> - **Business Logics**: ${logics}\n> - **Math & Helpers**: ${functions}\n> - **APIs & DB Ops**: None (pure simulator logic)`;
+      } else {
+        return `\n\n> ⚙️ **Module Logics & Functions (EMI Calculator):**\n> - **Business Logics**: ${logics}\n> - **Math & Helpers**: ${functions}\n> - **APIs & DB Ops**: None (pure simulator logic)`;
+      }
+    }
+
+    return '';
+  };
+
   const handleSendCommand = async (commandToSend?: string) => {
     const commandText = commandToSend || inputValue;
     if (!commandText.trim() || !user) return;
@@ -420,7 +518,7 @@ export default function VoiceTransactPage() {
             const botMessage: ChatMessage = {
               id: botMsgId,
               role: 'model',
-              content: friendlyQuestion,
+              content: friendlyQuestion + generateFunctionsAndLogicsDetails('transaction'),
               isInteractive: clientMissing.length === 0
             };
             setChatMessages(prev => [...prev, botMessage]);
@@ -453,7 +551,7 @@ export default function VoiceTransactPage() {
             const botMessage: ChatMessage = {
               id: botMsgId,
               role: 'model',
-              content: friendlyQuestion,
+              content: friendlyQuestion + generateFunctionsAndLogicsDetails('account'),
               isInteractive: clientMissing.length === 0
             };
             setChatMessages(prev => [...prev, botMessage]);
@@ -474,7 +572,7 @@ export default function VoiceTransactPage() {
             const botMessage: ChatMessage = {
               id: botMsgId,
               role: 'model',
-              content: friendlyQuestion,
+              content: friendlyQuestion + generateFunctionsAndLogicsDetails('budget'),
               isInteractive: clientMissing.length === 0
             };
             setChatMessages(prev => [...prev, botMessage]);
@@ -496,7 +594,7 @@ export default function VoiceTransactPage() {
             const botMessage: ChatMessage = {
               id: botMsgId,
               role: 'model',
-              content: friendlyQuestion,
+              content: friendlyQuestion + generateFunctionsAndLogicsDetails('emi_calculator'),
               isInteractive: false
             };
             setChatMessages(prev => [...prev, botMessage]);
@@ -657,11 +755,13 @@ export default function VoiceTransactPage() {
       content: `Selected ${displayLabel}`
     };
     
+    const logicsSummary = generateFunctionsAndLogicsDetails(currentIntent, field);
+    
     const botMsgId = Math.random().toString();
     const botMessage: ChatMessage = {
       id: botMsgId,
       role: 'model',
-      content: friendlyQuestion,
+      content: friendlyQuestion + logicsSummary,
       isInteractive: isComplete
     };
     
