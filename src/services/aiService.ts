@@ -427,6 +427,8 @@ export interface SmartChatbotResult {
     current_interest_rate?: number | null;
     loan_start_date?: string | null;
     due_date?: number | null;
+    statement_day?: number | null;
+    due_day?: number | null;
     web_url?: string | null;
     ios_app_url?: string | null;
     android_app_url?: string | null;
@@ -537,6 +539,8 @@ export async function parseSmartChatbotCommand(
          - "current_interest_rate" (number, required if loan)
          - "loan_start_date" (string 'YYYY-MM-DD', required if loan)
          - "due_date" (number, day of month 1-31, required if loan indicating EMI payment due day)
+         - "statement_day" (number, day of month 1-31, required if credit_card indicating the statement generation day)
+         - "due_day" (number, day of month 1-31, required if credit_card indicating the payment due day)
          - "web_url" (standard website or login URL specified by user, e.g. "https://www.hdfcbank.com")
          - "ios_app_url" (Apple app store link if mentioned)
          - "android_app_url" (Google play store link if mentioned)
@@ -544,7 +548,7 @@ export async function parseSmartChatbotCommand(
        - Required fields by type:
          - cash: "account_type", "account_name".
          - bank: "account_type", "account_name", "country", "currency", "institution_name".
-         - credit_card: "account_type", "account_name", "country", "currency", "institution_name", "credit_limit".
+         - credit_card: "account_type", "account_name", "country", "currency", "institution_name", "credit_limit", "statement_day", "due_day".
          - loan: "account_type", "account_name", "country", "currency", "institution_name", "loan_principal", "loan_tenure_months", "current_interest_rate", "loan_start_date", "due_date".
        - If any required fields are missing: set isComplete to false, list them in missingFields, and prompt for them conversationally in clarificationQuestion.
        
@@ -601,6 +605,8 @@ export async function parseSmartChatbotCommand(
         "current_interest_rate": number | null,
         "loan_start_date": "YYYY-MM-DD" | null,
         "due_date": number | null,
+        "statement_day": number | null,
+        "due_day": number | null,
         "web_url": string | null,
         "ios_app_url": string | null,
         "android_app_url": string | null,

@@ -65,6 +65,8 @@ interface DraftAccount {
   current_interest_rate: number | null;
   loan_start_date: string | null;
   due_date: number | null;
+  statement_day: number | null;
+  due_day: number | null;
   web_url: string | null;
   ios_app_url: string | null;
   android_app_url: string | null;
@@ -146,6 +148,8 @@ export default function VoiceTransactPage() {
     current_interest_rate: null,
     loan_start_date: null,
     due_date: null,
+    statement_day: null,
+    due_day: null,
     web_url: null,
     ios_app_url: null,
     android_app_url: null,
@@ -320,6 +324,12 @@ export default function VoiceTransactPage() {
         if (d.credit_limit === null || d.credit_limit === undefined || d.credit_limit <= 0) {
           missing.push('credit_limit');
         }
+        if (d.statement_day === null || d.statement_day === undefined || d.statement_day < 1 || d.statement_day > 31) {
+          missing.push('statement_day');
+        }
+        if (d.due_day === null || d.due_day === undefined || d.due_day < 1 || d.due_day > 31) {
+          missing.push('due_day');
+        }
       } else if (d.account_type === 'loan') {
         if (!d.loan_principal || d.loan_principal <= 0) missing.push('loan_principal');
         if (!d.loan_tenure_months || d.loan_tenure_months <= 0) missing.push('loan_tenure_months');
@@ -404,6 +414,10 @@ export default function VoiceTransactPage() {
         } else if (field === 'credit_limit') {
           logics = `Applies card limits. Activates real-time utilization triggers (warnings at >80% and blocks at >100%).`;
           functions += '\n- `calculateCreditUtilization()` & `getCreditLimitWarningLevel()` to calculate limits and flags.';
+        } else if (field === 'statement_day') {
+          logics = `Configures statement generation day (1-31). Determines the start and end boundaries of monthly credit card billing cycles.`;
+        } else if (field === 'due_day') {
+          logics = `Configures monthly repayment deadline day (1-31). Computes grace period from statement date to enforce payment timelines.`;
         } else if (field === 'loan_principal' || field === 'loan_tenure_months' || field === 'due_date') {
           logics = `Establishes principal assets and monthly installment triggers for loan schedules.`;
         } else {
@@ -538,6 +552,8 @@ export default function VoiceTransactPage() {
               current_interest_rate: ext.current_interest_rate !== undefined && ext.current_interest_rate !== null ? ext.current_interest_rate : draftAccount.current_interest_rate,
               loan_start_date: ext.loan_start_date || draftAccount.loan_start_date,
               due_date: ext.due_date !== undefined && ext.due_date !== null ? ext.due_date : draftAccount.due_date,
+              statement_day: ext.statement_day !== undefined && ext.statement_day !== null ? ext.statement_day : draftAccount.statement_day,
+              due_day: ext.due_day !== undefined && ext.due_day !== null ? ext.due_day : draftAccount.due_day,
               web_url: ext.web_url || draftAccount.web_url,
               ios_app_url: ext.ios_app_url || draftAccount.ios_app_url,
               android_app_url: ext.android_app_url || draftAccount.android_app_url,
@@ -799,6 +815,8 @@ export default function VoiceTransactPage() {
         current_interest_rate: null,
         loan_start_date: null,
         due_date: null,
+        statement_day: null,
+        due_day: null,
         web_url: null,
         ios_app_url: null,
         android_app_url: null,
@@ -967,7 +985,9 @@ export default function VoiceTransactPage() {
         loan_tenure_months: draftAccount.loan_tenure_months || null,
         loan_start_date: draftAccount.account_type === 'loan' ? draftAccount.loan_start_date : null,
         current_interest_rate: draftAccount.current_interest_rate || null,
-        due_date: draftAccount.account_type === 'loan' ? Number(draftAccount.due_date) : null
+        due_date: draftAccount.account_type === 'loan' ? Number(draftAccount.due_date) : null,
+        statement_day: draftAccount.account_type === 'credit_card' ? (draftAccount.statement_day ? Number(draftAccount.statement_day) : null) : null,
+        due_day: draftAccount.account_type === 'credit_card' ? (draftAccount.due_day ? Number(draftAccount.due_day) : null) : null
       };
       
       const newAccount = await accountApi.createAccount(accountPayload as any);
@@ -1028,6 +1048,8 @@ export default function VoiceTransactPage() {
         current_interest_rate: null,
         loan_start_date: null,
         due_date: null,
+        statement_day: null,
+        due_day: null,
         web_url: null,
         ios_app_url: null,
         android_app_url: null,
@@ -1890,6 +1912,99 @@ export default function VoiceTransactPage() {
                 }}
               >
                 ➕ Custom Rate
+              </Button>
+            </div>
+          </div>
+        );
+      }
+
+      if (nextMissing === 'statement_day') {
+        const statementDays = [
+          { val: 1, label: '1st of month' },
+          { val: 5, label: '5th of month' },
+          { val: 10, label: '10th of month' },
+          { val: 15, label: '15th of month' },
+          { val: 20, label: '20th of month' },
+          { val: 25, label: '25th of month' }
+        ];
+        return (
+          <div className="space-y-2 mt-2 animate-in fade-in-50 duration-300">
+            <p className="text-xs text-muted-foreground font-semibold">Select Credit Card Statement Generation Day:</p>
+            <div className="flex flex-wrap gap-2">
+              {statementDays.map(d => (
+                <Button
+                  key={d.val}
+                  variant="outline"
+                  size="sm"
+                  className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                  onClick={() => handleSelectField('statement_day', d.val, d.label)}
+                >
+                  📅 {d.label}
+                </Button>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-dashed hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                onClick={() => {
+                  const customDay = prompt("Enter statement generation day (1-31):");
+                  if (customDay !== null) {
+                    const parsed = parseInt(customDay);
+                    if (!isNaN(parsed) && parsed >= 1 && parsed <= 31) {
+                      handleSelectField('statement_day', parsed, `${parsed}th of month`);
+                    } else {
+                      alert("Please enter a valid day of the month (1-31).");
+                    }
+                  }
+                }}
+              >
+                ➕ Custom Day
+              </Button>
+            </div>
+          </div>
+        );
+      }
+
+      if (nextMissing === 'due_day') {
+        const dueDays = [
+          { val: 10, label: '10th of month' },
+          { val: 15, label: '15th of month' },
+          { val: 20, label: '20th of month' },
+          { val: 25, label: '25th of month' },
+          { val: 28, label: '28th of month' }
+        ];
+        return (
+          <div className="space-y-2 mt-2 animate-in fade-in-50 duration-300">
+            <p className="text-xs text-muted-foreground font-semibold">Select Credit Card Payment Due Day:</p>
+            <div className="flex flex-wrap gap-2">
+              {dueDays.map(d => (
+                <Button
+                  key={d.val}
+                  variant="outline"
+                  size="sm"
+                  className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                  onClick={() => handleSelectField('due_day', d.val, d.label)}
+                >
+                  📅 {d.label}
+                </Button>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-dashed hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                onClick={() => {
+                  const customDay = prompt("Enter payment due day (1-31):");
+                  if (customDay !== null) {
+                    const parsed = parseInt(customDay);
+                    if (!isNaN(parsed) && parsed >= 1 && parsed <= 31) {
+                      handleSelectField('due_day', parsed, `${parsed}th of month`);
+                    } else {
+                      alert("Please enter a valid day of the month (1-31).");
+                    }
+                  }
+                }}
+              >
+                ➕ Custom Day
               </Button>
             </div>
           </div>
