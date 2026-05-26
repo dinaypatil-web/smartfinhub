@@ -842,23 +842,31 @@ export default function TransactionForm() {
 
         if (formData.transaction_type === 'credit_card_repayment' && isSplitRepayment) {
           const createdTransactions = [];
+          const advanceSourcesToConsume: { creditCardId: string; amount: number }[] = [];
+
           for (const source of splitSources) {
+            const isAdvanceSrc = source.accountId.startsWith('advance_balance_');
+            const advanceCreditCardId = isAdvanceSrc ? source.accountId.replace('advance_balance_', '') : null;
+
             const createdTx = await transactionApi.createTransaction({
               user_id: user.id,
               transaction_type: 'credit_card_repayment',
-              from_account_id: source.accountId,
+              from_account_id: isAdvanceSrc ? null : source.accountId,
               to_account_id: formData.to_account_id,
               amount: parseFloat(source.amount),
               currency: formData.currency,
               category: formData.category || null,
               income_category: (formData.income_category as any) || null,
               description: formData.description 
-                ? `${formData.description} (Split repayment)`
-                : `Credit card split repayment (${formatCurrency(parseFloat(source.amount), formData.currency)})`,
+                ? `${formData.description} (Split repayment${isAdvanceSrc ? ' - from advance' : ''})`
+                : `Credit card split repayment (${formatCurrency(parseFloat(source.amount), formData.currency)}${isAdvanceSrc ? ' - from advance balance' : ''})`,
               transaction_date: formData.transaction_date,
             });
             if (createdTx) {
               createdTransactions.push({ id: createdTx.id, amount: parseFloat(source.amount) });
+              if (isAdvanceSrc && advanceCreditCardId) {
+                advanceSourcesToConsume.push({ creditCardId: advanceCreditCardId, amount: parseFloat(source.amount) });
+              }
             }
           }
 
@@ -972,6 +980,15 @@ export default function TransactionForm() {
                 user.id,
                 consumeCardId,
                 ccAdvanceUsed
+              );
+            }
+
+            // Consume advance balances from split sources
+            for (const advSrc of advanceSourcesToConsume) {
+              await creditCardStatementApi.consumeAdvanceBalance(
+                user.id,
+                advSrc.creditCardId,
+                advSrc.amount
               );
             }
 
@@ -1360,10 +1377,16 @@ export default function TransactionForm() {
 
                       <div className="space-y-3">
                         {splitSources.map((source, index) => {
-                          const sourceAccount = accounts.find(a => a.id === source.accountId);
-                          const sourceBalance = sourceAccount ? Number(sourceAccount.balance) : 0;
+                          const isAdvanceSource = source.accountId.startsWith('advance_balance_');
+                          const advanceSource = isAdvanceSource
+                            ? creditCardAdvances.find(adv => `advance_balance_${adv.creditCardId}` === source.accountId)
+                            : null;
+                          const sourceAccount = !isAdvanceSource ? accounts.find(a => a.id === source.accountId) : null;
+                          const sourceBalance = isAdvanceSource
+                            ? (advanceSource?.balance || 0)
+                            : (sourceAccount ? Number(sourceAccount.balance) : 0);
                           const sourceAmount = parseFloat(source.amount) || 0;
-                          const isSourceInsufficient = sourceAccount && sourceBalance < sourceAmount;
+                          const isSourceInsufficient = (sourceAccount || advanceSource) && sourceBalance < sourceAmount;
 
                           return (
                             <div key={index} className="flex gap-2 items-start bg-white dark:bg-slate-900/40 p-3 rounded-lg border border-purple-100 dark:border-purple-950/30">
@@ -1386,13 +1409,20 @@ export default function TransactionForm() {
                                         {account.account_name} ({formatCurrency(account.balance, account.currency)})
                                       </SelectItem>
                                     ))}
+                                    {creditCardAdvances.map(adv => (
+                                      <SelectItem key={`advance_balance_${adv.creditCardId}`} value={`advance_balance_${adv.creditCardId}`}>
+                                        CC Advance: {adv.accountName} ({formatCurrency(adv.balance, formData.currency)})
+                                      </SelectItem>
+                                    ))}
                                   </SelectContent>
                                 </Select>
-                                {sourceAccount && (
+                                {(sourceAccount || advanceSource) && (
                                   <div className="flex justify-between items-center text-[10px] px-1 pt-0.5">
-                                    <span className="text-muted-foreground">Balance: {formatCurrency(sourceBalance, sourceAccount.currency)}</span>
+                                    <span className="text-muted-foreground">
+                                      {isAdvanceSource ? 'Advance ' : ''}Balance: {formatCurrency(sourceBalance, isAdvanceSource ? formData.currency : (sourceAccount?.currency || formData.currency))}
+                                    </span>
                                     {isSourceInsufficient && (
-                                      <span className="text-destructive font-medium">⚠️ Insufficient funds</span>
+                                      <span className="text-destructive font-medium">⚠️ {isAdvanceSource ? 'Exceeds advance balance' : 'Insufficient funds'}</span>
                                     )}
                                   </div>
                                 )}
