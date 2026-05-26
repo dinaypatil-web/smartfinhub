@@ -85,6 +85,7 @@ export default function TransactionForm() {
   const [ccAdvanceCreated, setCCAdvanceCreated] = useState(0);
   const [ccAdvanceUsed, setCCAdvanceUsed] = useState(0);
   const [ccAdvanceBalance, setCCAdvanceBalance] = useState(0);
+  const [creditCardAdvances, setCreditCardAdvances] = useState<{ creditCardId: string; accountName: string; balance: number }[]>([]);
   const [ccLastAutoFilledTotal, setCCLastAutoFilledTotal] = useState<number | null>(null);
   const [isSplitRepayment, setIsSplitRepayment] = useState(false);
   const [splitSources, setSplitSources] = useState<Array<{ accountId: string; amount: string }>>([]);
@@ -181,10 +182,36 @@ export default function TransactionForm() {
     fetchAdvanceBalance();
   }, [formData.transaction_type, formData.to_account_id]);
 
+  // Fetch all Credit Card advance balances where remaining_balance > 0
+  useEffect(() => {
+    const fetchAllAdvances = async () => {
+      if (!user || accounts.length === 0) return;
+      
+      try {
+        const creditCards = accounts.filter(a => a.account_type === 'credit_card');
+        const advancesList = await Promise.all(
+          creditCards.map(async (card) => {
+            const balance = await creditCardStatementApi.getAdvanceBalance(card.id);
+            return {
+              creditCardId: card.id,
+              accountName: card.account_name,
+              balance: balance
+            };
+          })
+        );
+        setCreditCardAdvances(advancesList.filter(adv => adv.balance > 0));
+      } catch (err) {
+        console.error('Error fetching all CC advances:', err);
+      }
+    };
+    
+    fetchAllAdvances();
+  }, [user, accounts]);
+
   // When "Advance Balance" is selected as payment source, set advance consumed to amount
   useEffect(() => {
     if (formData.transaction_type === 'credit_card_repayment' && 
-        formData.from_account_id === 'advance_balance' && 
+        formData.from_account_id?.startsWith('advance_balance') && 
         formData.amount) {
       const amount = parseFloat(formData.amount) || 0;
       setCCAdvanceUsed(amount);
@@ -557,14 +584,20 @@ export default function TransactionForm() {
     }
 
     // If using advance balance, validate amount doesn't exceed available advance
-    const isUsingAdvanceBalance = !isSplitRepayment && formData.from_account_id === 'advance_balance';
-    if (isUsingAdvanceBalance && parseFloat(formData.amount) > ccAdvanceBalance) {
-      toast({
-        title: 'Error',
-        description: `Amount exceeds available advance balance of ${ccAdvanceBalance}`,
-        variant: 'destructive',
-      });
-      return;
+    const isUsingAdvanceBalance = !isSplitRepayment && formData.from_account_id?.startsWith('advance_balance');
+    if (isUsingAdvanceBalance) {
+      const activeAdvanceBalance = formData.from_account_id === 'advance_balance'
+        ? ccAdvanceBalance
+        : creditCardAdvances.find(adv => adv.creditCardId === formData.from_account_id.replace('advance_balance_', ''))?.balance || 0;
+      
+      if (parseFloat(formData.amount) > activeAdvanceBalance) {
+        toast({
+          title: 'Error',
+          description: `Amount exceeds available advance balance of ${formatCurrency(activeAdvanceBalance, formData.currency)}`,
+          variant: 'destructive',
+        });
+        return;
+      }
     }
 
     // Validate EMI fields if EMI is selected
@@ -626,7 +659,7 @@ export default function TransactionForm() {
       const transactionData: any = {
         user_id: user.id,
         transaction_type: formData.transaction_type,
-        from_account_id: formData.from_account_id === 'advance_balance' ? null : (formData.from_account_id || null),
+        from_account_id: formData.from_account_id?.startsWith('advance_balance') ? null : (formData.from_account_id || null),
         to_account_id: formData.to_account_id || null,
         amount: parseFloat(formData.amount),
         currency: formData.currency,
@@ -784,9 +817,13 @@ export default function TransactionForm() {
             }
 
             if (ccAdvanceUsed > 0) {
+              const consumeCardId = formData.from_account_id === 'advance_balance'
+                ? (formData.to_account_id as string)
+                : formData.from_account_id.replace('advance_balance_', '');
+
               await creditCardStatementApi.consumeAdvanceBalance(
                 user.id,
-                formData.to_account_id as string,
+                consumeCardId,
                 ccAdvanceUsed
               );
             }
@@ -814,7 +851,7 @@ export default function TransactionForm() {
               amount: parseFloat(source.amount),
               currency: formData.currency,
               category: formData.category || null,
-              income_category: formData.income_category || null,
+              income_category: (formData.income_category as any) || null,
               description: formData.description 
                 ? `${formData.description} (Split repayment)`
                 : `Credit card split repayment (${formatCurrency(parseFloat(source.amount), formData.currency)})`,
@@ -927,9 +964,13 @@ export default function TransactionForm() {
             }
 
             if (ccAdvanceUsed > 0) {
+              const consumeCardId = formData.from_account_id === 'advance_balance'
+                ? (formData.to_account_id as string)
+                : formData.from_account_id.replace('advance_balance_', '');
+
               await creditCardStatementApi.consumeAdvanceBalance(
                 user.id,
-                formData.to_account_id as string,
+                consumeCardId,
                 ccAdvanceUsed
               );
             }
@@ -1018,9 +1059,13 @@ export default function TransactionForm() {
               }
 
               if (ccAdvanceUsed > 0) {
+                const consumeCardId = formData.from_account_id === 'advance_balance'
+                  ? (formData.to_account_id as string)
+                  : formData.from_account_id.replace('advance_balance_', '');
+
                 await creditCardStatementApi.consumeAdvanceBalance(
                   user.id,
-                  formData.to_account_id as string,
+                  consumeCardId,
                   ccAdvanceUsed
                 );
               }
@@ -1173,11 +1218,11 @@ export default function TransactionForm() {
                                     {account.account_name}
                                   </SelectItem>
                                 )),
-                                ...(ccAdvanceBalance > 0 ? [
-                                  <SelectItem key="advance_balance" value="advance_balance">
-                                    Advance Balance ({formatCurrency(ccAdvanceBalance, formData.currency)})
+                                ...creditCardAdvances.map(adv => (
+                                  <SelectItem key={`advance_balance_${adv.creditCardId}`} value={`advance_balance_${adv.creditCardId}`}>
+                                    CC Advance: {adv.accountName} ({formatCurrency(adv.balance, formData.currency)})
                                   </SelectItem>
-                                ] : [])
+                                ))
                               ]
                               : accounts.filter(a => a.account_type !== 'loan').map(account => (
                                 <SelectItem key={account.id} value={account.id}>
@@ -1190,6 +1235,24 @@ export default function TransactionForm() {
 
                       {/* Display available balance for selected account */}
                       {formData.from_account_id && (() => {
+                        const isAdvance = formData.from_account_id.startsWith('advance_balance');
+                        if (isAdvance) {
+                          const activeAdvanceBalance = formData.from_account_id === 'advance_balance'
+                            ? ccAdvanceBalance
+                            : creditCardAdvances.find(adv => adv.creditCardId === formData.from_account_id.replace('advance_balance_', ''))?.balance || 0;
+                          
+                          return (
+                            <div className="mt-2 p-3 rounded-lg bg-muted/50 border border-border">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-muted-foreground">Available CC Advance</span>
+                                <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                                  {formatCurrency(activeAdvanceBalance, formData.currency)}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        }
+
                         const selectedAccount = accounts.find((a: Account) => a.id === formData.from_account_id);
                         if (selectedAccount) {
                           const isCreditCard = selectedAccount.account_type === 'credit_card';
@@ -1577,7 +1640,7 @@ export default function TransactionForm() {
                 }}
                 onAdvanceUsedChange={(amount) => {
                   // Don't override advance used when using advance balance
-                  if (formData.from_account_id !== 'advance_balance') {
+                  if (!formData.from_account_id?.startsWith('advance_balance')) {
                     setCCAdvanceUsed(amount);
                   }
                 }}
@@ -1592,7 +1655,7 @@ export default function TransactionForm() {
                     return prev;
                   });
                   // If using advance balance, also set advance consumed to total
-                  if (formData.from_account_id === 'advance_balance') {
+                  if (formData.from_account_id?.startsWith('advance_balance')) {
                     setCCAdvanceUsed(total);
                     setCCAdvanceCreated(0);
                   }
@@ -1745,7 +1808,7 @@ export default function TransactionForm() {
             {/* Credit Card Repayment Summary UI */}
             {formData.transaction_type === 'credit_card_repayment' && formData.to_account_id && (
               <div className="space-y-4">
-                {formData.from_account_id === 'advance_balance' ? (
+                {formData.from_account_id?.startsWith('advance_balance') ? (
                   // Special display when using advance balance
                   <div className="p-4 border rounded-lg bg-blue-50/50 dark:bg-blue-950/10">
                     <div className="flex items-center gap-2 mb-3">
