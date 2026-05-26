@@ -574,7 +574,7 @@ export default function VoiceTransactPage() {
       
       friendlyQuestion = isComplete 
         ? "Awesome! Everything is ready now. Would you like to confirm and save this transaction?"
-        : `I've updated the ${fieldName} to ${displayLabel}. What was the details for other missing fields?`;
+        : `I've updated the ${fieldName} to ${displayLabel}. Could you please select or provide the ${clientMissing[0].replace('_id', '').replace('_', ' ')}?`;
     }
     else if (currentIntent === 'account') {
       const updatedAccount = {
@@ -590,13 +590,16 @@ export default function VoiceTransactPage() {
       
       friendlyQuestion = isComplete 
         ? "Great! The account is ready to be created. Would you like to confirm and save it now?"
-        : `I've updated the ${fieldName} to ${displayLabel}. Please provide the remaining details.`;
+        : `I've updated the ${fieldName} to ${displayLabel}. Could you please specify or select the ${clientMissing[0].replace('_id', '').replace('_', ' ')}?`;
     }
     else if (currentIntent === 'budget') {
       const updatedBudget = {
         ...draftBudget,
         [field]: value
       };
+      if (field === 'budget_limit') {
+        updatedBudget.budgeted_expenses = value;
+      }
       
       const clientMissing = validateCurrentDraft('budget', updatedBudget);
       isComplete = clientMissing.length === 0;
@@ -606,7 +609,44 @@ export default function VoiceTransactPage() {
       
       friendlyQuestion = isComplete 
         ? "Awesome! The budget is ready. Confirm to set it now?"
-        : `I've updated the ${fieldName} to ${displayLabel}. What are the other missing details?`;
+        : `I've updated the ${fieldName} to ${displayLabel}. Could you please specify or select the ${clientMissing[0].replace('_id', '').replace('_', ' ')}?`;
+    }
+    else if (currentIntent === 'emi_calculator') {
+      const updatedEMI = {
+        ...draftEMI,
+        [field]: value
+      };
+      
+      // If all three fields are present, calculate loan EMI dynamically
+      if (updatedEMI.principal && updatedEMI.annual_rate && updatedEMI.tenure_months) {
+        const P = Number(updatedEMI.principal);
+        const R = Number(updatedEMI.annual_rate) / 12 / 100; // monthly rate
+        const N = Number(updatedEMI.tenure_months);
+        
+        let monthlyEMI = 0;
+        if (R === 0) {
+          monthlyEMI = P / N;
+        } else {
+          monthlyEMI = (P * R * Math.pow(1 + R, N)) / (Math.pow(1 + R, N) - 1);
+        }
+        
+        const totalPayable = monthlyEMI * N;
+        const totalInterest = totalPayable - P;
+        
+        updatedEMI.monthly_emi = monthlyEMI;
+        updatedEMI.total_interest = totalInterest;
+        updatedEMI.total_payable = totalPayable;
+      }
+      
+      const clientMissing = validateCurrentDraft('emi_calculator', updatedEMI);
+      isComplete = clientMissing.length === 0;
+      
+      setDraftEMI(updatedEMI);
+      setMissingFields(clientMissing);
+      
+      friendlyQuestion = isComplete 
+        ? "Perfect! The EMI Simulation is ready. View the details on the panel!"
+        : `I've updated the ${fieldName} to ${displayLabel}. Could you please specify the ${clientMissing[0].replace('_id', '').replace('_', ' ')}?`;
     }
     
     // Add conversational messages
@@ -1026,6 +1066,89 @@ export default function VoiceTransactPage() {
           </div>
         );
       }
+
+      if (nextMissing === 'amount') {
+        const amountOptions = [
+          { val: 100, label: '₹100' },
+          { val: 500, label: '₹500' },
+          { val: 1000, label: '₹1,000' },
+          { val: 2000, label: '₹2,000' },
+          { val: 5000, label: '₹5,000' }
+        ];
+        return (
+          <div className="space-y-2 mt-2 animate-in fade-in-50 duration-300">
+            <p className="text-xs text-muted-foreground font-semibold">Select or enter amount:</p>
+            <div className="flex flex-wrap gap-2">
+              {amountOptions.map(opt => (
+                <Button
+                  key={opt.val}
+                  variant="outline"
+                  size="sm"
+                  className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                  onClick={() => handleSelectField('amount', opt.val, opt.label)}
+                >
+                  💵 {opt.label}
+                </Button>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-dashed hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                onClick={() => {
+                  const customAmt = prompt("Enter amount (₹):");
+                  if (customAmt !== null) {
+                    const parsed = parseFloat(customAmt);
+                    if (!isNaN(parsed) && parsed > 0) {
+                      handleSelectField('amount', parsed, `₹${parsed.toLocaleString('en-IN')}`);
+                    } else {
+                      alert("Please enter a valid positive number.");
+                    }
+                  }
+                }}
+              >
+                ➕ Custom Amount
+              </Button>
+            </div>
+          </div>
+        );
+      }
+
+      if (nextMissing === 'description') {
+        const descOptions = draft.transaction_type === 'income'
+          ? ['Salary Payment', 'Freelance Project', 'Dividend Payout', 'Investment Returns', 'Gift / Allowance']
+          : ['Groceries', 'Dining Out & Food', 'Rent Payment', 'Internet / Utility Bill', 'Fuel / Transport', 'Shopping / Clothes'];
+        return (
+          <div className="space-y-2 mt-2 animate-in fade-in-50 duration-300">
+            <p className="text-xs text-muted-foreground font-semibold">Select or enter transaction description:</p>
+            <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-1 bg-muted/30 rounded-lg">
+              {descOptions.map(desc => (
+                <Button
+                  key={desc}
+                  variant="outline"
+                  size="sm"
+                  className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                  onClick={() => handleSelectField('description', desc, desc)}
+                >
+                  📝 {desc}
+                </Button>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-dashed hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                onClick={() => {
+                  const customDesc = prompt("Enter custom description:");
+                  if (customDesc && customDesc.trim()) {
+                    handleSelectField('description', customDesc.trim(), customDesc.trim());
+                  }
+                }}
+              >
+                ➕ Custom Description
+              </Button>
+            </div>
+          </div>
+        );
+      }
       
       if (nextMissing === 'from_account_id') {
         const filteredAccounts = accounts.filter(a => {
@@ -1133,6 +1256,81 @@ export default function VoiceTransactPage() {
           </div>
         );
       }
+
+      if (nextMissing === 'emi_months') {
+        const emiOptions = [
+          { val: 3, label: '3 Months' },
+          { val: 6, label: '6 Months' },
+          { val: 9, label: '9 Months' },
+          { val: 12, label: '12 Months (1 Year)' },
+          { val: 18, label: '18 Months' },
+          { val: 24, label: '24 Months (2 Years)' }
+        ];
+        return (
+          <div className="space-y-2 mt-2 animate-in fade-in-50 duration-300">
+            <p className="text-xs text-muted-foreground font-semibold">Select EMI Tenure (Months):</p>
+            <div className="flex flex-wrap gap-2">
+              {emiOptions.map(opt => (
+                <Button
+                  key={opt.val}
+                  variant="outline"
+                  size="sm"
+                  className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                  onClick={() => handleSelectField('emi_months', opt.val, opt.label)}
+                >
+                  📅 {opt.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+        );
+      }
+
+      if (nextMissing === 'bank_charges') {
+        const chargeOptions = [
+          { val: 0, label: 'No Charges (₹0)' },
+          { val: 99, label: '₹99' },
+          { val: 199, label: '₹199' },
+          { val: 299, label: '₹299' },
+          { val: 499, label: '₹499' }
+        ];
+        return (
+          <div className="space-y-2 mt-2 animate-in fade-in-50 duration-300">
+            <p className="text-xs text-muted-foreground font-semibold">Select processing / bank charges:</p>
+            <div className="flex flex-wrap gap-2">
+              {chargeOptions.map(opt => (
+                <Button
+                  key={opt.val}
+                  variant="outline"
+                  size="sm"
+                  className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                  onClick={() => handleSelectField('bank_charges', opt.val, opt.label)}
+                >
+                  💵 {opt.label}
+                </Button>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-dashed hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                onClick={() => {
+                  const customCharge = prompt("Enter bank charges amount (₹):", "0");
+                  if (customCharge !== null) {
+                    const parsed = parseFloat(customCharge);
+                    if (!isNaN(parsed) && parsed >= 0) {
+                      handleSelectField('bank_charges', parsed, `₹${parsed.toFixed(2)}`);
+                    } else {
+                      alert("Please enter a valid positive number.");
+                    }
+                  }
+                }}
+              >
+                ➕ Custom Charges
+              </Button>
+            </div>
+          </div>
+        );
+      }
     }
 
     if (currentIntent === 'account') {
@@ -1157,6 +1355,93 @@ export default function VoiceTransactPage() {
                   {item.label}
                 </Button>
               ))}
+            </div>
+          </div>
+        );
+      }
+
+      if (nextMissing === 'account_name') {
+        const nameOptions = draftAccount.account_type === 'credit_card'
+          ? ['Premium Signature Credit Card', 'Cashback Rewards Card', 'Travel Miles Card', 'Everyday Platinum Card']
+          : draftAccount.account_type === 'loan'
+          ? ['Personal Loan Account', 'Home Mortgage Loan', 'Vehicle Car Loan', 'Education Study Loan']
+          : draftAccount.account_type === 'cash'
+          ? ['My Cash Wallet', 'Home Petty Cash', 'Travel Pocket Cash']
+          : ['Primary Savings Account', 'Salary Checking Account', 'High-Yield Savings', 'Business Current Account'];
+        return (
+          <div className="space-y-2 mt-2 animate-in fade-in-50 duration-300">
+            <p className="text-xs text-muted-foreground font-semibold">Select or enter Account Name:</p>
+            <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-1 bg-muted/30 rounded-lg">
+              {nameOptions.map(name => (
+                <Button
+                  key={name}
+                  variant="outline"
+                  size="sm"
+                  className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                  onClick={() => handleSelectField('account_name', name, name)}
+                >
+                  🏦 {name}
+                </Button>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-dashed hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                onClick={() => {
+                  const customName = prompt("Enter custom account name:");
+                  if (customName && customName.trim()) {
+                    handleSelectField('account_name', customName.trim(), customName.trim());
+                  }
+                }}
+              >
+                ➕ Custom Name
+              </Button>
+            </div>
+          </div>
+        );
+      }
+
+      if (nextMissing === 'balance') {
+        const balanceOptions = [
+          { val: 0, label: '₹0 (Zero Balance)' },
+          { val: 5000, label: '₹5,000' },
+          { val: 10000, label: '₹10,000' },
+          { val: 50000, label: '₹50,000' },
+          { val: 100000, label: '₹1,00,000' }
+        ];
+        return (
+          <div className="space-y-2 mt-2 animate-in fade-in-50 duration-300">
+            <p className="text-xs text-muted-foreground font-semibold">Select or enter initial balance:</p>
+            <div className="flex flex-wrap gap-2">
+              {balanceOptions.map(opt => (
+                <Button
+                  key={opt.val}
+                  variant="outline"
+                  size="sm"
+                  className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                  onClick={() => handleSelectField('balance', opt.val, opt.label)}
+                >
+                  💵 {opt.label}
+                </Button>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-dashed hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                onClick={() => {
+                  const customBal = prompt("Enter initial balance (₹):");
+                  if (customBal !== null) {
+                    const parsed = parseFloat(customBal);
+                    if (!isNaN(parsed) && parsed >= 0) {
+                      handleSelectField('balance', parsed, `₹${parsed.toLocaleString('en-IN')}`);
+                    } else {
+                      alert("Please enter a valid positive number.");
+                    }
+                  }
+                }}
+              >
+                ➕ Custom Balance
+              </Button>
             </div>
           </div>
         );
@@ -1324,6 +1609,192 @@ export default function VoiceTransactPage() {
           </div>
         );
       }
+
+      if (nextMissing === 'credit_limit') {
+        const limitOptions = [
+          { val: 50000, label: '₹50,000' },
+          { val: 100000, label: '₹1,00,000' },
+          { val: 200000, label: '₹2,00,000' },
+          { val: 300000, label: '₹3,00,000' },
+          { val: 500000, label: '₹5,00,000' }
+        ];
+        return (
+          <div className="space-y-2 mt-2 animate-in fade-in-50 duration-300">
+            <p className="text-xs text-muted-foreground font-semibold">Select Credit Card Limit:</p>
+            <div className="flex flex-wrap gap-2">
+              {limitOptions.map(opt => (
+                <Button
+                  key={opt.val}
+                  variant="outline"
+                  size="sm"
+                  className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                  onClick={() => handleSelectField('credit_limit', opt.val, opt.label)}
+                >
+                  💳 {opt.label}
+                </Button>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-dashed hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                onClick={() => {
+                  const customLimit = prompt("Enter card credit limit (₹):");
+                  if (customLimit !== null) {
+                    const parsed = parseFloat(customLimit);
+                    if (!isNaN(parsed) && parsed > 0) {
+                      handleSelectField('credit_limit', parsed, `₹${parsed.toLocaleString('en-IN')}`);
+                    } else {
+                      alert("Please enter a valid positive number.");
+                    }
+                  }
+                }}
+              >
+                ➕ Custom Limit
+              </Button>
+            </div>
+          </div>
+        );
+      }
+
+      if (nextMissing === 'loan_principal') {
+        const principalOptions = [
+          { val: 100000, label: '₹1,00,000' },
+          { val: 300000, label: '₹3,00,000' },
+          { val: 500000, label: '₹5,00,000' },
+          { val: 1000000, label: '₹10,00,000' },
+          { val: 2000000, label: '₹20,00,000' }
+        ];
+        return (
+          <div className="space-y-2 mt-2 animate-in fade-in-50 duration-300">
+            <p className="text-xs text-muted-foreground font-semibold">Select Loan Principal Amount:</p>
+            <div className="flex flex-wrap gap-2">
+              {principalOptions.map(opt => (
+                <Button
+                  key={opt.val}
+                  variant="outline"
+                  size="sm"
+                  className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                  onClick={() => handleSelectField('loan_principal', opt.val, opt.label)}
+                >
+                  💵 {opt.label}
+                </Button>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-dashed hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                onClick={() => {
+                  const customPrincipal = prompt("Enter loan principal amount (₹):");
+                  if (customPrincipal !== null) {
+                    const parsed = parseFloat(customPrincipal);
+                    if (!isNaN(parsed) && parsed > 0) {
+                      handleSelectField('loan_principal', parsed, `₹${parsed.toLocaleString('en-IN')}`);
+                    } else {
+                      alert("Please enter a valid positive number.");
+                    }
+                  }
+                }}
+              >
+                ➕ Custom Principal
+              </Button>
+            </div>
+          </div>
+        );
+      }
+
+      if (nextMissing === 'loan_tenure_months') {
+        const tenureOptions = [
+          { val: 12, label: '12 Months (1 Year)' },
+          { val: 24, label: '24 Months (2 Years)' },
+          { val: 36, label: '36 Months (3 Years)' },
+          { val: 60, label: '60 Months (5 Years)' },
+          { val: 120, label: '120 Months (10 Years)' },
+          { val: 240, label: '240 Months (20 Years)' }
+        ];
+        return (
+          <div className="space-y-2 mt-2 animate-in fade-in-50 duration-300">
+            <p className="text-xs text-muted-foreground font-semibold">Select Loan Tenure:</p>
+            <div className="flex flex-wrap gap-2">
+              {tenureOptions.map(opt => (
+                <Button
+                  key={opt.val}
+                  variant="outline"
+                  size="sm"
+                  className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                  onClick={() => handleSelectField('loan_tenure_months', opt.val, opt.label)}
+                >
+                  📅 {opt.label}
+                </Button>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-dashed hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                onClick={() => {
+                  const customTenure = prompt("Enter loan tenure in months:");
+                  if (customTenure !== null) {
+                    const parsed = parseInt(customTenure);
+                    if (!isNaN(parsed) && parsed > 0) {
+                      handleSelectField('loan_tenure_months', parsed, `${parsed} Months`);
+                    } else {
+                      alert("Please enter a valid positive integer.");
+                    }
+                  }
+                }}
+              >
+                ➕ Custom Tenure
+              </Button>
+            </div>
+          </div>
+        );
+      }
+
+      if (nextMissing === 'current_interest_rate') {
+        const rateOptions = [
+          { val: 7.5, label: '7.5% p.a.' },
+          { val: 8.5, label: '8.5% p.a.' },
+          { val: 9.0, label: '9.0% p.a.' },
+          { val: 9.5, label: '9.5% p.a.' },
+          { val: 10.5, label: '10.5% p.a.' },
+          { val: 12.0, label: '12.0% p.a.' }
+        ];
+        return (
+          <div className="space-y-2 mt-2 animate-in fade-in-50 duration-300">
+            <p className="text-xs text-muted-foreground font-semibold">Select Loan Interest Rate:</p>
+            <div className="flex flex-wrap gap-2">
+              {rateOptions.map(opt => (
+                <Button
+                  key={opt.val}
+                  variant="outline"
+                  size="sm"
+                  className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                  onClick={() => handleSelectField('current_interest_rate', opt.val, opt.label)}
+                >
+                  📈 {opt.label}
+                </Button>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-dashed hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                onClick={() => {
+                  const customRate = prompt("Enter annual interest rate (%):");
+                  if (customRate !== null) {
+                    const parsed = parseFloat(customRate);
+                    if (!isNaN(parsed) && parsed >= 0) {
+                      handleSelectField('current_interest_rate', parsed, `${parsed}%`);
+                    } else {
+                      alert("Please enter a valid positive interest rate.");
+                    }
+                  }
+                }}
+              >
+                ➕ Custom Rate
+              </Button>
+            </div>
+          </div>
+        );
+      }
     }
 
     if (currentIntent === 'budget') {
@@ -1356,6 +1827,232 @@ export default function VoiceTransactPage() {
                   {m.label}
                 </Button>
               ))}
+            </div>
+          </div>
+        );
+      }
+
+      if (nextMissing === 'year') {
+        const currentYear = new Date().getFullYear();
+        const yearOptions = [currentYear, currentYear + 1];
+        return (
+          <div className="space-y-2 mt-2 animate-in fade-in-50 duration-300">
+            <p className="text-xs text-muted-foreground font-semibold">Select budget year:</p>
+            <div className="flex flex-wrap gap-2">
+              {yearOptions.map(y => (
+                <Button
+                  key={y}
+                  variant="outline"
+                  size="sm"
+                  className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                  onClick={() => handleSelectField('year', y, String(y))}
+                >
+                  📅 {y}
+                </Button>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-dashed hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                onClick={() => {
+                  const customYear = prompt("Enter budget year:", String(currentYear));
+                  if (customYear !== null) {
+                    const parsed = parseInt(customYear);
+                    if (!isNaN(parsed) && parsed > 2000) {
+                      handleSelectField('year', parsed, String(parsed));
+                    } else {
+                      alert("Please enter a valid year.");
+                    }
+                  }
+                }}
+              >
+                ➕ Custom Year
+              </Button>
+            </div>
+          </div>
+        );
+      }
+
+      if (nextMissing === 'budget_limit') {
+        const limitOptions = [
+          { val: 10000, label: '₹10,000' },
+          { val: 25000, label: '₹25,000' },
+          { val: 50000, label: '₹50,000' },
+          { val: 100000, label: '₹1,00,000' },
+          { val: 200000, label: '₹2,00,000' }
+        ];
+        return (
+          <div className="space-y-2 mt-2 animate-in fade-in-50 duration-300">
+            <p className="text-xs text-muted-foreground font-semibold">Select monthly expense budget limit:</p>
+            <div className="flex flex-wrap gap-2">
+              {limitOptions.map(opt => (
+                <Button
+                  key={opt.val}
+                  variant="outline"
+                  size="sm"
+                  className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                  onClick={() => handleSelectField('budget_limit', opt.val, opt.label)}
+                >
+                  📊 {opt.label}
+                </Button>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-dashed hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                onClick={() => {
+                  const customLimit = prompt("Enter budget expense limit (₹):");
+                  if (customLimit !== null) {
+                    const parsed = parseFloat(customLimit);
+                    if (!isNaN(parsed) && parsed > 0) {
+                      handleSelectField('budget_limit', parsed, `₹${parsed.toLocaleString('en-IN')}`);
+                    } else {
+                      alert("Please enter a valid positive number.");
+                    }
+                  }
+                }}
+              >
+                ➕ Custom Limit
+              </Button>
+            </div>
+          </div>
+        );
+      }
+    }
+
+    if (currentIntent === 'emi_calculator') {
+      if (nextMissing === 'principal') {
+        const principalOptions = [
+          { val: 100000, label: '₹1,00,000' },
+          { val: 500000, label: '₹5,00,000' },
+          { val: 1000000, label: '₹10,00,000' },
+          { val: 2000000, label: '₹20,00,000' }
+        ];
+        return (
+          <div className="space-y-2 mt-2 animate-in fade-in-50 duration-300">
+            <p className="text-xs text-muted-foreground font-semibold">Select Simulated Principal Amount:</p>
+            <div className="flex flex-wrap gap-2">
+              {principalOptions.map(opt => (
+                <Button
+                  key={opt.val}
+                  variant="outline"
+                  size="sm"
+                  className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                  onClick={() => handleSelectField('principal', opt.val, opt.label)}
+                >
+                  💵 {opt.label}
+                </Button>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-dashed hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                onClick={() => {
+                  const customPrincipal = prompt("Enter simulated loan principal amount (₹):");
+                  if (customPrincipal !== null) {
+                    const parsed = parseFloat(customPrincipal);
+                    if (!isNaN(parsed) && parsed > 0) {
+                      handleSelectField('principal', parsed, `₹${parsed.toLocaleString('en-IN')}`);
+                    } else {
+                      alert("Please enter a valid positive number.");
+                    }
+                  }
+                }}
+              >
+                ➕ Custom Principal
+              </Button>
+            </div>
+          </div>
+        );
+      }
+
+      if (nextMissing === 'annual_rate') {
+        const rateOptions = [
+          { val: 6.5, label: '6.5% p.a.' },
+          { val: 7.5, label: '7.5% p.a.' },
+          { val: 8.5, label: '8.5% p.a.' },
+          { val: 9.5, label: '9.5% p.a.' },
+          { val: 12.0, label: '12.0% p.a.' }
+        ];
+        return (
+          <div className="space-y-2 mt-2 animate-in fade-in-50 duration-300">
+            <p className="text-xs text-muted-foreground font-semibold">Select Simulated Annual Interest Rate:</p>
+            <div className="flex flex-wrap gap-2">
+              {rateOptions.map(opt => (
+                <Button
+                  key={opt.val}
+                  variant="outline"
+                  size="sm"
+                  className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                  onClick={() => handleSelectField('annual_rate', opt.val, opt.label)}
+                >
+                  📈 {opt.label}
+                </Button>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-dashed hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                onClick={() => {
+                  const customRate = prompt("Enter simulated annual interest rate (%):");
+                  if (customRate !== null) {
+                    const parsed = parseFloat(customRate);
+                    if (!isNaN(parsed) && parsed > 0) {
+                      handleSelectField('annual_rate', parsed, `${parsed}%`);
+                    } else {
+                      alert("Please enter a valid positive rate.");
+                    }
+                  }
+                }}
+              >
+                ➕ Custom Rate
+              </Button>
+            </div>
+          </div>
+        );
+      }
+
+      if (nextMissing === 'tenure_months') {
+        const tenureOptions = [
+          { val: 12, label: '12 Months (1 Year)' },
+          { val: 24, label: '24 Months (2 Years)' },
+          { val: 36, label: '36 Months (3 Years)' },
+          { val: 60, label: '60 Months (5 Years)' },
+          { val: 120, label: '120 Months (10 Years)' }
+        ];
+        return (
+          <div className="space-y-2 mt-2 animate-in fade-in-50 duration-300">
+            <p className="text-xs text-muted-foreground font-semibold">Select Simulated Loan Tenure:</p>
+            <div className="flex flex-wrap gap-2">
+              {tenureOptions.map(opt => (
+                <Button
+                  key={opt.val}
+                  variant="outline"
+                  size="sm"
+                  className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-muted hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                  onClick={() => handleSelectField('tenure_months', opt.val, opt.label)}
+                >
+                  📅 {opt.label}
+                </Button>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-card text-foreground hover:bg-primary/10 hover:text-primary transition-all border border-dashed hover:border-primary/50 text-xs rounded-full shadow-sm font-medium"
+                onClick={() => {
+                  const customTenure = prompt("Enter simulated loan tenure in months:");
+                  if (customTenure !== null) {
+                    const parsed = parseInt(customTenure);
+                    if (!isNaN(parsed) && parsed > 0) {
+                      handleSelectField('tenure_months', parsed, `${parsed} Months`);
+                    } else {
+                      alert("Please enter a valid positive integer.");
+                    }
+                  }
+                }}
+              >
+                ➕ Custom Tenure
+              </Button>
             </div>
           </div>
         );
