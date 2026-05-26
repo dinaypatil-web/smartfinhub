@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useHybridAuth } from '@/contexts/HybridAuthContext';
-import { transactionApi, accountApi, categoryApi, budgetApi, interestRateApi } from '@/db/api';
+import { transactionApi, accountApi, categoryApi, budgetApi, interestRateApi, emiApi, userCustomBankLinksApi } from '@/db/api';
 import { parseSmartChatbotCommand, type SmartChatbotResult } from '@/services/aiService';
 import { INCOME_CATEGORIES, getIncomeCategoryName } from '@/constants/incomeCategories';
 import { countries } from '@/utils/countries';
@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
+import { calculateMonthlyEMI } from '@/utils/emiCalculations';
 import { 
   Sparkles, 
   Mic, 
@@ -19,14 +20,9 @@ import {
   Send, 
   Check, 
   X, 
-  ArrowRight, 
   AlertCircle, 
   Calendar, 
   CreditCard, 
-  ArrowLeftRight, 
-  ArrowUpRight, 
-  ArrowDownLeft, 
-  Coins, 
   Loader2,
   Trash2,
   Volume2,
@@ -50,6 +46,9 @@ interface DraftTransaction {
   income_category: 'salaries' | 'allowances' | 'family_income' | 'others' | null;
   description: string | null;
   transaction_date: string | null;
+  is_emi: boolean | null;
+  emi_months: number | null;
+  bank_charges: number | null;
 }
 
 interface DraftAccount {
@@ -66,6 +65,10 @@ interface DraftAccount {
   current_interest_rate: number | null;
   loan_start_date: string | null;
   due_date: number | null;
+  web_url: string | null;
+  ios_app_url: string | null;
+  android_app_url: string | null;
+  institution_logo: string | null;
 }
 
 interface DraftBudget {
@@ -105,7 +108,6 @@ export default function VoiceTransactPage() {
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isListening, setIsListening] = useState(false);
-  const [inputValueActive, setInputValueActive] = useState(''); // Keep track
   const [isLoading, setIsLoading] = useState(false);
   
   // Streaming text placeholder
@@ -124,7 +126,10 @@ export default function VoiceTransactPage() {
     category: null,
     income_category: null,
     description: null,
-    transaction_date: null
+    transaction_date: null,
+    is_emi: null,
+    emi_months: null,
+    bank_charges: null
   });
 
   const [draftAccount, setDraftAccount] = useState<DraftAccount>({
@@ -140,7 +145,11 @@ export default function VoiceTransactPage() {
     loan_tenure_months: null,
     current_interest_rate: null,
     loan_start_date: null,
-    due_date: null
+    due_date: null,
+    web_url: null,
+    ios_app_url: null,
+    android_app_url: null,
+    institution_logo: null
   });
 
   // Automatically sync profile country/currency when loaded
@@ -277,6 +286,10 @@ export default function VoiceTransactPage() {
       if (type === 'expense') {
         if (!d.from_account_id) missing.push('from_account_id');
         if (!d.category) missing.push('category');
+        if (d.is_emi) {
+          if (!d.emi_months || d.emi_months <= 0) missing.push('emi_months');
+          if (d.bank_charges === null || d.bank_charges === undefined || d.bank_charges < 0) missing.push('bank_charges');
+        }
       } else if (type === 'income') {
         if (!d.to_account_id) missing.push('to_account_id');
         if (!d.income_category) missing.push('income_category');
@@ -394,7 +407,10 @@ export default function VoiceTransactPage() {
               category: ext.category || draft.category,
               income_category: ext.income_category || draft.income_category,
               description: ext.description || draft.description,
-              transaction_date: ext.transaction_date || draft.transaction_date || today
+              transaction_date: ext.transaction_date || draft.transaction_date || today,
+              is_emi: ext.is_emi !== undefined && ext.is_emi !== null ? ext.is_emi : draft.is_emi,
+              emi_months: ext.emi_months || draft.emi_months,
+              bank_charges: ext.bank_charges !== undefined && ext.bank_charges !== null ? ext.bank_charges : draft.bank_charges,
             };
             
             const clientMissing = validateCurrentDraft('transaction', updatedDraft);
@@ -423,7 +439,11 @@ export default function VoiceTransactPage() {
               loan_tenure_months: ext.loan_tenure_months || draftAccount.loan_tenure_months,
               current_interest_rate: ext.current_interest_rate !== undefined && ext.current_interest_rate !== null ? ext.current_interest_rate : draftAccount.current_interest_rate,
               loan_start_date: ext.loan_start_date || draftAccount.loan_start_date,
-              due_date: ext.due_date !== undefined && ext.due_date !== null ? ext.due_date : draftAccount.due_date
+              due_date: ext.due_date !== undefined && ext.due_date !== null ? ext.due_date : draftAccount.due_date,
+              web_url: ext.web_url || draftAccount.web_url,
+              ios_app_url: ext.ios_app_url || draftAccount.ios_app_url,
+              android_app_url: ext.android_app_url || draftAccount.android_app_url,
+              institution_logo: ext.institution_logo || draftAccount.institution_logo,
             };
             
             const clientMissing = validateCurrentDraft('account', updatedAccount);
@@ -619,7 +639,10 @@ export default function VoiceTransactPage() {
         category: null,
         income_category: null,
         description: null,
-        transaction_date: null
+        transaction_date: null,
+        is_emi: null,
+        emi_months: null,
+        bank_charges: null
       });
     } else if (currentIntent === 'account') {
       setDraftAccount({
@@ -635,7 +658,11 @@ export default function VoiceTransactPage() {
         loan_tenure_months: null,
         current_interest_rate: null,
         loan_start_date: null,
-        due_date: null
+        due_date: null,
+        web_url: null,
+        ios_app_url: null,
+        android_app_url: null,
+        institution_logo: null
       });
     } else if (currentIntent === 'budget') {
       setDraftBudget({
@@ -695,7 +722,35 @@ export default function VoiceTransactPage() {
         transaction_date: draft.transaction_date || new Date().toISOString().slice(0, 10)
       };
       
-      await transactionApi.createTransaction(transactionPayload);
+      const newTx = await transactionApi.createTransaction(transactionPayload);
+
+      // Save Credit Card EMI if is_emi is true
+      if (draft.is_emi && draft.emi_months && draft.from_account_id) {
+        const purchaseAmount = Number(draft.amount);
+        const bankCharges = Number(draft.bank_charges || 0);
+        const emiMonths = Number(draft.emi_months);
+        const monthlyEMI = calculateMonthlyEMI(purchaseAmount, bankCharges, emiMonths);
+        const totalAmount = purchaseAmount + bankCharges;
+
+        const emiData = {
+          user_id: user.id,
+          account_id: draft.from_account_id,
+          transaction_id: newTx.id,
+          purchase_amount: purchaseAmount,
+          bank_charges: bankCharges,
+          total_amount: totalAmount,
+          emi_months: emiMonths,
+          monthly_emi: monthlyEMI,
+          remaining_installments: emiMonths,
+          start_date: transactionPayload.transaction_date,
+          next_due_date: transactionPayload.transaction_date,
+          description: transactionPayload.description || `EMI for ${draft.category || 'purchase'}`,
+          status: 'active' as const,
+        };
+
+        await emiApi.createEMI(emiData);
+      }
+
       await loadData();
       
       setIsLoading(false);
@@ -723,7 +778,10 @@ export default function VoiceTransactPage() {
         category: null,
         income_category: null,
         description: null,
-        transaction_date: null
+        transaction_date: null,
+        is_emi: null,
+        emi_months: null,
+        bank_charges: null
       });
       setMissingFields([]);
       
@@ -762,9 +820,9 @@ export default function VoiceTransactPage() {
         currency: draftAccount.currency || 'INR',
         country: draftAccount.country || 'IN',
         institution_name: draftAccount.account_type === 'cash' ? 'Cash' : (draftAccount.institution_name || draftAccount.account_name!),
-        institution_logo: draftAccount.account_type === 'cash' ? null : getBankLogo(draftAccount.institution_name || draftAccount.account_name!),
+        institution_logo: draftAccount.account_type === 'cash' ? null : (draftAccount.institution_logo || getBankLogo(draftAccount.institution_name || draftAccount.account_name!)),
         last_4_digits: draftAccount.last_4_digits || null,
-        credit_limit: draftAccount.account_limit || draftAccount.credit_limit || null,
+        credit_limit: (draftAccount as any).account_limit || draftAccount.credit_limit || null,
         loan_principal: draftAccount.loan_principal || null,
         loan_tenure_months: draftAccount.loan_tenure_months || null,
         loan_start_date: draftAccount.account_type === 'loan' ? draftAccount.loan_start_date : null,
@@ -780,6 +838,21 @@ export default function VoiceTransactPage() {
           interest_rate: Number(draftAccount.current_interest_rate),
           effective_date: draftAccount.loan_start_date,
         });
+      }
+
+      // Save/create custom bank links if specified in the draft
+      const hasCustomLinks = !!(draftAccount.web_url || draftAccount.ios_app_url || draftAccount.android_app_url);
+      if (draftAccount.account_type !== 'cash' && hasCustomLinks && newAccount) {
+        const linkPayload = {
+          user_id: user.id,
+          account_id: newAccount.id,
+          bank_name: draftAccount.institution_name || draftAccount.account_name!,
+          web_url: draftAccount.web_url || null,
+          ios_app_url: draftAccount.ios_app_url || null,
+          android_app_url: draftAccount.android_app_url || null,
+          notes: 'Created via AI Chatbot'
+        };
+        await userCustomBankLinksApi.createCustomBankLink(linkPayload);
       }
       
       await loadData();
@@ -814,7 +887,11 @@ export default function VoiceTransactPage() {
         loan_tenure_months: null,
         current_interest_rate: null,
         loan_start_date: null,
-        due_date: null
+        due_date: null,
+        web_url: null,
+        ios_app_url: null,
+        android_app_url: null,
+        institution_logo: null
       });
       setMissingFields([]);
       
@@ -851,7 +928,14 @@ export default function VoiceTransactPage() {
         year: Number(draftBudget.year!),
         budgeted_income: Number(draftBudget.budgeted_income || 0),
         budgeted_expenses: Number(draftBudget.budgeted_expenses || 0),
-        category_budgets: draftBudget.category_budgets || {}
+        category_budgets: draftBudget.category_budgets || {},
+        income_category_budgets: {
+          salaries: 0,
+          allowances: 0,
+          family_income: 0,
+          others: 0
+        },
+        currency: profile?.default_currency || 'INR'
       };
       
       await budgetApi.createOrUpdateBudget(budgetPayload);

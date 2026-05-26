@@ -409,6 +409,9 @@ export interface SmartChatbotResult {
     income_category?: 'salaries' | 'allowances' | 'family_income' | 'others' | null;
     description?: string | null;
     transaction_date?: string | null;
+    is_emi?: boolean | null;
+    emi_months?: number | null;
+    bank_charges?: number | null;
 
     // For account
     account_type?: 'cash' | 'bank' | 'credit_card' | 'loan' | null;
@@ -424,6 +427,10 @@ export interface SmartChatbotResult {
     current_interest_rate?: number | null;
     loan_start_date?: string | null;
     due_date?: number | null;
+    web_url?: string | null;
+    ios_app_url?: string | null;
+    android_app_url?: string | null;
+    institution_logo?: string | null;
 
     // For budget
     month?: number | null;
@@ -508,6 +515,10 @@ export async function parseSmartChatbotCommand(
          - income: to_account_id (matched from accounts), income_category (salaries/allowances/family_income/others).
          - transfer / withdrawal / loan_payment / credit_card_repayment: both from_account_id and to_account_id.
          - interest_charge: to_account_id.
+       - Special Credit Card EMI extraction: If the user mentions converting a credit card transaction or expense to EMI (e.g., "convert to 12 months EMI with 500 charges" or "make it a 6-month EMI"), extract:
+         - "is_emi": true (boolean)
+         - "emi_months": total number of months (integer, e.g., 6 or 12)
+         - "bank_charges": processing fee or bank charges amount (number, default 0 if not mentioned)
        - Missing fields go in "missingFields". Ask for them in "clarificationQuestion".
        
     2. intent: "account"
@@ -526,6 +537,10 @@ export async function parseSmartChatbotCommand(
          - "current_interest_rate" (number, required if loan)
          - "loan_start_date" (string 'YYYY-MM-DD', required if loan)
          - "due_date" (number, day of month 1-31, required if loan indicating EMI payment due day)
+         - "web_url" (standard website or login URL specified by user, e.g. "https://www.hdfcbank.com")
+         - "ios_app_url" (Apple app store link if mentioned)
+         - "android_app_url" (Google play store link if mentioned)
+         - "institution_logo" (custom logo image URL if specified)
        - Required fields by type:
          - cash: "account_type", "account_name".
          - bank: "account_type", "account_name", "country", "currency", "institution_name".
@@ -569,6 +584,9 @@ export async function parseSmartChatbotCommand(
         "income_category": "salaries" | "allowances" | "family_income" | "others" | null,
         "description": string | null,
         "transaction_date": "YYYY-MM-DD" | null,
+        "is_emi": boolean | null,
+        "emi_months": number | null,
+        "bank_charges": number | null,
         
         "account_type": "cash" | "bank" | "credit_card" | "loan" | null,
         "account_name": string | null,
@@ -583,6 +601,10 @@ export async function parseSmartChatbotCommand(
         "current_interest_rate": number | null,
         "loan_start_date": "YYYY-MM-DD" | null,
         "due_date": number | null,
+        "web_url": string | null,
+        "ios_app_url": string | null,
+        "android_app_url": string | null,
+        "institution_logo": string | null,
         
         "month": number | null,
         "year": number | null,
