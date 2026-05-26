@@ -285,8 +285,8 @@ export default function Budgets() {
           <p className="text-muted-foreground">Plan and track your monthly budget by category</p>
         </div>
         <Link to="/voice-transact?intent=budget">
-          <Button variant="outline" className="border-primary/50 text-primary hover:bg-primary/5 dark:hover:bg-primary/10">
-            <Sparkles className="mr-2 h-4 w-4 text-primary animate-pulse" />
+          <Button className="bg-primary hover:bg-primary/90 text-white shadow-md transition-all">
+            <Sparkles className="mr-2 h-4 w-4 text-white animate-pulse" />
             Ask AI Budget Assistant
           </Button>
         </Link>

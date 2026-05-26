@@ -422,8 +422,8 @@ export default function Dashboard() {
         </div>
         <div className="flex gap-2 flex-wrap">
           <Link to="/voice-transact">
-            <Button variant="outline" size="sm" className="md:size-default border-primary/50 text-primary hover:bg-primary/5 dark:hover:bg-primary/10">
-              <Sparkles className="mr-2 h-4 w-4 text-primary animate-pulse" />
+            <Button size="sm" className="md:size-default bg-primary hover:bg-primary/90 text-white shadow-md transition-all">
+              <Sparkles className="mr-2 h-4 w-4 text-white animate-pulse" />
               Ask AI Assistant
             </Button>
           </Link>

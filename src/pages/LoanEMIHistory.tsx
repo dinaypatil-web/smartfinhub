@@ -117,12 +117,11 @@ export default function LoanEMIHistory() {
               <h1 className="text-3xl font-bold text-slate-900 dark:text-white">EMI Payment History</h1>
               <div className="ml-auto flex items-center gap-2">
                 <Button
-                  variant="outline"
                   size="sm"
                   onClick={() => navigate('/voice-transact?intent=emi_calculator')}
-                  className="border-primary/50 text-primary hover:bg-primary/5 dark:hover:bg-primary/10"
+                  className="bg-primary hover:bg-primary/90 text-white shadow-md transition-all"
                 >
-                  <Sparkles className="h-4 w-4 mr-2 text-primary animate-pulse" />
+                  <Sparkles className="h-4 w-4 mr-2 text-white animate-pulse" />
                   Ask AI Assistant
                 </Button>
                 <Button

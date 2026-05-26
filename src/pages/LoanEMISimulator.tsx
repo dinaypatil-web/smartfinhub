@@ -488,11 +488,10 @@ export default function LoanEMISimulator() {
           </div>
           <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
             <Button
-              variant="outline"
-              className="border-primary/50 text-primary hover:bg-primary/5 dark:hover:bg-primary/10"
+              className="bg-primary hover:bg-primary/90 text-white shadow-md transition-all"
               onClick={() => navigate('/voice-transact?intent=emi_calculator')}
             >
-              <Sparkles className="mr-2 h-4 w-4 text-primary animate-pulse" />
+              <Sparkles className="mr-2 h-4 w-4 text-white animate-pulse" />
               Ask AI EMI Simulator
             </Button>
             <Button
