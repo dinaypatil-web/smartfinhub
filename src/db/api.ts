@@ -1837,18 +1837,17 @@ export const creditCardStatementApi = {
     return Array.isArray(data) ? data : [];
   },
 
-  // Get advance payment balance for a credit card
+  // Get advance payment balance for a credit card (sum of all remaining balances)
   async getAdvanceBalance(creditCardId: string): Promise<number> {
     const { data, error } = await supabase
       .from('credit_card_advance_payments')
       .select('remaining_balance')
       .eq('credit_card_id', creditCardId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .gt('remaining_balance', 0);
 
     if (error) throw error;
-    return data?.remaining_balance || 0;
+    if (!data || data.length === 0) return 0;
+    return data.reduce((sum, row) => sum + (row.remaining_balance || 0), 0);
   },
 
   // Get all advance payments for a user (for backup)
@@ -1862,32 +1861,36 @@ export const creditCardStatementApi = {
     return Array.isArray(data) ? data : [];
   },
 
-  // Consume advance balance (decrement from latest record)
+  // Consume advance balance (decrement from oldest records first - FIFO)
   async consumeAdvanceBalance(userId: string, creditCardId: string, amountToConsume: number): Promise<void> {
-    const { data: latestRecord, error: fetchError } = await supabase
+    const { data: records, error: fetchError } = await supabase
       .from('credit_card_advance_payments')
       .select('id, remaining_balance')
       .eq('credit_card_id', creditCardId)
       .eq('user_id', userId)
       .gt('remaining_balance', 0)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .order('created_at', { ascending: true });
 
     if (fetchError) throw fetchError;
-    if (!latestRecord) return;
+    if (!records || records.length === 0) return;
 
-    const newBalance = Math.max(0, latestRecord.remaining_balance - amountToConsume);
+    let remaining = amountToConsume;
+    for (const record of records) {
+      if (remaining <= 0) break;
+      const consume = Math.min(remaining, record.remaining_balance);
+      const newBalance = record.remaining_balance - consume;
+      remaining -= consume;
 
-    const { error: updateError } = await supabase
-      .from('credit_card_advance_payments')
-      .update({
-        remaining_balance: newBalance,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', latestRecord.id);
+      const { error: updateError } = await supabase
+        .from('credit_card_advance_payments')
+        .update({
+          remaining_balance: newBalance,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', record.id);
 
-    if (updateError) throw updateError;
+      if (updateError) throw updateError;
+    }
   },
 
   // Record advance payment
@@ -1899,17 +1902,13 @@ export const creditCardStatementApi = {
     notes?: string,
     transactionId?: string
   ): Promise<any> {
-    // Get current advance balance
-    const currentBalance = await this.getAdvanceBalance(creditCardId);
-    const newBalance = currentBalance + paymentAmount;
-
     const { data, error } = await supabase
       .from('credit_card_advance_payments')
       .insert({
         user_id: userId,
         credit_card_id: creditCardId,
         payment_amount: paymentAmount,
-        remaining_balance: newBalance,
+        remaining_balance: paymentAmount,
         payment_date: new Date().toISOString(),
         currency,
         notes: notes || null,
@@ -1966,71 +1965,49 @@ export const creditCardStatementApi = {
 
     if (error) throw error;
 
-    if (delta !== 0) {
-      await this.propagateAdvanceBalanceChange(existing.credit_card_id, existing.created_at, delta);
-    }
+
 
     return data;
   },
 
   // Delete advance payment
   async deleteAdvancePayment(id: string): Promise<void> {
-    const { data: existing, error: fetchError } = await supabase
-      .from('credit_card_advance_payments')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (fetchError) throw fetchError;
-
-    const delta = -existing.payment_amount;
-
     const { error } = await supabase
       .from('credit_card_advance_payments')
       .delete()
       .eq('id', id);
 
     if (error) throw error;
-
-    await this.propagateAdvanceBalanceChange(existing.credit_card_id, existing.created_at, delta);
-  },
-
-  // Helper to propagate balance changes
-  async propagateAdvanceBalanceChange(creditCardId: string, fromDate: string, delta: number): Promise<void> {
-    const { data: subsequentRecords, error } = await supabase
-      .from('credit_card_advance_payments')
-      .select('id, remaining_balance')
-      .eq('credit_card_id', creditCardId)
-      .gt('created_at', fromDate);
-
-    if (error) throw error;
-
-    if (subsequentRecords && subsequentRecords.length > 0) {
-      for (const record of subsequentRecords) {
-        await supabase
-          .from('credit_card_advance_payments')
-          .update({
-            remaining_balance: record.remaining_balance + delta,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', record.id);
-      }
-    }
   },
 
   // Update advance payment balance (e.g., when excess is used against future statement)
+  // Consumes from oldest records first (FIFO)
   async updateAdvanceBalance(creditCardId: string, amount: number): Promise<void> {
-    const currentBalance = await this.getAdvanceBalance(creditCardId);
-    const newBalance = Math.max(0, currentBalance - amount);
+    let remaining = amount;
 
-    const { error } = await supabase
+    const { data: records, error: fetchError } = await supabase
       .from('credit_card_advance_payments')
-      .update({ remaining_balance: newBalance })
+      .select('id, remaining_balance')
       .eq('credit_card_id', creditCardId)
-      .order('created_at', { ascending: false })
-      .limit(1);
+      .gt('remaining_balance', 0)
+      .order('created_at', { ascending: true });
 
-    if (error) throw error;
+    if (fetchError) throw fetchError;
+    if (!records || records.length === 0) return;
+
+    for (const record of records) {
+      if (remaining <= 0) break;
+      const consume = Math.min(remaining, record.remaining_balance);
+      const newBalance = record.remaining_balance - consume;
+      remaining -= consume;
+
+      const { error } = await supabase
+        .from('credit_card_advance_payments')
+        .update({ remaining_balance: newBalance, updated_at: new Date().toISOString() })
+        .eq('id', record.id);
+
+      if (error) throw error;
+    }
   },
 
   // Delete allocations for a specific repayment
