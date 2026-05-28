@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useHybridAuth as useAuth } from '@/contexts/HybridAuthContext';
 import { transactionApi, accountApi, categoryApi, budgetApi, emiApi, loanEMIPaymentApi, creditCardStatementApi } from '@/db/api';
@@ -106,6 +106,14 @@ export default function TransactionForm() {
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [chatStreamingText, setChatStreamingText] = useState('');
   const [lastUpdatedFields, setLastUpdatedFields] = useState<string[]>([]);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll chat message list to bottom
+  useEffect(() => {
+    if (showAIChat) {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatMessages, chatStreamingText, isChatLoading, showAIChat]);
 
   useEffect(() => {
     if (user) {
@@ -2334,7 +2342,7 @@ export default function TransactionForm() {
             )}
 
             {/* Message list area */}
-            <ScrollArea className="flex-1 pr-3 mb-3">
+            <ScrollArea className="h-[380px] lg:h-[420px] flex-1 pr-3 mb-3 overflow-y-auto">
               <div className="space-y-3.5 pb-2">
                 {chatMessages.map((msg) => (
                   <div
@@ -2382,6 +2390,7 @@ export default function TransactionForm() {
                     </div>
                   </div>
                 )}
+                <div ref={chatEndRef} />
               </div>
             </ScrollArea>
 
