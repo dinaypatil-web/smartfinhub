@@ -3,15 +3,17 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useHybridAuth as useAuth } from '@/contexts/HybridAuthContext';
 import { transactionApi, accountApi, categoryApi, budgetApi, emiApi, loanEMIPaymentApi, creditCardStatementApi } from '@/db/api';
 import type { TransactionType, Account, CreditCardPaymentAllocation } from '@/types/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, ArrowLeft, TrendingDown, CreditCard, AlertCircle, Plus, Info, Trash2 } from 'lucide-react';
+import { Loader2, ArrowLeft, TrendingDown, CreditCard, AlertCircle, Plus, Info, Trash2, Sparkles, X, Send, Bot } from 'lucide-react';
+import { parseSmartChatbotCommand } from '@/services/aiService';
 import { formatCurrency } from '@/utils/format';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CreditCardStatementSelector } from '@/components/CreditCardStatementSelector';
@@ -89,6 +91,21 @@ export default function TransactionForm() {
   const [ccLastAutoFilledTotal, setCCLastAutoFilledTotal] = useState<number | null>(null);
   const [isSplitRepayment, setIsSplitRepayment] = useState(false);
   const [splitSources, setSplitSources] = useState<Array<{ accountId: string; amount: string }>>([]);
+
+  // Integrated AI Chatbot Assistant State
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [showAIChat, setShowAIChat] = useState(!id);
+  const [chatMessages, setChatMessages] = useState<Array<{ id: string; role: 'user' | 'model'; content: string }>>([
+    {
+      id: 'welcome',
+      role: 'model',
+      content: "Hello! I am your Smart AI Assistant. I can help you record this transaction or answer any questions. Tell me details about your transaction, or ask for guidance! E.g.:\n\n• *\"I spent 1200 on grocery shopping at supermarket yesterday\"*\n• *\"Salary credit of 75000 in HDFC bank\"*\n• *\"Repay 5000 CC bill of SBI credit card from HDFC savings\"*\n• *\"Which expense categories do I have?\"*"
+    }
+  ]);
+  const [chatInput, setChatInput] = useState('');
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const [chatStreamingText, setChatStreamingText] = useState('');
+  const [lastUpdatedFields, setLastUpdatedFields] = useState<string[]>([]);
 
   useEffect(() => {
     if (user) {
@@ -379,17 +396,18 @@ export default function TransactionForm() {
 
     setLoadingData(true);
     try {
-      const [accountsData, categoriesData] = await Promise.all([
+      const [accountsData, categoriesData, transactionsData] = await Promise.all([
         accountApi.getAccounts(user.id),
-        categoryApi.getCategories(user.id)
+        categoryApi.getCategories(user.id),
+        transactionApi.getTransactions(user.id)
       ]);
 
       setAccounts(accountsData);
       setCategories(categoriesData);
+      setTransactions(transactionsData);
 
       if (id) {
-        const transactions = await transactionApi.getTransactions(user.id);
-        const transaction = transactions.find(t => t.id === id);
+        const transaction = transactionsData.find(t => t.id === id);
         if (transaction) {
           // Fetch EMI details if it's a credit card transaction
           let emiData = null;
@@ -439,6 +457,133 @@ export default function TransactionForm() {
       });
     } finally {
       setLoadingData(false);
+    }
+  };
+
+  const handleSendChatMessage = async (customCommand?: string) => {
+    const text = customCommand !== undefined ? customCommand : chatInput;
+    if (!text.trim() || !user) return;
+
+    setChatInput('');
+    setIsChatLoading(true);
+    setChatStreamingText('');
+    setLastUpdatedFields([]);
+
+    const userMessageId = Math.random().toString();
+    setChatMessages(prev => [...prev, { id: userMessageId, role: 'user', content: text }]);
+
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const history = chatMessages.slice(-6).map(m => ({
+        role: m.role,
+        content: m.content
+      }));
+
+      let streamingResponse = '';
+
+      await parseSmartChatbotCommand(
+        {
+          command: text,
+          accounts,
+          categories,
+          transactions,
+          chatHistory: history,
+          currentDate: today
+        },
+        (chunk) => {
+          streamingResponse += chunk;
+          setChatStreamingText(streamingResponse);
+        },
+        (result: any) => {
+          setIsChatLoading(false);
+          setChatStreamingText('');
+
+          const botMessageId = Math.random().toString();
+          setChatMessages(prev => [
+            ...prev,
+            { id: botMessageId, role: 'model', content: result.clarificationQuestion }
+          ]);
+
+          // Apply extracted updates if the intent is transaction
+          if (result.intent === 'transaction' && result.extractedInfo) {
+            const ext = result.extractedInfo;
+            const updates: any = {};
+            const updatedNames: string[] = [];
+
+            if (ext.transaction_type) {
+              updates.transaction_type = ext.transaction_type;
+              updatedNames.push('Transaction Type');
+            }
+            if (ext.amount !== undefined && ext.amount !== null) {
+              updates.amount = ext.amount.toString();
+              updatedNames.push('Amount');
+            }
+            if (ext.from_account_id) {
+              updates.from_account_id = ext.from_account_id;
+              updatedNames.push('From Account');
+            }
+            if (ext.to_account_id) {
+              updates.to_account_id = ext.to_account_id;
+              updatedNames.push('To Account');
+            }
+            if (ext.category) {
+              updates.category = ext.category;
+              updatedNames.push('Category');
+            }
+            if (ext.income_category) {
+              updates.income_category = ext.income_category;
+              updatedNames.push('Income Category');
+            }
+            if (ext.description) {
+              updates.description = ext.description;
+              updatedNames.push('Description');
+            }
+            if (ext.transaction_date) {
+              updates.transaction_date = ext.transaction_date;
+              updatedNames.push('Date');
+            }
+            if (ext.is_emi !== undefined && ext.is_emi !== null) {
+              updates.is_emi = ext.is_emi;
+              updatedNames.push('Is EMI');
+            }
+            if (ext.emi_months) {
+              updates.emi_months = ext.emi_months.toString();
+              updatedNames.push('EMI Months');
+            }
+            if (ext.bank_charges !== undefined && ext.bank_charges !== null) {
+              updates.bank_charges = ext.bank_charges.toString();
+              updatedNames.push('Bank Charges');
+            }
+
+            if (Object.keys(updates).length > 0) {
+              setFormData(prev => ({ ...prev, ...updates }));
+              setLastUpdatedFields(updatedNames);
+              
+              toast({
+                title: 'Form Auto-Filled ✨',
+                description: `Successfully set: ${updatedNames.join(', ')}`,
+              });
+            }
+          }
+        },
+        (error: string) => {
+          setIsChatLoading(false);
+          setChatStreamingText('');
+          const errId = Math.random().toString();
+          setChatMessages(prev => [
+            ...prev,
+            { id: errId, role: 'model', content: `Sorry, I encountered an error: ${error}` }
+          ]);
+        }
+      );
+    } catch (err: any) {
+      setIsChatLoading(false);
+      setChatStreamingText('');
+      const errId = Math.random().toString();
+      setChatMessages(prev => [
+        ...prev,
+        { id: errId, role: 'model', content: `Sorry, I encountered an error: ${err.message || err}` }
+      ]);
     }
   };
 
@@ -1149,18 +1294,37 @@ export default function TransactionForm() {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-2xl">
-      <Button variant="ghost" onClick={() => navigate('/transactions')} className="mb-4">
-        <ArrowLeft className="mr-2 h-4 w-4" />
-        Back to Transactions
-      </Button>
+    <div className="container mx-auto p-6 max-w-6xl">
+      <div className="flex justify-between items-center mb-6">
+        <Button variant="ghost" onClick={() => navigate('/transactions')}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Transactions
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() => setShowAIChat(!showAIChat)}
+          className={`shadow-md transition-all gap-1.5 ${showAIChat ? 'bg-primary text-white hover:bg-primary/95 border-primary font-medium' : 'bg-purple-50 dark:bg-purple-950/20 hover:bg-purple-100 dark:hover:bg-purple-950/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-900/40 font-medium'}`}
+        >
+          <Sparkles className={`h-4 w-4 ${showAIChat ? 'animate-pulse text-white' : 'text-purple-600 dark:text-purple-400'}`} />
+          {showAIChat ? 'Hide AI Guide' : 'Ask AI Assistant ✨'}
+        </Button>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{id ? 'Edit Transaction' : 'Add New Transaction'}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <div className={showAIChat ? 'lg:col-span-7 w-full' : 'lg:col-span-12 max-w-2xl mx-auto w-full'}>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex justify-between items-center">
+                <span>{id ? 'Edit Transaction' : 'Add New Transaction'}</span>
+                {!showAIChat && (
+                  <span className="text-xs text-muted-foreground font-normal italic flex items-center gap-1">
+                    AI Assistant available in header ✨
+                  </span>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="transaction_type">Transaction Type *</Label>
               <Select
@@ -2124,5 +2288,150 @@ export default function TransactionForm() {
         </CardContent>
       </Card>
     </div>
+
+    {showAIChat && (
+      <div className="lg:col-span-5 w-full lg:sticky lg:top-6">
+        <Card className="border border-purple-100 dark:border-purple-950/40 shadow-xl overflow-hidden bg-gradient-to-br from-white to-purple-50/10 dark:from-slate-900 dark:to-purple-950/10 flex flex-col h-[650px]">
+          <CardHeader className="bg-gradient-to-r from-purple-50 to-indigo-50/50 dark:from-purple-950/20 dark:to-indigo-950/10 border-b border-purple-100/60 dark:border-purple-950/30 p-4 shrink-0">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2.5">
+                <div className="bg-gradient-to-tr from-primary to-purple-600 p-2 rounded-xl text-white shadow-md shadow-primary/20">
+                  <Sparkles className="h-4 w-4 animate-pulse text-white" />
+                </div>
+                <div>
+                  <CardTitle className="text-sm font-bold flex items-center gap-1.5 text-slate-800 dark:text-slate-100">
+                    AI Transaction Guide
+                  </CardTitle>
+                  <CardDescription className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Enter data naturally & ask for help
+                  </CardDescription>
+                </div>
+              </div>
+              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground rounded-lg hover:bg-slate-200/50 dark:hover:bg-slate-800/50" onClick={() => setShowAIChat(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardHeader>
+          
+          <CardContent className="p-4 flex flex-col flex-1 overflow-hidden">
+            {/* Recently auto-filled fields list */}
+            {lastUpdatedFields.length > 0 && (
+              <div className="mb-3 p-2.5 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 rounded-lg animate-in slide-in-from-top-2 duration-300">
+                <p className="text-[10px] text-emerald-800 dark:text-emerald-300 font-semibold mb-1 flex items-center gap-1">
+                  ✨ Auto-filled Fields:
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {lastUpdatedFields.map((field) => (
+                    <span key={field} className="text-[9px] px-2 py-0.5 bg-emerald-105/90 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 rounded font-medium border border-emerald-200/40">
+                      {field}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-[9px] text-muted-foreground mt-1">
+                  💡 Saved pattern matches: the AI chatbot learns with each transaction to help you in the future.
+                </p>
+              </div>
+            )}
+
+            {/* Message list area */}
+            <ScrollArea className="flex-1 pr-3 mb-3">
+              <div className="space-y-3.5 pb-2">
+                {chatMessages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`flex gap-2.5 max-w-[85%] ${msg.role === 'user' ? 'ml-auto flex-row-reverse' : 'mr-auto'}`}
+                  >
+                    {msg.role !== 'user' && (
+                      <div className="h-7 w-7 rounded-lg bg-purple-100 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 flex items-center justify-center flex-shrink-0 border border-purple-200/50 dark:border-purple-900/30">
+                        <Bot className="h-4 w-4" />
+                      </div>
+                    )}
+                    <div
+                      className={`rounded-2xl px-3 py-2.5 text-xs shadow-sm leading-relaxed whitespace-pre-wrap ${
+                        msg.role === 'user'
+                          ? 'bg-gradient-to-br from-primary to-purple-600 text-white rounded-tr-none'
+                          : 'bg-white dark:bg-slate-800 border border-purple-100/50 dark:border-purple-950/30 text-slate-800 dark:text-slate-200 rounded-tl-none'
+                      }`}
+                    >
+                      {msg.content}
+                    </div>
+                  </div>
+                ))}
+                
+                {/* Chat streaming response text */}
+                {chatStreamingText && (
+                  <div className="flex gap-2.5 max-w-[85%] mr-auto">
+                    <div className="h-7 w-7 rounded-lg bg-purple-100 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 flex items-center justify-center flex-shrink-0 border border-purple-200/50 dark:border-purple-900/30">
+                      <Bot className="h-4 w-4" />
+                    </div>
+                    <div className="rounded-2xl px-3 py-2.5 text-xs shadow-sm bg-white dark:bg-slate-800 border border-purple-100/50 dark:border-purple-950/30 text-slate-800 dark:text-slate-200 rounded-tl-none animate-pulse">
+                      {chatStreamingText}
+                    </div>
+                  </div>
+                )}
+
+                {/* Chat loading animation */}
+                {isChatLoading && !chatStreamingText && (
+                  <div className="flex gap-2.5 max-w-[85%] mr-auto items-center">
+                    <div className="h-7 w-7 rounded-lg bg-purple-100 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 flex items-center justify-center flex-shrink-0 border border-purple-200/50 dark:border-purple-900/30">
+                      <Bot className="h-4 w-4 animate-bounce" />
+                    </div>
+                    <div className="bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-2xl px-3 py-2 text-xs flex items-center gap-1.5">
+                      <Loader2 className="h-3 w-3 animate-spin text-purple-600" />
+                      Thinking...
+                    </div>
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+
+            {/* Clickable suggestion pills */}
+            <div className="mb-3 space-y-1 shrink-0">
+              <p className="text-[10px] text-muted-foreground font-medium px-1">Suggested inputs:</p>
+              <div className="flex flex-wrap gap-1 max-h-[75px] overflow-y-auto pr-1">
+                {[
+                  'Groceries 350 yesterday',
+                  'HDFC Bank 50000 salary',
+                  'SBI Card repayment 1500 from Cash',
+                  'Show my bank balances',
+                  'What categories do I have?'
+                ].map((pill) => (
+                  <button
+                    key={pill}
+                    type="button"
+                    onClick={() => handleSendChatMessage(pill)}
+                    className="text-[10px] px-2 py-1 bg-white hover:bg-purple-50 dark:bg-slate-800 dark:hover:bg-purple-950/30 border border-purple-100/60 dark:border-purple-950/30 text-purple-700 dark:text-purple-300 rounded-full transition-colors cursor-pointer text-left truncate max-w-[240px]"
+                  >
+                    💡 {pill}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Input action bar */}
+            <div className="flex gap-2 items-center border-t border-purple-100/50 dark:border-purple-950/20 pt-3 shrink-0">
+              <Input
+                placeholder="Enter natural language command..."
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleSendChatMessage())}
+                className="h-9 text-xs focus-visible:ring-purple-400 bg-white dark:bg-slate-800/80"
+              />
+              <Button
+                type="button"
+                size="sm"
+                className="h-9 px-3 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/95 hover:to-purple-600/95 text-white shadow-md shadow-primary/10 rounded-lg shrink-0"
+                onClick={() => handleSendChatMessage()}
+                disabled={isChatLoading}
+              >
+                <Send className="h-3.5 w-3.5 text-white" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )}
+  </div>
+</div>
   );
 }

@@ -507,6 +507,11 @@ export async function parseSmartChatbotCommand(
     Today's date is: ${currentDate}
     Default currency is INR (₹).
 
+    LEARNING & PREFERENCE RULES:
+    - Carefully analyze the provided context of the user's recent transactions (last 100) to learn their spending patterns, preferred accounts, and category mappings.
+    - If the user provides a brief command (e.g., "spent 250 at Starbucks" or "McDonald's 500"), use the history to resolve the most likely "category" (e.g., matching "Starbucks" to "Food & Dining" because of previous transactions) and "from_account_id" (e.g., HDFC Bank account if they typically pay HDFC there).
+    - Leverage this history to auto-fill missing details seamlessly, so the bot gets smarter with every transaction the user records!
+
     RULES FOR DETECTING INTENTS & REQUIRED FIELDS:
     
     1. intent: "transaction"
