@@ -182,11 +182,12 @@ export default function TransactionForm() {
     fetchAdvanceBalance();
   }, [formData.transaction_type, formData.to_account_id]);
 
+  const [hasFetchedAdvances, setHasFetchedAdvances] = useState(false);
+
   // Fetch all Credit Card advance balances where remaining_balance > 0
   useEffect(() => {
     const fetchAllAdvances = async () => {
-      if (!user || accounts.length === 0) return;
-      
+      if (!user || accounts.length === 0 || hasFetchedAdvances) return;
       try {
         const creditCards = accounts.filter(a => a.account_type === 'credit_card');
         const advancesList = await Promise.all(
@@ -200,12 +201,14 @@ export default function TransactionForm() {
           })
         );
         setCreditCardAdvances(advancesList.filter(adv => adv.balance > 0));
+        setHasFetchedAdvances(true);
       } catch (err) {
         console.error('Error fetching all CC advances:', err);
       }
     };
-    
     fetchAllAdvances();
+    // Reset flag if accounts change (e.g., new card added)
+    return () => setHasFetchedAdvances(false);
   }, [user, accounts]);
 
   // When "Advance Balance" is selected as payment source, set advance consumed to amount
