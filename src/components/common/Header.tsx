@@ -40,7 +40,7 @@ const Header = () => {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                className={`px-3 py-2 text-sm font-medium rounded-md transition-colors text-center ${
                   location.pathname === item.path
                     ? 'text-primary bg-primary/10'
                     : 'text-foreground hover:text-primary hover:bg-muted'
@@ -74,7 +74,7 @@ const Header = () => {
                       key={item.path}
                       to={item.path}
                       onClick={() => setIsMenuOpen(false)}
-                      className={`px-3 py-2 text-base font-medium rounded-md ${
+                      className={`px-3 py-2 text-base font-medium rounded-md text-center ${
                         location.pathname === item.path
                           ? 'text-primary bg-primary/10'
                           : 'text-foreground hover:text-primary hover:bg-muted'
