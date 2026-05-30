@@ -97,6 +97,7 @@ export default function TransactionForm() {
   const [splitCategories, setSplitCategories] = useState<Array<{ category: string; amount: string; description: string }>>([
     { category: '', amount: '', description: '' }
   ]);
+  const [splitBudgets, setSplitBudgets] = useState<Record<string, { budgeted: number; spent: number; remaining: number } | null>>({});
 
   // Integrated AI Chatbot Assistant State
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -271,6 +272,54 @@ export default function TransactionForm() {
       setBudgetInfo(null);
     }
   }, [user, formData.category, formData.transaction_type, formData.transaction_date]);
+
+  // Load budget info for each split category dynamically
+  useEffect(() => {
+    if (!user || formData.transaction_type !== 'expense' || !isSplitCategory) {
+      setSplitBudgets({});
+      return;
+    }
+
+    const loadSplitBudgets = async () => {
+      const transactionDate = new Date(formData.transaction_date);
+      const month = transactionDate.getMonth() + 1;
+      const year = transactionDate.getFullYear();
+
+      // Get unique selected split categories that we don't have budgets for yet
+      const uniqueCategories = Array.from(new Set(
+        splitCategories
+          .map(s => s.category)
+          .filter(cat => cat && !splitBudgets[cat])
+      ));
+
+      if (uniqueCategories.length === 0) return;
+
+      const newBudgets = { ...splitBudgets };
+      let updated = false;
+
+      await Promise.all(uniqueCategories.map(async (cat) => {
+        try {
+          const info = await budgetApi.getCategoryBudgetInfo(user.id, cat, month, year);
+          newBudgets[cat] = info;
+          updated = true;
+        } catch (error) {
+          console.error(`Error loading budget info for split category ${cat}:`, error);
+          newBudgets[cat] = null;
+        }
+      }));
+
+      if (updated) {
+        setSplitBudgets(newBudgets);
+      }
+    };
+
+    loadSplitBudgets();
+  }, [splitCategories, formData.transaction_date, user, formData.transaction_type, isSplitCategory]);
+
+  // Reset split budgets when transaction date changes
+  useEffect(() => {
+    setSplitBudgets({});
+  }, [formData.transaction_date]);
 
   // Calculate EMI when EMI fields change
   useEffect(() => {
@@ -1941,7 +1990,32 @@ export default function TransactionForm() {
                                 ))}
                               </SelectContent>
                             </Select>
-                          </div>
+                             {split.category && !splitBudgets[split.category] && (
+                               <div className="mt-1 text-[9px] text-muted-foreground animate-pulse leading-none">
+                                 Loading budget status...
+                               </div>
+                             )}
+
+                             {split.category && splitBudgets[split.category] && (
+                               <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[9px] font-medium leading-none">
+                                 {(() => {
+                                   const info = splitBudgets[split.category]!;
+                                   const remainingColor = info.remaining < 0 
+                                     ? 'text-red-600 dark:text-red-400 font-bold' 
+                                     : info.remaining < info.budgeted * 0.2 
+                                       ? 'text-amber-600 dark:text-amber-400 font-bold' 
+                                       : 'text-emerald-600 dark:text-emerald-400 font-bold';
+                                   return (
+                                     <>
+                                       <span className="text-muted-foreground">Budgeted: <span className="text-slate-700 dark:text-slate-300 font-semibold">{formatCurrency(info.budgeted, formData.currency)}</span></span>
+                                       <span className="text-muted-foreground">• Spent: <span className="text-slate-700 dark:text-slate-300 font-semibold">{formatCurrency(info.spent, formData.currency)}</span></span>
+                                       <span className="text-muted-foreground">• Remaining: <span className={remainingColor}>{formatCurrency(info.remaining, formData.currency)}</span></span>
+                                     </>
+                                   );
+                                 })()}
+                               </div>
+                             )}
+                           </div>
 
                           <div className="w-full sm:w-[130px] space-y-1">
                             <Label className="text-[10px] text-muted-foreground">Split Amount *</Label>
