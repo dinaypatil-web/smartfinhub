@@ -92,6 +92,12 @@ export default function TransactionForm() {
   const [isSplitRepayment, setIsSplitRepayment] = useState(false);
   const [splitSources, setSplitSources] = useState<Array<{ accountId: string; amount: string }>>([]);
 
+  // Split Transaction within Multiple Expense Categories State
+  const [isSplitCategory, setIsSplitCategory] = useState(false);
+  const [splitCategories, setSplitCategories] = useState<Array<{ category: string; amount: string; description: string }>>([
+    { category: '', amount: '', description: '' }
+  ]);
+
   // Integrated AI Chatbot Assistant State
   const [transactions, setTransactions] = useState<any[]>([]);
   const [showAIChat, setShowAIChat] = useState(!id);
@@ -438,6 +444,19 @@ export default function TransactionForm() {
             } catch (error) {
               console.error('Error fetching CC repayment allocations:', error);
             }
+          }
+
+          // Pre-populate category splits if they exist
+          if (transaction.transaction_splits && transaction.transaction_splits.length > 0) {
+            setIsSplitCategory(true);
+            setSplitCategories(transaction.transaction_splits.map((s: any) => ({
+              category: s.category,
+              amount: s.amount.toString(),
+              description: s.description || ''
+            })));
+          } else {
+            setIsSplitCategory(false);
+            setSplitCategories([{ category: '', amount: '', description: '' }]);
           }
 
           setFormData({
@@ -809,6 +828,61 @@ export default function TransactionForm() {
       }
     }
 
+    // Validate Category Splits if selected for Expense transactions
+    if (formData.transaction_type === 'expense' && isSplitCategory) {
+      if (splitCategories.length === 0) {
+        toast({
+          title: 'Error',
+          description: 'Please add at least one category split',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const uniqueCategories = new Set<string>();
+      for (const split of splitCategories) {
+        if (!split.category) {
+          toast({
+            title: 'Error',
+            description: 'Please select a category for all split rows',
+            variant: 'destructive',
+          });
+          return;
+        }
+        if (uniqueCategories.has(split.category)) {
+          toast({
+            title: 'Error',
+            description: 'Split categories must be unique. Please remove duplicate rows.',
+            variant: 'destructive',
+          });
+          return;
+        }
+        uniqueCategories.add(split.category);
+
+        const splitAmt = parseFloat(split.amount);
+        if (isNaN(splitAmt) || splitAmt <= 0) {
+          toast({
+            title: 'Error',
+            description: 'Split amounts must be greater than zero',
+            variant: 'destructive',
+          });
+          return;
+        }
+      }
+
+      const splitsSum = splitCategories.reduce((sum, s) => sum + (parseFloat(s.amount) || 0), 0);
+      const transactionAmt = parseFloat(formData.amount);
+
+      if (Math.abs(splitsSum - transactionAmt) > 0.01) {
+        toast({
+          title: 'Error',
+          description: `The total split categories amount (${formatCurrency(splitsSum, formData.currency)}) must match the transaction amount (${formatCurrency(transactionAmt, formData.currency)})`,
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
@@ -819,10 +893,11 @@ export default function TransactionForm() {
         to_account_id: formData.to_account_id || null,
         amount: parseFloat(formData.amount),
         currency: formData.currency,
-        category: formData.category || null,
+        category: (formData.transaction_type === 'expense' && isSplitCategory) ? 'Split' : (formData.category || null),
         income_category: formData.income_category || null,
         description: formData.description || null,
         transaction_date: formData.transaction_date,
+        transaction_splits: (formData.transaction_type === 'expense' && isSplitCategory) ? splitCategories : undefined,
       };
 
 
@@ -1743,9 +1818,41 @@ export default function TransactionForm() {
 
             {(formData.transaction_type === 'income' || formData.transaction_type === 'expense' || formData.transaction_type === 'loan_payment') && (
               <div className="space-y-2">
-                <Label htmlFor="category">
-                  {formData.transaction_type === 'income' ? 'Income Category' : 'Expense Category'}
-                </Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="category">
+                    {formData.transaction_type === 'income' ? 'Income Category' : 'Expense Category'}
+                  </Label>
+                  {formData.transaction_type === 'expense' && (
+                    <div className="flex items-center space-x-2 pb-1">
+                      <Checkbox
+                        id="is_split_category"
+                        checked={isSplitCategory}
+                        onCheckedChange={(checked) => {
+                          const flag = checked as boolean;
+                          setIsSplitCategory(flag);
+                          if (flag) {
+                            // Initialize split rows with partial amounts
+                            if (splitCategories.length <= 1 && !splitCategories[0].category) {
+                              const transAmt = parseFloat(formData.amount) || 0;
+                              setSplitCategories([
+                                { category: formData.category, amount: (transAmt / 2 || '').toString(), description: '' },
+                                { category: '', amount: (transAmt / 2 || '').toString(), description: '' }
+                              ]);
+                            }
+                          } else {
+                            if (splitCategories.length > 0 && splitCategories[0].category) {
+                              setFormData(prev => ({ ...prev, category: splitCategories[0].category }));
+                            }
+                          }
+                        }}
+                      />
+                      <Label htmlFor="is_split_category" className="cursor-pointer text-xs font-semibold flex items-center gap-1 text-purple-800 dark:text-purple-300">
+                        Split across Multiple Categories
+                      </Label>
+                    </div>
+                  )}
+                </div>
+
                 {formData.transaction_type === 'income' ? (
                   <Select
                     value={formData.income_category}
@@ -1762,7 +1869,7 @@ export default function TransactionForm() {
                       ))}
                     </SelectContent>
                   </Select>
-                ) : (
+                ) : formData.transaction_type === 'loan_payment' ? (
                   <Select
                     value={formData.category}
                     onValueChange={(value) => setFormData({ ...formData, category: value })}
@@ -1778,6 +1885,139 @@ export default function TransactionForm() {
                       ))}
                     </SelectContent>
                   </Select>
+                ) : !isSplitCategory ? (
+                  <Select
+                    value={formData.category}
+                    onValueChange={(value) => setFormData({ ...formData, category: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select expense category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map(category => (
+                        <SelectItem key={category.id} value={category.name}>
+                          {category.icon} {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  // Category Splits Breakdown rows
+                  <div className="space-y-3 p-4 rounded-xl border border-purple-200 dark:border-purple-900/50 bg-purple-50/20 dark:bg-purple-950/5 animate-in fade-in duration-300">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-semibold text-purple-900 dark:text-purple-300">Category Splits Breakdown</Label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-200 flex items-center gap-1 h-8 text-[11px]"
+                        onClick={() => setSplitCategories([...splitCategories, { category: '', amount: '', description: '' }])}
+                      >
+                        <Plus className="h-3.5 w-3.5" /> Add Category
+                      </Button>
+                    </div>
+
+                    <div className="space-y-3">
+                      {splitCategories.map((split, index) => (
+                        <div key={index} className="flex flex-col sm:flex-row gap-2 items-start sm:items-center bg-white dark:bg-slate-900/40 p-3 rounded-lg border border-purple-100 dark:border-purple-950/30">
+                          <div className="flex-1 w-full space-y-1">
+                            <Label className="text-[10px] text-muted-foreground">Category {index + 1} *</Label>
+                            <Select
+                              value={split.category}
+                              onValueChange={(val) => {
+                                const updated = [...splitCategories];
+                                updated[index].category = val;
+                                setSplitCategories(updated);
+                              }}
+                            >
+                              <SelectTrigger className="h-9">
+                                <SelectValue placeholder="Select category" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {categories.map(category => (
+                                  <SelectItem key={category.id} value={category.name}>
+                                    {category.icon} {category.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="w-full sm:w-[130px] space-y-1">
+                            <Label className="text-[10px] text-muted-foreground">Split Amount *</Label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              className="h-9"
+                              value={split.amount}
+                              onChange={(e) => {
+                                const updated = [...splitCategories];
+                                updated[index].amount = e.target.value;
+                                setSplitCategories(updated);
+                              }}
+                              placeholder="0.00"
+                            />
+                          </div>
+
+                          <div className="flex-1 w-full space-y-1">
+                            <Label className="text-[10px] text-muted-foreground">Split Notes (Optional)</Label>
+                            <Input
+                              type="text"
+                              className="h-9"
+                              value={split.description}
+                              onChange={(e) => {
+                                const updated = [...splitCategories];
+                                updated[index].description = e.target.value;
+                                setSplitCategories(updated);
+                              }}
+                              placeholder="e.g. Lunch portion"
+                            />
+                          </div>
+
+                          {splitCategories.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-9 w-9 mt-0 sm:mt-5 text-muted-foreground hover:text-destructive shrink-0"
+                              onClick={() => {
+                                const updated = splitCategories.filter((_, i) => i !== index);
+                                setSplitCategories(updated);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Live splits sum calculation block */}
+                    {(() => {
+                      const requiredTotal = parseFloat(formData.amount) || 0;
+                      const splitSum = splitCategories.reduce((sum, s) => sum + (parseFloat(s.amount) || 0), 0);
+                      const remaining = requiredTotal - splitSum;
+
+                      return (
+                        <div className="mt-3 pt-3 border-t border-purple-100 dark:border-purple-950/30 flex items-center justify-between text-[11px] font-semibold">
+                          <div className="flex gap-4">
+                            <span className="text-muted-foreground">Transaction Total: <strong className="text-foreground">{formatCurrency(requiredTotal, formData.currency)}</strong></span>
+                            <span className="text-muted-foreground">Allocated Total: <strong className="text-purple-600 dark:text-purple-400">{formatCurrency(splitSum, formData.currency)}</strong></span>
+                          </div>
+                          {Math.abs(remaining) > 0.01 ? (
+                            <span className={remaining > 0 ? 'text-amber-600 dark:text-amber-400 animate-pulse font-bold' : 'text-destructive font-bold'}>
+                              {remaining > 0 ? `Unallocated: ${formatCurrency(remaining, formData.currency)}` : `Excess: ${formatCurrency(Math.abs(remaining), formData.currency)}`}
+                            </span>
+                          ) : (
+                            <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-bold">
+                              ✓ Allocated Perfectly
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
                 )}
 
                 {/* Budget Information Display for Expense and Loan Payment Transactions */}

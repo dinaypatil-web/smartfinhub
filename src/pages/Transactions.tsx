@@ -136,18 +136,22 @@ export default function Transactions() {
   const filteredAndSortedTransactions = useMemo(() => {
     return transactions
       .filter((transaction) => {
-        // 1. Search Query (Matches description or category or type)
+        // 1. Search Query (Matches description or category or type or splits)
         if (searchQuery.trim()) {
           const query = searchQuery.toLowerCase();
           const desc = (transaction.description || '').toLowerCase();
           const cat = (transaction.category || '').toLowerCase();
           const incCat = (transaction.income_category || '').toLowerCase();
           const type = (transaction.transaction_type || '').toLowerCase();
+          const inSplits = transaction.transaction_splits && transaction.transaction_splits.some(
+            s => s.category.toLowerCase().includes(query) || (s.description || '').toLowerCase().includes(query)
+          );
           if (
             !desc.includes(query) &&
             !cat.includes(query) &&
             !incCat.includes(query) &&
-            !type.includes(query)
+            !type.includes(query) &&
+            !inSplits
           ) {
             return false;
           }
@@ -170,13 +174,14 @@ export default function Transactions() {
           }
         }
 
-        // 4. Category (matches category or income_category)
+        // 4. Category (matches category or income_category or splits)
         if (filterCategory !== 'all') {
+          const hasSplitMatch = transaction.transaction_splits && transaction.transaction_splits.some(
+            s => s.category.toLowerCase() === filterCategory.toLowerCase()
+          );
           const transactionCat = transaction.category || transaction.income_category;
-          if (
-            !transactionCat ||
-            transactionCat.toLowerCase() !== filterCategory.toLowerCase()
-          ) {
+          
+          if (!hasSplitMatch && (!transactionCat || transactionCat.toLowerCase() !== filterCategory.toLowerCase())) {
             return false;
           }
         }
@@ -773,7 +778,24 @@ export default function Transactions() {
                           </div>
                         </TableCell>
                         <TableCell className="max-w-xs">
-                          <div className="break-words">{transaction.category || '-'}</div>
+                          <div className="break-words">
+                            {transaction.transaction_splits && transaction.transaction_splits.length > 0 ? (
+                              <div className="flex flex-col gap-1">
+                                <span className="text-[10px] font-bold text-purple-700 dark:text-purple-400">
+                                  Split ({transaction.transaction_splits.length}):
+                                </span>
+                                <div className="flex flex-wrap gap-1">
+                                  {transaction.transaction_splits.map((s, idx) => (
+                                    <Badge key={s.id || idx} variant="outline" className="text-[9px] py-0 px-1.5 border-purple-200 bg-purple-50/30 text-slate-700 dark:text-slate-300 dark:border-purple-900/50">
+                                      {s.category}: {formatCurrency(s.amount, transaction.currency)}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : (
+                              transaction.category || '-'
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell
                           className={`text-right font-semibold ${

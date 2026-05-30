@@ -53,6 +53,16 @@ export interface InterestRateHistory {
   created_at: string;
 }
 
+export interface TransactionSplit {
+  id: string;
+  transaction_id: string;
+  user_id: string;
+  category: string;
+  amount: number;
+  description: string | null;
+  created_at: string;
+}
+
 export interface Transaction {
   id: string;
   user_id: string;
@@ -67,6 +77,7 @@ export interface Transaction {
   transaction_date: string;
   created_at: string;
   updated_at: string;
+  transaction_splits?: TransactionSplit[];
 }
 
 export type IncomeCategoryKey = 'salaries' | 'allowances' | 'family_income' | 'others';

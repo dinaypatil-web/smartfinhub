@@ -136,8 +136,11 @@ export default function Reports() {
       const typeMatch = filters.transactionType === 'all' || t.transaction_type === filters.transactionType;
 
       // Category filters
+      const hasSplitMatch = t.transaction_splits && t.transaction_splits.some(
+        s => s.category.toLowerCase() === filters.expenseCategory.toLowerCase()
+      );
       const expenseCategoryMatch = filters.expenseCategory === 'all' ||
-        (t.transaction_type === 'expense' && t.category === filters.expenseCategory);
+        (t.transaction_type === 'expense' && (t.category === filters.expenseCategory || hasSplitMatch));
       const incomeCategoryMatch = filters.incomeCategory === 'all' ||
         (t.transaction_type === 'income' && t.income_category === filters.incomeCategory);
 
@@ -206,7 +209,9 @@ export default function Reports() {
     const rows = filtered.map(t => [
       formatDate(t.transaction_date),
       t.transaction_type,
-      t.category || '',
+      t.transaction_splits && t.transaction_splits.length > 0
+        ? t.transaction_splits.map(s => `${s.category}: ${formatCurrency(s.amount, t.currency || currency)}`).join(' | ')
+        : (t.category || ''),
       accounts.find(a => a.id === t.from_account_id)?.account_name || '',
       accounts.find(a => a.id === t.to_account_id)?.account_name || '',
       t.amount.toString(),
@@ -638,7 +643,24 @@ export default function Reports() {
                         <TableRow key={transaction.id}>
                           <TableCell>{formatDate(transaction.transaction_date)}</TableCell>
                           <TableCell className="capitalize">{transaction.transaction_type.replace('_', ' ')}</TableCell>
-                          <TableCell>{transaction.category || '-'}</TableCell>
+                          <TableCell>
+                            {transaction.transaction_splits && transaction.transaction_splits.length > 0 ? (
+                              <div className="flex flex-col gap-1">
+                                <span className="text-[10px] font-bold text-purple-700 dark:text-purple-400">
+                                  Split ({transaction.transaction_splits.length}):
+                                </span>
+                                <div className="flex flex-wrap gap-1">
+                                  {transaction.transaction_splits.map((s, idx) => (
+                                    <Badge key={s.id || idx} variant="outline" className="text-[9px] py-0 px-1.5 border-purple-200 bg-purple-50/30 text-slate-700 dark:text-slate-300 dark:border-purple-900/50">
+                                      {s.category}: {formatCurrency(s.amount, transaction.currency || currency)}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : (
+                              transaction.category || '-'
+                            )}
+                          </TableCell>
                           <TableCell>
                             {accounts.find(a => a.id === transaction.from_account_id)?.account_name || '-'}
                           </TableCell>
@@ -691,7 +713,7 @@ export default function Reports() {
                               ? 'text-success'
                               : 'text-danger'
                           }`}>
-                          {formatCurrency(Math.abs(account.balance), account.currency)}
+                           {formatCurrency(Math.abs(account.balance), account.currency)}
                           {(account.account_type === 'credit_card' || account.account_type === 'loan') && ' (Outstanding)'}
                         </TableCell>
                       </TableRow>
@@ -1123,7 +1145,22 @@ export default function Reports() {
                                 </TableCell>
                                 <TableCell>{transaction.description || '-'}</TableCell>
                                 <TableCell>
-                                  <Badge variant="outline">{transaction.category || 'Uncategorized'}</Badge>
+                                  {transaction.transaction_splits && transaction.transaction_splits.length > 0 ? (
+                                    <div className="flex flex-col gap-1">
+                                      <span className="text-[10px] font-bold text-purple-700 dark:text-purple-400">
+                                        Split ({transaction.transaction_splits.length}):
+                                      </span>
+                                      <div className="flex flex-wrap gap-1">
+                                        {transaction.transaction_splits.map((s, idx) => (
+                                          <Badge key={s.id || idx} variant="outline" className="text-[9px] py-0 px-1.5 border-purple-200 bg-purple-50/30 text-slate-700 dark:text-slate-300 dark:border-purple-900/50">
+                                            {s.category}: {formatCurrency(s.amount, transaction.currency || currency)}
+                                          </Badge>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <Badge variant="outline">{transaction.category || 'Uncategorized'}</Badge>
+                                  )}
                                 </TableCell>
                                 <TableCell className="text-right font-medium">
                                   <span className={

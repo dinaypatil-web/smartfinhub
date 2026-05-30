@@ -376,12 +376,24 @@ export default function Dashboard() {
 
   const expenseData = allExpenses
     .reduce((acc, t) => {
-      const category = t.category || 'Other';
-      const existing = acc.find(item => item.name === category);
-      if (existing) {
-        existing.value += Number(t.amount);
+      if (t.transaction_splits && t.transaction_splits.length > 0) {
+        t.transaction_splits.forEach(s => {
+          const category = s.category || 'Other';
+          const existing = acc.find(item => item.name === category);
+          if (existing) {
+            existing.value += Number(s.amount);
+          } else {
+            acc.push({ name: category, value: Number(s.amount) });
+          }
+        });
       } else {
-        acc.push({ name: category, value: Number(t.amount) });
+        const category = t.category || 'Other';
+        const existing = acc.find(item => item.name === category);
+        if (existing) {
+          existing.value += Number(t.amount);
+        } else {
+          acc.push({ name: category, value: Number(t.amount) });
+        }
       }
       return acc;
     }, [] as { name: string; value: number }[]);

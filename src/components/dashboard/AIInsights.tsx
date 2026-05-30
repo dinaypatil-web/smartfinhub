@@ -65,13 +65,24 @@ export default function AIInsights() {
       totalIncome,
       totalExpenses,
       budgetedExpenses,
-      transactions: monthlyTransactions.map(t => ({
-        type: t.transaction_type,
-        category: t.transaction_type === 'income' ? (t.income_category || 'others') : (t.category || 'uncategorized'),
-        amount: t.amount,
-        date: t.transaction_date,
-        description: t.description ?? undefined,
-      })),
+      transactions: monthlyTransactions.flatMap(t => {
+        if (t.transaction_splits && t.transaction_splits.length > 0) {
+          return t.transaction_splits.map(s => ({
+            type: t.transaction_type,
+            category: s.category || 'uncategorized',
+            amount: s.amount,
+            date: t.transaction_date,
+            description: s.description || t.description || undefined,
+          }));
+        }
+        return [{
+          type: t.transaction_type,
+          category: t.transaction_type === 'income' ? (t.income_category || 'others') : (t.category || 'uncategorized'),
+          amount: t.amount,
+          date: t.transaction_date,
+          description: t.description ?? undefined,
+        }];
+      }),
       accountBalances,
       historicalData,
     };
@@ -112,10 +123,19 @@ export default function AIInsights() {
       monthTransactions
         .filter(t => t.transaction_type === 'expense')
         .forEach(t => {
-          if (!categoryTrends[t.category]) {
-            categoryTrends[t.category] = [];
+          if (t.transaction_splits && t.transaction_splits.length > 0) {
+            t.transaction_splits.forEach(s => {
+              if (!categoryTrends[s.category]) {
+                categoryTrends[s.category] = [];
+              }
+              categoryTrends[s.category].push(s.amount);
+            });
+          } else {
+            if (!categoryTrends[t.category]) {
+              categoryTrends[t.category] = [];
+            }
+            categoryTrends[t.category].push(t.amount);
           }
-          categoryTrends[t.category].push(t.amount);
         });
     }
 

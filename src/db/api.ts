@@ -284,7 +284,7 @@ export const transactionApi = {
   async getTransactions(userId: string, limit?: number): Promise<Transaction[]> {
     let query = supabase
       .from('transactions')
-      .select('*')
+      .select('*, transaction_splits(*)')
       .eq('user_id', userId)
       .order('transaction_date', { ascending: false })
       .order('created_at', { ascending: false });
@@ -302,7 +302,7 @@ export const transactionApi = {
   async getTransactionsByDateRange(userId: string, startDate: string, endDate: string): Promise<Transaction[]> {
     const { data, error } = await supabase
       .from('transactions')
-      .select('*')
+      .select('*, transaction_splits(*)')
       .eq('user_id', userId)
       .gte('transaction_date', startDate)
       .lte('transaction_date', endDate)
@@ -317,7 +317,7 @@ export const transactionApi = {
   async getTransactionsByCategory(userId: string, category: string): Promise<Transaction[]> {
     const { data, error } = await supabase
       .from('transactions')
-      .select('*')
+      .select('*, transaction_splits(*)')
       .eq('user_id', userId)
       .eq('category', category)
       .order('transaction_date', { ascending: false });
@@ -331,7 +331,7 @@ export const transactionApi = {
   async getTransactionsByAccount(userId: string, accountId: string): Promise<Transaction[]> {
     const { data, error } = await supabase
       .from('transactions')
-      .select('*')
+      .select('*, transaction_splits(*)')
       .eq('user_id', userId)
       .or(`from_account_id.eq.${accountId},to_account_id.eq.${accountId}`)
       .order('transaction_date', { ascending: false });
@@ -342,9 +342,9 @@ export const transactionApi = {
     return transactions;
   },
 
-  async createTransaction(transaction: Omit<Transaction, 'id' | 'created_at' | 'updated_at'>): Promise<Transaction> {
-    // Extract loan_components to prevent sending it to the database
-    const { loan_components, ...restTransaction } = transaction as any;
+  async createTransaction(transaction: Omit<Transaction, 'id' | 'created_at' | 'updated_at'> & { transaction_splits?: any[] }): Promise<Transaction> {
+    // Extract loan_components and transaction_splits to prevent sending it to the database
+    const { loan_components, transaction_splits, ...restTransaction } = transaction as any;
 
     const transactionData = {
       ...restTransaction,
@@ -359,6 +359,24 @@ export const transactionApi = {
 
     if (error) throw error;
     if (!data) throw new Error('Failed to create transaction');
+
+    // Insert splits if present
+    if (transaction_splits && transaction_splits.length > 0) {
+      const splitsToInsert = transaction_splits.map(s => ({
+        transaction_id: data.id,
+        user_id: data.user_id,
+        category: s.category,
+        amount: Number(s.amount),
+        description: s.description || null
+      }));
+
+      const { error: splitsError } = await supabase
+        .from('transaction_splits')
+        .insert(splitsToInsert);
+
+      if (splitsError) throw splitsError;
+      data.transaction_splits = splitsToInsert;
+    }
 
     await this.updateAccountBalances(transaction, (transaction as any).loan_components);
 
@@ -433,7 +451,7 @@ export const transactionApi = {
     return data;
   },
 
-  async updateTransaction(transactionId: string, updates: Partial<Transaction>): Promise<Transaction> {
+  async updateTransaction(transactionId: string, updates: Partial<Transaction> & { transaction_splits?: any[] }): Promise<Transaction> {
     const { data: oldTransaction } = await supabase
       .from('transactions')
       .select('*')
@@ -453,8 +471,8 @@ export const transactionApi = {
       await this.reverseAccountBalances(oldTransaction);
     }
 
-    // Extract loan_components to prevent sending it to the database
-    const { loan_components, ...restUpdates } = updates as any;
+    // Extract loan_components and transaction_splits to prevent sending it to the database
+    const { loan_components, transaction_splits, ...restUpdates } = updates as any;
 
     const updateData = {
       ...restUpdates,
@@ -470,6 +488,32 @@ export const transactionApi = {
 
     if (error) throw error;
     if (!data) throw new Error('Transaction not found');
+
+    // Update splits: delete previous splits first
+    const { error: deleteSplitsError } = await supabase
+      .from('transaction_splits')
+      .delete()
+      .eq('transaction_id', transactionId);
+
+    if (deleteSplitsError) throw deleteSplitsError;
+
+    // Insert new splits if present
+    if (transaction_splits && transaction_splits.length > 0) {
+      const splitsToInsert = transaction_splits.map(s => ({
+        transaction_id: transactionId,
+        user_id: data.user_id,
+        category: s.category,
+        amount: Number(s.amount),
+        description: s.description || null
+      }));
+
+      const { error: splitsError } = await supabase
+        .from('transaction_splits')
+        .insert(splitsToInsert);
+
+      if (splitsError) throw splitsError;
+      data.transaction_splits = splitsToInsert;
+    }
 
     if (oldTransaction) {
       if (isDifferentialUpdate) {
@@ -1031,8 +1075,17 @@ export const budgetApi = {
       if (!categoryName) continue;
 
       const actual = transactions
-        .filter(t => t.category === categoryName && (t.transaction_type === 'expense' || t.transaction_type === 'loan_payment'))
-        .reduce((sum, t) => sum + Number(t.amount), 0);
+        .reduce((sum, t) => {
+          if (t.transaction_splits && t.transaction_splits.length > 0) {
+            const splitSum = t.transaction_splits
+              .filter(s => s.category === categoryName && (t.transaction_type === 'expense' || t.transaction_type === 'loan_payment'))
+              .reduce((sSum, s) => sSum + Number(s.amount), 0);
+            return sum + splitSum;
+          } else {
+            const isMatch = t.category === categoryName && (t.transaction_type === 'expense' || t.transaction_type === 'loan_payment');
+            return sum + (isMatch ? Number(t.amount) : 0);
+          }
+        }, 0);
 
       category_analysis[categoryId] = {
         budgeted: Number(budgeted),
@@ -1122,8 +1175,17 @@ export const budgetApi = {
 
     const transactions = await transactionApi.getTransactionsByDateRange(userId, startDate, endDate);
     const spent = transactions
-      .filter(t => t.category === categoryName && (t.transaction_type === 'expense' || t.transaction_type === 'loan_payment'))
-      .reduce((sum, t) => sum + Number(t.amount), 0);
+      .reduce((sum, t) => {
+        if (t.transaction_splits && t.transaction_splits.length > 0) {
+          const splitSum = t.transaction_splits
+            .filter(s => s.category === categoryName && (t.transaction_type === 'expense' || t.transaction_type === 'loan_payment'))
+            .reduce((sSum, s) => sSum + Number(s.amount), 0);
+          return sum + splitSum;
+        } else {
+          const isMatch = t.category === categoryName && (t.transaction_type === 'expense' || t.transaction_type === 'loan_payment');
+          return sum + (isMatch ? Number(t.amount) : 0);
+        }
+      }, 0);
 
     return {
       budgeted,
