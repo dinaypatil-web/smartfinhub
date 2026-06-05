@@ -1025,9 +1025,9 @@ export default function GlobalChatbot() {
                   <Button
                     key={idx}
                     type="button"
-                    variant="secondary"
+                    variant="outline"
                     size="sm"
-                    className="text-[10px] h-7 px-2.5 rounded-full shadow-sm font-medium hover:bg-primary/20 hover:text-primary border border-muted hover:border-primary/30 transition-all"
+                    className="text-[10px] h-7 px-2.5 rounded-full bg-background text-foreground hover:bg-primary hover:text-primary-foreground border border-input transition-all shadow-sm font-medium"
                     onClick={() => handleSelectSuggestion(s.text, s.type)}
                   >
                     {s.type === 'account' ? '💳 ' : '🏷️ '}

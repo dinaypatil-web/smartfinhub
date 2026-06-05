@@ -2622,9 +2622,9 @@ export default function VoiceTransactPage() {
                     <Button
                       key={idx}
                       type="button"
-                      variant="secondary"
+                      variant="outline"
                       size="sm"
-                      className="text-xs rounded-full shadow-elegant hover:bg-primary/20 hover:text-primary transition-all duration-200 border border-muted hover:border-primary/30"
+                      className="text-xs rounded-full bg-background text-foreground hover:bg-primary hover:text-primary-foreground border border-input transition-all duration-200 shadow-elegant"
                       onClick={() => handleSelectSuggestion(s.text, s.type)}
                     >
                       {s.type === 'account' ? '💳 ' : '🏷️ '}
