@@ -6,6 +6,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { Toaster } from './components/ui/toaster';
 import { Skeleton } from './components/ui/skeleton';
 import Header from '@/components/common/Header';
+import GlobalChatbot from '@/components/common/GlobalChatbot';
 import routes from './routes';
 import { auth0Config, isAuth0Configured } from './config/auth0';
 
@@ -45,6 +46,7 @@ const App = () => {
               </Routes>
             </Suspense>
           </main>
+          <GlobalChatbot />
         </div>
       </HybridAuthProvider>
     </ThemeProvider>

@@ -117,6 +117,89 @@ export default function VoiceTransactPage() {
   // Streaming text placeholder
   const [streamingText, setStreamingText] = useState('');
   
+  // Autocomplete Suggestions logic
+  const [suggestions, setSuggestions] = useState<{ text: string; type: 'reason' | 'account' }[]>([]);
+
+  useEffect(() => {
+    if (!inputValue) {
+      setSuggestions([]);
+      return;
+    }
+
+    // 1. Check if user wrote "from" followed by partial account name
+    const fromMatch = inputValue.match(/(?:^|\s)from\s+([a-zA-Z0-9\s]*)$/i);
+    if (fromMatch) {
+      const partial = fromMatch[1].toLowerCase();
+      const accountSuggestions = accounts
+        .filter(acc => acc.account_name.toLowerCase().includes(partial))
+        .map(acc => ({ text: acc.account_name, type: 'account' as const }));
+      setSuggestions(accountSuggestions);
+      return;
+    }
+
+    // 2. Check if user wrote "for" or "on"
+    const forMatch = inputValue.match(/(?:^|\s)(for|on)\s+([a-zA-Z0-9\s]*)$/i);
+    if (forMatch) {
+      const partial = forMatch[2].toLowerCase();
+      // Find most used reasons (descriptions/categories) from expense transactions
+      const expenseTx = transactions.filter(t => t.transaction_type === 'expense');
+      
+      const frequencies: Record<string, number> = {};
+      expenseTx.forEach(t => {
+        const desc = t.description || t.category;
+        if (desc) {
+          frequencies[desc] = (frequencies[desc] || 0) + 1;
+        }
+      });
+
+      const sortedDescriptions = Object.keys(frequencies)
+        .sort((a, b) => frequencies[b] - frequencies[a]);
+
+      let filtered = sortedDescriptions.filter(desc => 
+        desc.toLowerCase().includes(partial)
+      );
+
+      // Fallback/enrich with categories
+      if (filtered.length < 5) {
+        categories.forEach(cat => {
+          const name = cat.name;
+          if (name && !filtered.includes(name) && name.toLowerCase().includes(partial)) {
+            filtered.push(name);
+          }
+        });
+      }
+
+      const reasonSuggestions = filtered.slice(0, 6).map(desc => ({
+        text: desc,
+        type: 'reason' as const
+      }));
+      setSuggestions(reasonSuggestions);
+      return;
+    }
+
+    setSuggestions([]);
+  }, [inputValue, accounts, transactions, categories]);
+
+  const handleSelectSuggestion = (suggestionText: string, type: 'reason' | 'account') => {
+    if (type === 'reason') {
+      const regex = /(.*?\b(for|on)\s+)(.*)$/i;
+      const match = inputValue.match(regex);
+      if (match) {
+        setInputValue(match[1] + suggestionText + " ");
+      } else {
+        setInputValue(inputValue + " " + suggestionText + " ");
+      }
+    } else if (type === 'account') {
+      const regex = /(.*?\bfrom\s+)(.*)$/i;
+      const match = inputValue.match(regex);
+      if (match) {
+        setInputValue(match[1] + suggestionText + " ");
+      } else {
+        setInputValue(inputValue + " " + suggestionText + " ");
+      }
+    }
+  };
+  
   // Voice Recognition states
   const [recognitionSupported, setRecognitionSupported] = useState(false);
   const recognitionRef = useRef<any>(null);
@@ -2526,6 +2609,31 @@ export default function VoiceTransactPage() {
             
             {/* Quick reply chips */}
             {renderQuickReplyChips()}
+
+            {/* Dynamic Autocomplete Suggestions */}
+            {suggestions.length > 0 && (
+              <div className="space-y-1.5 animate-in fade-in-50 duration-300">
+                <p className="text-[11px] text-muted-foreground font-semibold flex items-center gap-1">
+                  <Bot className="h-3.5 w-3.5 text-primary animate-pulse" />
+                  {suggestions[0].type === 'account' ? 'Select Account:' : 'Most Used Reasons:'}
+                </p>
+                <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto py-1">
+                  {suggestions.map((s, idx) => (
+                    <Button
+                      key={idx}
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="text-xs rounded-full shadow-elegant hover:bg-primary/20 hover:text-primary transition-all duration-200 border border-muted hover:border-primary/30"
+                      onClick={() => handleSelectSuggestion(s.text, s.type)}
+                    >
+                      {s.type === 'account' ? '💳 ' : '🏷️ '}
+                      {s.text}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Bottom input row */}
             <div className="flex items-center gap-2">
