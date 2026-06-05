@@ -2521,22 +2521,22 @@ export default function VoiceTransactPage() {
                 >
                   {/* Avatar */}
                   <div
-                    className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold shadow-md shrink-0 ${
+                    className={`h-8 w-8 rounded-lg flex items-center justify-center text-xs font-bold shadow-md shrink-0 ${
                       msg.role === 'user'
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-indigo-600 text-white'
+                        ? 'bg-primary text-primary-foreground border border-white/10'
+                        : 'bg-gradient-to-tr from-teal-400 to-indigo-600 text-white border border-white/10'
                     }`}
                   >
-                    {msg.role === 'user' ? 'U' : <Sparkles className="h-4 w-4" />}
+                    {msg.role === 'user' ? 'U' : <Sparkles className="h-4 w-4 text-white" />}
                   </div>
 
                   {/* Bubble Content */}
-                  <div className="space-y-2">
+                  <div className="space-y-2 flex-grow">
                     <div
-                      className={`px-4 py-3 rounded-2xl text-sm leading-relaxed shadow-sm ${
+                      className={`px-4 py-3 rounded-2xl text-sm leading-relaxed shadow-sm whitespace-pre-wrap transition-all duration-200 ${
                         msg.role === 'user'
-                          ? 'bg-primary text-primary-foreground rounded-tr-none font-medium'
-                          : 'bg-muted/80 text-foreground rounded-tl-none border border-muted/50'
+                          ? 'bg-gradient-to-tr from-teal-500 via-primary to-indigo-600 text-white rounded-tr-none font-semibold shadow-primary/10 border border-white/10'
+                          : 'bg-muted/80 dark:bg-slate-800/80 border border-muted dark:border-slate-700/50 text-foreground dark:text-slate-100 rounded-tl-none backdrop-blur-sm shadow-sm'
                       }`}
                     >
                       {msg.content}
@@ -2544,29 +2544,33 @@ export default function VoiceTransactPage() {
 
                     {/* Render Interactive Confirmation Controls IN the chat block */}
                     {msg.isInteractive && (
-                      <div className="bg-indigo-950/40 border border-indigo-500/30 rounded-xl p-3 flex flex-col sm:flex-row items-center justify-between gap-3 animate-in slide-in-from-bottom-2 duration-300">
+                      <div className="bg-slate-950/80 border border-teal-500/20 rounded-xl p-3.5 flex flex-col gap-2.5 animate-in slide-in-from-bottom-2 duration-300 shadow-lg w-full">
                         <div className="flex items-center gap-2">
-                          <Check className="h-5 w-5 text-emerald-400 shrink-0" />
-                          <span className="text-xs text-indigo-200 font-medium">Ready to record this draft transaction?</span>
+                          <span className="h-2 w-2 rounded-full bg-teal-400 animate-pulse"></span>
+                          <span className="text-[11px] text-slate-300 font-bold uppercase tracking-wider">CONFIRM DRAFT INFORMATION</span>
                         </div>
-                        <div className="flex gap-2 w-full sm:w-auto">
+                        <div className="flex gap-2 w-full">
                           <Button
-                            variant="destructive"
+                            variant="ghost"
                             size="sm"
-                            className="text-xs w-full sm:w-auto h-8 rounded-lg shadow-sm"
+                            className="text-xs h-8 flex-1 rounded-lg border border-red-500/20 hover:bg-red-500/10 hover:text-red-400 text-red-300 bg-red-950/20"
                             onClick={handleResetDraft}
                           >
-                            <Trash2 className="h-3 w-3 mr-1" />
-                            Discard
+                            <Trash2 className="h-3.5 w-3.5 mr-1" /> Discard
                           </Button>
                           <Button
                             variant="default"
                             size="sm"
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs w-full sm:w-auto h-8 rounded-lg shadow-md font-semibold"
-                            onClick={handleSaveTransaction}
+                            className="bg-teal-500 hover:bg-teal-650 text-slate-950 text-xs h-8 flex-1 rounded-lg font-bold shadow-md shadow-teal-500/10 transition-all hover:scale-[1.02]"
+                            onClick={
+                              currentIntent === 'transaction' 
+                                ? handleSaveTransaction 
+                                : currentIntent === 'account' 
+                                  ? handleSaveAccount 
+                                  : handleSaveBudget
+                            }
                           >
-                            <Check className="h-3 w-3 mr-1" />
-                            Confirm & Save
+                            <Check className="h-3.5 w-3.5 mr-1 text-slate-950 font-bold" /> Confirm & Save
                           </Button>
                         </div>
                       </div>
@@ -2578,10 +2582,10 @@ export default function VoiceTransactPage() {
               {/* Streaming Content Overlay */}
               {streamingText && (
                 <div className="flex gap-3 max-w-[85%] mr-auto animate-pulse">
-                  <div className="h-8 w-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-bold shrink-0">
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                  <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-teal-400 to-indigo-600 text-white flex items-center justify-center text-xs font-bold shrink-0 border border-white/10">
+                    <Loader2 className="h-4 w-4 animate-spin text-white" />
                   </div>
-                  <div className="px-4 py-3 rounded-2xl text-sm leading-relaxed bg-muted/80 text-foreground rounded-tl-none border border-muted/50">
+                  <div className="px-4 py-3 rounded-2xl text-sm leading-relaxed bg-muted/80 dark:bg-slate-800/80 border border-muted dark:border-slate-700/50 text-foreground dark:text-slate-100 rounded-tl-none">
                     {streamingText}
                   </div>
                 </div>
@@ -2590,12 +2594,12 @@ export default function VoiceTransactPage() {
               {/* Loader */}
               {isLoading && !streamingText && (
                 <div className="flex gap-3 max-w-[85%] mr-auto">
-                  <div className="h-8 w-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-bold shrink-0">
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                  <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-teal-400 to-indigo-600 text-white flex items-center justify-center text-xs font-bold shrink-0 border border-white/10">
+                    <Loader2 className="h-4 w-4 animate-spin text-white" />
                   </div>
-                  <div className="px-4 py-3 rounded-2xl text-sm leading-relaxed bg-muted/50 text-muted-foreground rounded-tl-none flex items-center gap-2 border border-muted/30">
-                    <Loader2 className="h-3 w-3 animate-spin text-primary" />
-                    AI is writing...
+                  <div className="px-4 py-3 rounded-2xl text-sm leading-relaxed bg-muted/40 dark:bg-slate-800/40 text-muted-foreground rounded-tl-none flex items-center gap-2 border border-muted/20 dark:border-slate-800/50">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-teal-400" />
+                    AI is preparing response...
                   </div>
                 </div>
               )}
@@ -2613,8 +2617,8 @@ export default function VoiceTransactPage() {
             {/* Dynamic Autocomplete Suggestions */}
             {suggestions.length > 0 && (
               <div className="space-y-1.5 animate-in fade-in-50 duration-300">
-                <p className="text-[11px] text-muted-foreground font-semibold flex items-center gap-1">
-                  <Bot className="h-3.5 w-3.5 text-primary animate-pulse" />
+                <p className="text-[11px] text-teal-400 font-bold uppercase tracking-wider flex items-center gap-1.5 px-1">
+                  <Sparkles className="h-3.5 w-3.5 text-teal-400 animate-pulse" />
                   {suggestions[0].type === 'account' ? 'Select Account:' : 'Most Used Reasons:'}
                 </p>
                 <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto py-1">
@@ -2624,7 +2628,7 @@ export default function VoiceTransactPage() {
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="text-xs rounded-full bg-background text-foreground hover:bg-primary hover:text-primary-foreground border border-input transition-all duration-200 shadow-elegant"
+                      className="text-xs rounded-full bg-slate-950 text-slate-200 hover:bg-teal-500 hover:text-slate-950 border border-white/10 hover:border-teal-500 transition-all duration-200 shadow-sm font-semibold hover:-translate-y-0.5 active:scale-95"
                       onClick={() => handleSelectSuggestion(s.text, s.type)}
                     >
                       {s.type === 'account' ? '💳 ' : '🏷️ '}
@@ -2815,128 +2819,78 @@ export default function VoiceTransactPage() {
                 
                 {/* 1. TRANSACTION PREVIEW */}
                 {currentIntent === 'transaction' && (
-                  <div className="space-y-6">
-                    {/* Visual Header / Amount representation */}
-                    <div className="bg-gradient-to-br from-indigo-950/40 via-muted/40 to-card border border-muted/80 rounded-xl p-5 flex flex-col items-center justify-center text-center space-y-2 relative overflow-hidden group shadow-inner">
-                      {draft.transaction_type && (
-                        <div className="absolute top-2 right-2">
-                          <Badge className="bg-primary/10 text-primary border border-primary/20 text-[10px] capitalize">
+                  <div className="space-y-4 animate-in slide-in-from-top-3 duration-300">
+                    <div className="p-5 bg-slate-950/70 dark:bg-slate-950/70 border border-white/5 rounded-2xl text-xs space-y-4 shadow-2xl relative overflow-hidden">
+                      {/* Top color tag */}
+                      <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-teal-500 via-primary to-indigo-500 opacity-80"></div>
+                      
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold text-slate-400 uppercase tracking-widest text-[10px] flex items-center gap-1.5 font-mono">
+                          <Calendar className="h-4 w-4 text-teal-400" /> DIGITAL RECEIPT
+                        </span>
+                        {draft.transaction_type && (
+                          <Badge className="bg-teal-500/10 text-teal-300 border border-teal-500/20 text-[10px] capitalize font-bold px-2.5 py-0.5 rounded-full">
                             {draft.transaction_type.replace('_', ' ')}
                           </Badge>
-                        </div>
-                      )}
-
-                      <span className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">Amount</span>
-                      <div className="flex items-baseline justify-center text-foreground font-bold font-mono">
-                        <span className="text-2xl mr-1 text-muted-foreground font-mono">₹</span>
-                        <span className={`text-4xl tracking-tight transition-all duration-300 ${draft.amount ? 'text-foreground' : 'text-muted-foreground/30 animate-pulse'}`}>
-                          {draft.amount ? draft.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}
-                        </span>
-                      </div>
-
-                      {draft.description && (
-                        <p className="text-xs text-muted-foreground italic truncate max-w-[90%]">
-                          "{draft.description}"
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Line details */}
-                    <div className="space-y-4 text-sm">
-                      <div className="flex justify-between items-center py-2 border-b border-muted/50">
-                        <span className="text-muted-foreground font-medium">Transaction Type</span>
-                        <span className="font-semibold capitalize text-primary">
-                          {draft.transaction_type ? draft.transaction_type.replace('_', ' ') : 'Unspecified'}
-                        </span>
-                      </div>
-
-                      {(!draft.transaction_type || draft.transaction_type !== 'income') && (
-                        <div className="flex justify-between items-center py-2 border-b border-muted/50">
-                          <span className="text-muted-foreground font-medium">Paid From</span>
-                          {draft.from_account_id ? (
-                            <div className="text-right">
-                              <p className="font-semibold text-foreground">{getAccountName(draft.from_account_id)}</p>
-                              {getAccountBalance(draft.from_account_id) !== null && (
-                                <p className="text-[10px] text-muted-foreground">Bal: ₹{getAccountBalance(draft.from_account_id)?.toLocaleString('en-IN')}</p>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-xs px-2.5 py-1 rounded-md border border-dashed border-amber-500/50 text-amber-500 bg-amber-500/5 font-medium flex items-center gap-1.5 animate-pulse">
-                              <CreditCard className="h-3.5 w-3.5" />
-                              Needs Selection
-                            </span>
-                          )}
-                        </div>
-                      )}
-
-                      {draft.transaction_type && draft.transaction_type !== 'expense' && (
-                        <div className="flex justify-between items-center py-2 border-b border-muted/50">
-                          <span className="text-muted-foreground font-medium">Received In / Destination</span>
-                          {draft.to_account_id ? (
-                            <div className="text-right">
-                              <p className="font-semibold text-foreground">{getAccountName(draft.to_account_id)}</p>
-                              {getAccountBalance(draft.to_account_id) !== null && (
-                                <p className="text-[10px] text-muted-foreground">Bal: ₹{getAccountBalance(draft.to_account_id)?.toLocaleString('en-IN')}</p>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-xs px-2.5 py-1 rounded-md border border-dashed border-amber-500/50 text-amber-500 bg-amber-500/5 font-medium flex items-center gap-1.5 animate-pulse">
-                              <CreditCard className="h-3.5 w-3.5" />
-                              Needs Selection
-                            </span>
-                          )}
-                        </div>
-                      )}
-
-                      {draft.transaction_type === 'expense' && (
-                        <div className="flex justify-between items-center py-2 border-b border-muted/50">
-                          <span className="text-muted-foreground font-medium">Expense Category</span>
-                          {draft.category ? (
-                            <span className="font-semibold bg-muted/60 text-foreground px-2.5 py-1 rounded-full border text-xs shadow-sm">
-                              📁 {draft.category}
-                            </span>
-                          ) : (
-                            <span className="text-xs px-2.5 py-1 rounded-md border border-dashed border-amber-500/50 text-amber-500 bg-amber-500/5 font-medium animate-pulse">
-                              📁 Select Category
-                            </span>
-                          )}
-                        </div>
-                      )}
-
-                      {draft.transaction_type === 'income' && (
-                        <div className="flex justify-between items-center py-2 border-b border-muted/50">
-                          <span className="text-muted-foreground font-medium">Income Category</span>
-                          {draft.income_category ? (
-                            <span className="font-semibold bg-muted/60 text-foreground px-2.5 py-1 rounded-full border text-xs shadow-sm capitalize">
-                              📊 {getIncomeCategoryName(draft.income_category)}
-                            </span>
-                          ) : (
-                            <span className="text-xs px-2.5 py-1 rounded-md border border-dashed border-amber-500/50 text-amber-500 bg-amber-500/5 font-medium animate-pulse">
-                              📊 Select Category
-                            </span>
-                          )}
-                        </div>
-                      )}
-
-                      <div className="flex justify-between items-center py-2 border-b border-muted/50">
-                        <span className="text-muted-foreground font-medium">Description</span>
-                        {draft.description ? (
-                          <span className="font-semibold text-foreground max-w-[60%] truncate text-right text-xs">
-                            {draft.description}
-                          </span>
-                        ) : (
-                          <span className="text-xs px-2.5 py-1 rounded-md border border-dashed border-amber-500/50 text-amber-500 bg-amber-500/5 font-medium animate-pulse">
-                            📝 Needs Description
-                          </span>
                         )}
                       </div>
-
-                      <div className="flex justify-between items-center py-2 border-b border-muted/50">
-                        <span className="text-muted-foreground font-medium">Date</span>
-                        <span className="font-semibold text-foreground flex items-center gap-1">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          {draft.transaction_date || 'Today'}
-                        </span>
+                      
+                      <div className="border-t border-dashed border-slate-800 my-2"></div>
+                      
+                      <div className="flex flex-col items-center justify-center py-4 bg-slate-900/60 rounded-xl border border-white/5">
+                        <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Amount Due / Recorded</span>
+                        <div className="text-3xl font-black font-mono text-teal-400 tracking-tight mt-1">
+                          ₹{draft.amount ? Number(draft.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2.5 pt-1 text-slate-350">
+                        <div className="flex justify-between border-b border-white/5 pb-2">
+                          <span className="text-slate-400 font-medium">Category:</span>
+                          <strong className="text-white font-semibold">
+                            📁 {draft.category || (draft.income_category ? getIncomeCategoryName(draft.income_category) : null) || 'Unspecified'}
+                          </strong>
+                        </div>
+                        {(!draft.transaction_type || draft.transaction_type !== 'income') && (
+                          <div className="flex justify-between border-b border-white/5 pb-2">
+                            <span className="text-slate-400 font-medium">Paid From:</span>
+                            {draft.from_account_id ? (
+                              <strong className="text-white font-semibold truncate max-w-[210px]">
+                                💳 {getAccountName(draft.from_account_id)}
+                              </strong>
+                            ) : (
+                              <span className="text-[10px] px-2 py-0.5 rounded border border-dashed border-amber-500/50 text-amber-500 bg-amber-500/5 font-semibold animate-pulse">
+                                Needs Account Selection
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {draft.transaction_type && draft.transaction_type !== 'expense' && (
+                          <div className="flex justify-between border-b border-white/5 pb-2">
+                            <span className="text-slate-400 font-medium">Received In / Destination:</span>
+                            {draft.to_account_id ? (
+                              <strong className="text-white font-semibold truncate max-w-[210px]">
+                                🏦 {getAccountName(draft.to_account_id)}
+                              </strong>
+                            ) : (
+                              <span className="text-[10px] px-2 py-0.5 rounded border border-dashed border-amber-500/50 text-amber-500 bg-amber-500/5 font-semibold animate-pulse">
+                                Needs Account Selection
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        <div className="flex justify-between border-b border-white/5 pb-2">
+                          <span className="text-slate-400 font-medium">Description:</span>
+                          <strong className="text-white font-semibold truncate max-w-[210px] italic">
+                            "{draft.description || 'N/A'}"
+                          </strong>
+                        </div>
+                        <div className="flex justify-between pb-1">
+                          <span className="text-slate-400 font-medium">Date:</span>
+                          <strong className="text-white font-semibold flex items-center gap-1">
+                            <Calendar className="h-3.5 w-3.5 text-teal-400" /> {draft.transaction_date || 'Today'}
+                          </strong>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -2945,67 +2899,46 @@ export default function VoiceTransactPage() {
                 {/* 2. ACCOUNT PASSBOOK PREVIEW */}
                 {currentIntent === 'account' && (
                   <div className="space-y-6 animate-in fade-in-50 duration-300">
-                    <div className="relative h-48 w-full bg-gradient-to-br from-indigo-900 via-purple-900 to-slate-900 rounded-2xl p-5 text-white flex flex-col justify-between shadow-2xl border border-white/10 overflow-hidden">
-                      <div className="absolute -top-10 -right-10 w-32 h-32 bg-primary/20 rounded-full blur-2xl"></div>
+                    <div className="relative h-48 w-full bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 border border-white/10 rounded-2xl p-5 text-white flex flex-col justify-between shadow-2xl overflow-hidden aspect-[1.7/1]">
+                      {/* Glowing orb in the card background */}
+                      <div className="absolute -right-10 -top-10 w-32 h-32 bg-primary/20 rounded-full blur-2xl pointer-events-none"></div>
                       
-                      <div className="flex justify-between items-start">
+                      <div className="flex justify-between items-start relative z-10">
                         <div>
-                          <span className="text-[10px] uppercase tracking-widest text-indigo-300 font-bold">
-                            {draftAccount.account_type ? `${draftAccount.account_type} account` : 'new account draft'}
-                          </span>
-                          <h3 className="text-xl font-bold mt-1 tracking-wide truncate max-w-[200px]">
-                            {draftAccount.account_name || 'Untitled Account'}
+                          <span className="text-[9px] uppercase tracking-widest text-indigo-300 font-bold">VIRTUAL CARD PASSBOOK</span>
+                          <h3 className="text-base font-black text-white mt-1 tracking-wide truncate max-w-[230px]">
+                            {draftAccount.account_name || 'New Account'}
                           </h3>
-                          {draftAccount.institution_name && (
-                            <div className="flex items-center gap-1.5 mt-1">
-                              {draftAccount.account_type !== 'cash' && (
-                                <img 
-                                  src={getBankLogo(draftAccount.institution_name)} 
-                                  alt={draftAccount.institution_name}
-                                  className="w-4 h-4 rounded-full bg-white object-contain"
-                                  onError={(e) => {
-                                    (e.target as HTMLImageElement).style.display = 'none';
-                                  }}
-                                />
-                              )}
-                              <p className="text-[10px] text-indigo-200">{draftAccount.institution_name}</p>
-                            </div>
-                          )}
+                          <p className="text-[10px] text-indigo-200/70 mt-0.5">{draftAccount.institution_name || 'SmartFinHub Bank'}</p>
                         </div>
-                        <div className="text-right flex flex-col items-end gap-1">
-                          <span className="text-2xl font-bold bg-white/10 px-3 py-1 rounded-lg border border-white/10">
-                            {draftAccount.account_type === 'credit_card' ? '💳' : draftAccount.account_type === 'loan' ? '📈' : draftAccount.account_type === 'cash' ? '💵' : '🏦'}
-                          </span>
-                          {draftAccount.country && (
-                            <Badge className="bg-white/10 text-white border-none text-[9px] uppercase tracking-wider scale-90 origin-right">
-                              {draftAccount.country === 'IN' ? '🇮🇳 IN' : 
-                               draftAccount.country === 'US' ? '🇺🇸 US' : 
-                               draftAccount.country === 'GB' ? '🇬🇧 GB' : 
-                               draftAccount.country === 'EU' ? '🇪🇺 EU' : 
-                               `${draftAccount.country}`}
-                            </Badge>
-                          )}
+                        <div className="bg-white/10 border border-white/10 px-2.5 py-1.5 rounded-xl text-lg shadow-inner">
+                          {draftAccount.account_type === 'credit_card' ? '💳' : draftAccount.account_type === 'loan' ? '📈' : draftAccount.account_type === 'cash' ? '💵' : '🏦'}
                         </div>
                       </div>
 
-                      <div className="flex justify-between items-end">
+                      {/* Simulating card microchip */}
+                      <div className="h-5.5 w-8 rounded bg-gradient-to-br from-amber-400 to-yellow-600 opacity-90 shadow-md relative overflow-hidden border border-amber-300/20 z-10">
+                        <div className="absolute inset-y-0 left-1/3 w-px bg-amber-950/20"></div>
+                        <div className="absolute inset-y-0 left-2/3 w-px bg-amber-950/20"></div>
+                        <div className="absolute inset-x-0 top-1/2 h-px bg-amber-950/20"></div>
+                      </div>
+
+                      <div className="flex justify-between items-end relative z-10">
                         <div>
-                          <span className="text-[10px] text-indigo-300 block uppercase font-bold">
+                          <span className="text-[9px] text-indigo-300 block uppercase font-bold tracking-wider">
                             {draftAccount.account_type === 'credit_card' ? 'Credit Limit' : draftAccount.account_type === 'loan' ? 'Principal Amount' : 'Initial Balance'}
                           </span>
-                          <span className="text-2xl font-mono font-bold tracking-tight">
-                            {draftAccount.account_type === 'credit_card' 
-                              ? `₹${(draftAccount.credit_limit || 0).toLocaleString('en-IN')}` 
+                          <span className="text-xl font-mono font-extrabold text-white tracking-tight">
+                            ₹{draftAccount.account_type === 'credit_card' 
+                              ? (draftAccount.credit_limit || 0).toLocaleString('en-IN') 
                               : draftAccount.account_type === 'loan'
-                                ? `₹${(draftAccount.loan_principal || 0).toLocaleString('en-IN')}` 
-                                : `₹${(draftAccount.balance || 0).toLocaleString('en-IN')}`}
+                                ? (draftAccount.loan_principal || 0).toLocaleString('en-IN') 
+                                : (draftAccount.balance || 0).toLocaleString('en-IN')}
                           </span>
                         </div>
-                        {draftAccount.last_4_digits && (
-                          <div className="text-right font-mono text-xs tracking-wider text-indigo-200">
-                            •••• {draftAccount.last_4_digits}
-                          </div>
-                        )}
+                        <div className="text-right font-mono text-xs tracking-widest text-white/90 font-semibold">
+                          {draftAccount.last_4_digits ? `•••• ${draftAccount.last_4_digits}` : '•••• 8888'}
+                        </div>
                       </div>
                     </div>
 
@@ -3047,7 +2980,7 @@ export default function VoiceTransactPage() {
 
                       <div className="flex justify-between items-center py-2 border-b border-muted/50">
                         <span className="text-muted-foreground font-medium">Currency</span>
-                        <span className="font-semibold text-foreground">
+                        <span className="font-semibold text-foreground font-mono">
                           {draftAccount.currency || 'INR'}
                         </span>
                       </div>

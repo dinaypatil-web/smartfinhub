@@ -848,116 +848,189 @@ export default function GlobalChatbot() {
       <SheetTrigger asChild>
         <Button
           size="lg"
-          className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full bg-gradient-to-r from-teal-500 via-primary to-indigo-600 hover:from-teal-600 hover:to-indigo-700 text-white shadow-2xl hover:shadow-primary/30 flex items-center justify-center border-none p-0 group relative overflow-hidden transition-all duration-300 hover:scale-110 active:scale-95"
+          className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full bg-gradient-to-tr from-teal-400 via-primary to-indigo-600 hover:from-teal-500 hover:to-indigo-750 text-white shadow-[0_4px_20px_rgba(20,184,166,0.3)] hover:shadow-[0_8px_30px_rgba(20,184,166,0.5)] flex items-center justify-center border-none p-0 group relative overflow-hidden transition-all duration-300 hover:scale-110 active:scale-95"
           title="Smart AI Assistant"
         >
-          <span className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-full animate-ping pointer-events-none"></span>
+          {/* Subtle spinning outer aura */}
+          <span className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent rotate-0 group-hover:rotate-180 transition-transform duration-1000"></span>
+          <span className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-full animate-ping pointer-events-none"></span>
           <div className="relative z-10 flex items-center justify-center">
-            <Bot className="h-6 w-6 animate-pulse" />
-            <Sparkles className="h-3.5 w-3.5 absolute -top-1.5 -right-1.5 text-yellow-300" />
+            <Bot className="h-6 w-6 text-white drop-shadow-[0_2px_5px_rgba(0,0,0,0.2)]" />
+            <Sparkles className="h-3.5 w-3.5 absolute -top-1.5 -right-1.5 text-yellow-300 animate-pulse" />
           </div>
         </Button>
       </SheetTrigger>
 
-      <SheetContent side="right" className="sm:max-w-[460px] w-full p-0 flex flex-col h-full bg-card/95 backdrop-blur-md border-l border-muted">
-        <SheetHeader className="p-4 border-b bg-gradient-to-r from-teal-950/20 via-primary/10 to-indigo-950/20 shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="bg-gradient-to-tr from-teal-500 to-indigo-600 p-2 rounded-xl text-white shadow-md">
-              <Bot className="h-5 w-5 animate-pulse text-white" />
+      <SheetContent 
+        side="right" 
+        className="sm:max-w-[460px] w-full p-0 flex flex-col h-full bg-slate-900/90 dark:bg-slate-950/90 backdrop-blur-xl border-l border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.6)] text-slate-100 animate-in slide-in-from-right duration-300"
+      >
+        {/* Sleek Gradient Header */}
+        <SheetHeader className="p-5 border-b border-white/10 bg-gradient-to-r from-teal-950/40 via-slate-900/30 to-indigo-950/40 shrink-0 relative overflow-hidden">
+          {/* Background glowing orb */}
+          <div className="absolute -left-16 -top-16 w-36 h-36 bg-teal-500/10 rounded-full blur-3xl pointer-events-none"></div>
+          <div className="absolute -right-16 -bottom-16 w-36 h-36 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+          
+          <div className="flex items-center gap-3 relative z-10">
+            <div className="bg-gradient-to-tr from-teal-400 to-indigo-500 p-2 rounded-xl text-white shadow-lg shadow-teal-500/10 border border-white/10">
+              <Bot className="h-5 w-5 text-white" />
             </div>
             <div>
-              <SheetTitle className="text-base font-bold bg-gradient-to-r from-teal-400 to-indigo-500 bg-clip-text text-transparent">
-                Smart AI Chatbot ✨
+              <SheetTitle className="text-base font-black tracking-tight bg-gradient-to-r from-teal-400 via-emerald-300 to-indigo-400 bg-clip-text text-transparent">
+                Smart AI Chatbot
               </SheetTitle>
-              <SheetDescription className="text-xs">
-                Ask queries or write transactions naturally.
+              <SheetDescription className="text-[11px] text-slate-400 mt-0.5">
+                Financial assistant • Operates on voice or text
               </SheetDescription>
             </div>
           </div>
         </SheetHeader>
 
-        {/* Dynamic collapsible draft transaction widget */}
+        {/* 1. DIGITAL INVOICE RECEIPT PREVIEW */}
         {currentIntent === 'transaction' && draft.transaction_type && (
-          <div className="mx-4 mt-3 p-3 bg-indigo-950/20 border border-indigo-500/20 rounded-xl text-xs space-y-2 shrink-0 animate-in slide-in-from-top-2 duration-300">
+          <div className="mx-5 mt-4 p-4 bg-slate-950/60 border border-white/5 rounded-2xl text-[11px] space-y-3 shrink-0 animate-in slide-in-from-top-3 duration-300 shadow-xl relative overflow-hidden">
+            {/* Top color tag */}
+            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-teal-500 via-primary to-indigo-500 opacity-80"></div>
+            
             <div className="flex justify-between items-center">
-              <span className="font-semibold text-indigo-300 uppercase tracking-wider text-[9px] flex items-center gap-1">
-                <Calendar className="h-3 w-3" /> Draft Transaction
+              <span className="font-bold text-slate-400 uppercase tracking-widest text-[9px] flex items-center gap-1.5 font-mono">
+                <Calendar className="h-3.5 w-3.5 text-teal-400" /> DIGITAL RECEIPT
               </span>
-              <Badge className="bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 text-[9px] capitalize py-0">
+              <Badge className="bg-teal-500/10 text-teal-300 border border-teal-500/20 text-[9px] capitalize font-bold px-2 py-0.5 rounded-full">
                 {draft.transaction_type.replace('_', ' ')}
               </Badge>
             </div>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-muted-foreground">
-              <div>Amount: <strong className="text-foreground font-mono">₹{draft.amount || '0'}</strong></div>
-              <div>Category: <strong className="text-foreground">{draft.category || getIncomeCategoryName(draft.income_category || 'others')}</strong></div>
+            
+            <div className="border-t border-dashed border-slate-800 my-2"></div>
+            
+            <div className="flex flex-col items-center justify-center py-2.5 bg-slate-900/60 rounded-xl border border-white/5">
+              <span className="text-[9px] text-slate-400 font-semibold uppercase tracking-wider">Amount Due / Recorded</span>
+              <div className="text-2xl font-black font-mono text-teal-400 tracking-tight mt-0.5">
+                ₹{draft.amount ? Number(draft.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}
+              </div>
+            </div>
+            
+            <div className="space-y-1.5 pt-1 text-slate-300">
+              <div className="flex justify-between">
+                <span className="text-slate-450">Category:</span>
+                <strong className="text-white font-semibold">
+                  📁 {draft.category || (draft.income_category ? getIncomeCategoryName(draft.income_category) : null) || 'Unspecified'}
+                </strong>
+              </div>
               {draft.from_account_id && (
-                <div className="col-span-2 truncate">From Account: <strong className="text-foreground">{getAccountName(draft.from_account_id)}</strong></div>
+                <div className="flex justify-between">
+                  <span className="text-slate-450">Paid From:</span>
+                  <strong className="text-white font-semibold truncate max-w-[190px]">
+                    💳 {getAccountName(draft.from_account_id)}
+                  </strong>
+                </div>
               )}
               {draft.to_account_id && (
-                <div className="col-span-2 truncate">To Account: <strong className="text-foreground">{getAccountName(draft.to_account_id)}</strong></div>
+                <div className="flex justify-between">
+                  <span className="text-slate-450">Received In:</span>
+                  <strong className="text-white font-semibold truncate max-w-[190px]">
+                    🏦 {getAccountName(draft.to_account_id)}
+                  </strong>
+                </div>
               )}
-              <div className="col-span-2 truncate">Desc: <strong className="text-foreground italic">"{draft.description || 'N/A'}"</strong></div>
+              <div className="flex justify-between">
+                <span className="text-slate-450">Description:</span>
+                <strong className="text-white font-semibold truncate max-w-[190px] italic">
+                  "{draft.description || 'N/A'}"
+                </strong>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Dynamic collapsible draft account widget */}
+        {/* 2. VIRTUAL BANK PASSBOOK CARD PREVIEW */}
         {currentIntent === 'account' && draftAccount.account_type && (
-          <div className="mx-4 mt-3 p-3 bg-purple-950/20 border border-purple-500/20 rounded-xl text-xs space-y-2 shrink-0 animate-in slide-in-from-top-2 duration-300">
-            <div className="flex justify-between items-center">
-              <span className="font-semibold text-purple-300 uppercase tracking-wider text-[9px] flex items-center gap-1">
-                <CreditCard className="h-3 w-3" /> Draft Account
-              </span>
-              <Badge className="bg-purple-500/10 text-purple-300 border border-purple-500/20 text-[9px] capitalize py-0">
-                {draftAccount.account_type}
-              </Badge>
+          <div className="mx-5 mt-4 p-4.5 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 border border-white/10 rounded-2xl text-[11px] space-y-4 shrink-0 animate-in slide-in-from-top-3 duration-300 shadow-2xl relative overflow-hidden aspect-[1.7/1] flex flex-col justify-between">
+            {/* Glowing orb in the card background */}
+            <div className="absolute -right-8 -top-8 w-24 h-24 bg-primary/20 rounded-full blur-2xl pointer-events-none"></div>
+            
+            <div className="flex justify-between items-start">
+              <div>
+                <span className="text-[8px] uppercase tracking-widest text-indigo-300 font-bold">VIRTUAL CARD PASSBOOK</span>
+                <h3 className="text-sm font-black text-white mt-0.5 tracking-wide truncate max-w-[200px]">
+                  {draftAccount.account_name || 'New Account'}
+                </h3>
+                <p className="text-[9px] text-indigo-200/70">{draftAccount.institution_name || 'SmartFinHub Bank'}</p>
+              </div>
+              <div className="bg-white/10 border border-white/10 px-2 py-1 rounded-xl text-base shadow-inner">
+                {draftAccount.account_type === 'credit_card' ? '💳' : draftAccount.account_type === 'loan' ? '📈' : draftAccount.account_type === 'cash' ? '💵' : '🏦'}
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-muted-foreground">
-              <div className="col-span-2">Name: <strong className="text-foreground">{draftAccount.account_name || 'N/A'}</strong></div>
-              <div>Balance: <strong className="text-foreground font-mono">₹{draftAccount.balance || '0'}</strong></div>
-              <div>Bank: <strong className="text-foreground">{draftAccount.institution_name || 'N/A'}</strong></div>
+
+            {/* Simulating card microchip */}
+            <div className="h-5 w-7 rounded bg-gradient-to-br from-amber-400 to-yellow-600 opacity-90 shadow-md relative overflow-hidden border border-amber-300/20">
+              <div className="absolute inset-y-0 left-1/3 w-px bg-amber-950/20"></div>
+              <div className="absolute inset-y-0 left-2/3 w-px bg-amber-950/20"></div>
+              <div className="absolute inset-x-0 top-1/2 h-px bg-amber-950/20"></div>
+            </div>
+
+            <div className="flex justify-between items-end">
+              <div>
+                <span className="text-[8px] text-indigo-300 block uppercase font-bold tracking-wider">
+                  {draftAccount.account_type === 'credit_card' ? 'Credit Limit' : draftAccount.account_type === 'loan' ? 'Principal Amount' : 'Initial Balance'}
+                </span>
+                <span className="text-lg font-mono font-extrabold text-white tracking-tight">
+                  ₹{draftAccount.account_type === 'credit_card' 
+                    ? (draftAccount.credit_limit || 0).toLocaleString('en-IN') 
+                    : draftAccount.account_type === 'loan'
+                      ? (draftAccount.loan_principal || 0).toLocaleString('en-IN') 
+                      : (draftAccount.balance || 0).toLocaleString('en-IN')}
+                </span>
+              </div>
+              <div className="text-right font-mono text-xs tracking-widest text-white/90 font-semibold">
+                {draftAccount.last_4_digits ? `•••• ${draftAccount.last_4_digits}` : '•••• 8888'}
+              </div>
             </div>
           </div>
         )}
 
         {/* Main Conversation Log */}
-        <ScrollArea className="flex-grow px-4 py-3 h-[calc(100vh-250px)] overflow-y-auto">
+        <ScrollArea className="flex-grow px-5 py-4 h-[calc(100vh-250px)] overflow-y-auto">
           <div className="space-y-4 pb-4">
             {chatMessages.map(msg => (
               <div
                 key={msg.id}
-                className={`flex gap-2.5 max-w-[88%] ${msg.role === 'user' ? 'ml-auto flex-row-reverse' : 'mr-auto'}`}
+                className={`flex gap-3 max-w-[88%] ${msg.role === 'user' ? 'ml-auto flex-row-reverse' : 'mr-auto'} animate-in fade-in slide-in-from-bottom-1 duration-200`}
               >
+                {/* Avatar with Glow Ring */}
                 <div
-                  className={`h-7 w-7 rounded-lg flex items-center justify-center text-[10px] font-bold shadow shrink-0 ${
-                    msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-indigo-600 text-white'
+                  className={`h-7 w-7 rounded-lg flex items-center justify-center text-[10px] font-bold shrink-0 shadow-md ${
+                    msg.role === 'user' 
+                      ? 'bg-primary text-primary-foreground border border-white/10' 
+                      : 'bg-gradient-to-tr from-teal-400 to-indigo-600 text-white border border-white/10'
                   }`}
                 >
                   {msg.role === 'user' ? 'U' : <Sparkles className="h-3.5 w-3.5 text-white" />}
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2 flex-grow">
+                  {/* Chat bubble content */}
                   <div
-                    className={`px-3 py-2.5 rounded-2xl text-xs leading-relaxed shadow-sm whitespace-pre-wrap ${
+                    className={`px-3.5 py-2.5 rounded-2xl text-[11px] leading-relaxed shadow-md whitespace-pre-wrap transition-all duration-200 ${
                       msg.role === 'user'
-                        ? 'bg-primary text-primary-foreground rounded-tr-none font-medium'
-                        : 'bg-muted/80 text-foreground rounded-tl-none border border-muted/50'
+                        ? 'bg-gradient-to-tr from-teal-400 via-primary to-indigo-600 text-white rounded-tr-none font-semibold shadow-primary/10'
+                        : 'bg-slate-800/80 border border-slate-700/50 text-slate-100 rounded-tl-none backdrop-blur-sm'
                     }`}
                   >
                     {msg.content}
                   </div>
 
                   {msg.isInteractive && (
-                    <div className="bg-indigo-950/40 border border-indigo-500/30 rounded-xl p-2.5 flex flex-col sm:flex-row items-center justify-between gap-2.5 animate-in slide-in-from-bottom-2 duration-300">
-                      <div className="flex items-center gap-1.5">
-                        <Check className="h-4 w-4 text-emerald-400 shrink-0" />
-                        <span className="text-[10px] text-indigo-200 font-medium">Draft complete. Confirm and save?</span>
+                    <div className="bg-slate-950/80 border border-teal-500/20 rounded-xl p-3 flex flex-col gap-2.5 animate-in slide-in-from-bottom-2 duration-300 shadow-lg">
+                      <div className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-teal-400 animate-pulse"></span>
+                        <span className="text-[10px] text-slate-300 font-semibold tracking-wide">CONFIRM DRAFT INFORMATION</span>
                       </div>
-                      <div className="flex gap-1.5 w-full sm:w-auto">
+                      <div className="flex gap-2 w-full">
                         <Button
-                          variant="destructive"
+                          variant="ghost"
                           size="sm"
-                          className="text-[10px] h-7 px-2"
+                          className="text-[10px] h-7 flex-1 rounded-lg border border-red-500/20 hover:bg-red-500/10 hover:text-red-400 text-red-300 bg-red-950/20"
                           onClick={handleResetDraft}
                         >
                           <Trash2 className="h-3 w-3 mr-1" /> Discard
@@ -965,7 +1038,7 @@ export default function GlobalChatbot() {
                         <Button
                           variant="default"
                           size="sm"
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] h-7 px-2 font-semibold"
+                          className="bg-teal-500 hover:bg-teal-650 text-slate-950 text-[10px] h-7 flex-1 rounded-lg font-bold shadow-md shadow-teal-500/10 transition-all hover:scale-[1.02]"
                           onClick={
                             currentIntent === 'transaction' 
                               ? handleSaveTransaction 
@@ -974,7 +1047,7 @@ export default function GlobalChatbot() {
                                 : handleSaveBudget
                           }
                         >
-                          <Check className="h-3 w-3 mr-1" /> Confirm
+                          <Check className="h-3 w-3 mr-1" /> Confirm & Save
                         </Button>
                       </div>
                     </div>
@@ -984,24 +1057,24 @@ export default function GlobalChatbot() {
             ))}
 
             {streamingText && (
-              <div className="flex gap-2.5 max-w-[88%] mr-auto animate-pulse">
-                <div className="h-7 w-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs font-bold shrink-0">
+              <div className="flex gap-3 max-w-[88%] mr-auto animate-pulse">
+                <div className="h-7 w-7 rounded-lg bg-gradient-to-tr from-teal-400 to-indigo-600 text-white flex items-center justify-center text-xs font-bold shrink-0 border border-white/10">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 </div>
-                <div className="px-3 py-2.5 rounded-2xl text-xs leading-relaxed bg-muted/80 text-foreground rounded-tl-none border border-muted/50">
+                <div className="px-3.5 py-2.5 rounded-2xl text-[11px] leading-relaxed bg-slate-800/80 border border-slate-700/50 text-slate-100 rounded-tl-none">
                   {streamingText}
                 </div>
               </div>
             )}
 
             {isLoading && !streamingText && (
-              <div className="flex gap-2.5 max-w-[88%] mr-auto">
-                <div className="h-7 w-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs font-bold shrink-0">
+              <div className="flex gap-3 max-w-[88%] mr-auto">
+                <div className="h-7 w-7 rounded-lg bg-gradient-to-tr from-teal-400 to-indigo-600 text-white flex items-center justify-center text-xs font-bold shrink-0 border border-white/10">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 </div>
-                <div className="px-3 py-2.5 rounded-2xl text-xs leading-relaxed bg-muted/50 text-muted-foreground rounded-tl-none flex items-center gap-1.5 border border-muted/30">
-                  <Loader2 className="h-3 w-3 animate-spin text-primary" />
-                  Thinking...
+                <div className="px-3.5 py-2.5 rounded-2xl text-[11px] leading-relaxed bg-slate-800/40 text-slate-400 rounded-tl-none flex items-center gap-1.5 border border-slate-800/50">
+                  <Loader2 className="h-3 w-3 animate-spin text-teal-400" />
+                  AI is preparing response...
                 </div>
               </div>
             )}
@@ -1010,14 +1083,14 @@ export default function GlobalChatbot() {
           </div>
         </ScrollArea>
 
-        {/* Input area container */}
-        <div className="p-4 border-t border-muted bg-card shrink-0 space-y-3">
+        {/* Input container at the bottom */}
+        <div className="p-4 border-t border-white/10 bg-slate-900/90 dark:bg-slate-950/95 backdrop-blur-md shrink-0 space-y-3">
           
-          {/* Autocomplete Suggestions */}
+          {/* Autocomplete Suggestion Chips */}
           {suggestions.length > 0 && (
             <div className="space-y-1.5 animate-in fade-in-50 duration-300">
-              <p className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1 px-1">
-                <Bot className="h-3 w-3 text-primary animate-pulse" />
+              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1 px-1">
+                <Sparkles className="h-3 w-3 text-teal-400 animate-pulse" />
                 {suggestions[0].type === 'account' ? 'Select Account:' : 'Most Used Reasons:'}
               </p>
               <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto pr-1">
@@ -1027,7 +1100,7 @@ export default function GlobalChatbot() {
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="text-[10px] h-7 px-2.5 rounded-full bg-background text-foreground hover:bg-primary hover:text-primary-foreground border border-input transition-all shadow-sm font-medium"
+                    className="text-[10px] h-7 px-3 rounded-full bg-slate-950 text-slate-200 hover:bg-teal-500 hover:text-slate-950 border border-white/5 hover:border-teal-500 transition-all duration-200 shadow-sm font-semibold hover:-translate-y-0.5 active:scale-95"
                     onClick={() => handleSelectSuggestion(s.text, s.type)}
                   >
                     {s.type === 'account' ? '💳 ' : '🏷️ '}
@@ -1046,18 +1119,20 @@ export default function GlobalChatbot() {
                 variant={isListening ? 'destructive' : 'outline'}
                 size="icon"
                 className={`h-10 w-10 rounded-full shrink-0 relative transition-all duration-300 shadow-md ${
-                  isListening ? 'animate-pulse ring-4 ring-destructive/40' : 'hover:border-primary hover:text-primary hover:bg-primary/5'
+                  isListening 
+                    ? 'animate-pulse ring-4 ring-destructive/40 bg-red-600 border-none' 
+                    : 'bg-slate-950 border-white/5 hover:border-teal-400 hover:text-teal-400 hover:bg-teal-500/5'
                 }`}
                 onClick={toggleListening}
                 title={isListening ? 'Stop listening' : 'Start speaking'}
               >
                 {isListening ? (
                   <div className="flex items-center justify-center">
-                    <MicOff className="h-4.5 w-4.5" />
-                    <span className="absolute inline-flex h-full w-full rounded-full bg-destructive/30 animate-ping duration-1000"></span>
+                    <MicOff className="h-4.5 w-4.5 text-white" />
+                    <span className="absolute inline-flex h-full w-full rounded-full bg-red-500/20 animate-ping duration-1000"></span>
                   </div>
                 ) : (
-                  <Mic className="h-4.5 w-4.5" />
+                  <Mic className="h-4.5 w-4.5 text-slate-300" />
                 )}
               </Button>
             ) : (
@@ -1065,11 +1140,10 @@ export default function GlobalChatbot() {
                 type="button"
                 variant="outline"
                 size="icon"
-                className="h-10 w-10 rounded-full shrink-0 opacity-50 cursor-not-allowed"
+                className="h-10 w-10 rounded-full shrink-0 opacity-40 cursor-not-allowed bg-slate-950 border-white/5"
                 disabled
-                title="Speech recognition not supported in browser"
               >
-                <MicOff className="h-4.5 w-4.5" />
+                <MicOff className="h-4.5 w-4.5 text-slate-400" />
               </Button>
             )}
 
@@ -1082,38 +1156,38 @@ export default function GlobalChatbot() {
             >
               <div className="relative flex-grow">
                 <Input
-                  placeholder={isListening ? "Listening..." : "Type command... e.g. \"Spent 100 for...\""}
+                  placeholder={isListening ? "Listening... speak clearly" : "Type command... e.g. \"Spent 100 for...\""}
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   disabled={isListening || isLoading}
-                  className="pr-9 h-10 bg-muted/40 border-muted focus-visible:ring-primary focus-visible:border-primary/80 text-xs rounded-full"
+                  className="pr-9 h-10 bg-slate-950 border-white/5 focus-visible:ring-1 focus-visible:ring-teal-400 focus-visible:border-teal-400 text-xs rounded-full text-white placeholder-slate-500"
                 />
                 {inputValue && (
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 rounded-full"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 rounded-full text-slate-400 hover:text-white"
                     onClick={() => setInputValue('')}
                   >
-                    <X className="h-3.5 w-3.5 text-muted-foreground" />
+                    <X className="h-3.5 w-3.5" />
                   </Button>
                 )}
               </div>
               <Button
                 type="submit"
                 size="icon"
-                className="h-10 w-10 rounded-full shadow-lg bg-primary hover:bg-primary/95 text-primary-foreground shrink-0"
+                className="h-10 w-10 rounded-full shadow-lg bg-gradient-to-tr from-teal-400 to-indigo-500 hover:from-teal-500 hover:to-indigo-600 text-slate-950 shrink-0 border-none transition-all duration-300 hover:scale-105 active:scale-95"
                 disabled={!inputValue.trim() || isLoading || isListening}
               >
-                <Send className="h-3.5 w-3.5" />
+                <Send className="h-3.5 w-3.5 text-slate-950 font-bold" />
               </Button>
             </form>
           </div>
 
-          <p className="text-[9px] text-muted-foreground text-center flex items-center justify-center gap-1">
-            <Volume2 className="h-2.5 w-2.5" />
-            Try typing: "Spent 100 for [reason] from [account]" to see suggestions.
+          <p className="text-[9px] text-slate-500 text-center flex items-center justify-center gap-1 font-medium">
+            <Volume2 className="h-2.5 w-2.5 text-slate-500" />
+            Try typing: "Spent 100 for [reason] from [account]" to trigger suggestions.
           </p>
         </div>
       </SheetContent>
