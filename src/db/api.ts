@@ -65,6 +65,11 @@ export const profileApi = {
 
 export const accountApi = {
   async getAccounts(userId: string): Promise<Account[]> {
+    // Auto-generate EMI statement lines in the background
+    creditCardStatementApi.generateEMIStatementLines(userId).catch(err =>
+      console.error('Background EMI statement generation error:', err)
+    );
+
     const { data, error } = await supabase
       .from('accounts')
       .select('*')
@@ -1784,11 +1789,161 @@ export const userCustomBankLinksApi = {
 };
 
 export const creditCardStatementApi = {
+  // Automatically generate statement lines for active EMIs if the statement date has been reached
+  async generateEMIStatementLines(userId: string): Promise<void> {
+    try {
+      // 1. Get all credit cards for this user
+      const { data: accounts, error: accError } = await supabase
+        .from('accounts')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('account_type', 'credit_card');
+
+      if (accError) throw accError;
+      if (!accounts || accounts.length === 0) return;
+
+      // 2. Get active EMIs for this user
+      const { data: activeEMIs, error: emiError } = await supabase
+        .from('emi_transactions')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('status', 'active');
+
+      if (emiError) throw emiError;
+      if (!activeEMIs || activeEMIs.length === 0) return;
+
+      // 3. Get existing generated EMI statement lines to prevent duplicate inserts
+      const { data: existingLines, error: linesError } = await supabase
+        .from('credit_card_statement_lines')
+        .select('emi_id, statement_month')
+        .eq('user_id', userId)
+        .is('transaction_id', null)
+        .not('emi_id', 'is', null);
+
+      if (linesError) throw linesError;
+
+      const existingSet = new Set(
+        (existingLines || []).map(l => `${l.emi_id}_${l.statement_month}`)
+      );
+
+      const today = new Date();
+      const todayDay = today.getDate();
+      const currentYear = today.getFullYear();
+      const currentMonth = today.getMonth();
+
+      const formatLocalDateStr = (d: Date) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      };
+
+      const getStatementMonthLocal = (dateStr: string, stmtDay: number): string => {
+        const date = new Date(dateStr);
+        const dayOfMonth = date.getDate();
+        let month = date.getMonth();
+        let year = date.getFullYear();
+
+        if (dayOfMonth < stmtDay) {
+          month--;
+          if (month < 0) {
+            month = 11;
+            year--;
+          }
+        }
+        return `${year}-${String(month + 1).padStart(2, '0')}`;
+      };
+
+      const linesToInsert: any[] = [];
+
+      for (const card of accounts) {
+        const statementDay = card.statement_day;
+        if (!statementDay) continue;
+
+        // Calculate the latest statement date that has been generated
+        let latestStatementDate: Date;
+        if (todayDay >= statementDay) {
+          latestStatementDate = new Date(currentYear, currentMonth, statementDay);
+        } else {
+          latestStatementDate = new Date(currentYear, currentMonth - 1, statementDay);
+        }
+        
+        const latestStatementDateStr = formatLocalDateStr(latestStatementDate);
+
+        // Filter active EMIs for this card
+        const cardEMIs = activeEMIs.filter(emi => emi.account_id === card.id);
+
+        for (const emi of cardEMIs) {
+          // If EMI next_due_date is on or before the latest statement date
+          if (emi.next_due_date && emi.next_due_date <= latestStatementDateStr) {
+            const statementMonth = getStatementMonthLocal(emi.next_due_date, statementDay);
+            const key = `${emi.id}_${statementMonth}`;
+
+            if (!existingSet.has(key)) {
+              const installmentNum = emi.emi_months - emi.remaining_installments + 1;
+              const description = `EMI Installment: ${emi.description} (${installmentNum}/${emi.emi_months})`;
+
+              linesToInsert.push({
+                credit_card_id: card.id,
+                user_id: userId,
+                transaction_id: null,
+                emi_id: emi.id,
+                description,
+                amount: emi.monthly_emi,
+                transaction_date: emi.next_due_date,
+                statement_month: statementMonth,
+                status: 'pending',
+                paid_amount: 0,
+                currency: card.currency || 'INR'
+              });
+            }
+          }
+        }
+      }
+
+      if (linesToInsert.length > 0) {
+        const { error: insertError } = await supabase
+          .from('credit_card_statement_lines')
+          .insert(linesToInsert);
+
+        if (insertError) throw insertError;
+        console.log(`Auto-generated ${linesToInsert.length} EMI statement lines.`);
+      }
+    } catch (err) {
+      console.error('Error auto-generating EMI statement lines:', err);
+    }
+  },
+
+  // Get all statement lines for a specific month
+  async getStatementLinesByMonth(
+    creditCardId: string,
+    statementMonth: string
+  ): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('credit_card_statement_lines')
+      .select('*')
+      .eq('credit_card_id', creditCardId)
+      .eq('statement_month', statementMonth)
+      .order('transaction_date', { ascending: false });
+
+    if (error) throw error;
+    return Array.isArray(data) ? data : [];
+  },
+
   // Get statement items (due transactions/EMIs) for a credit card in a given month
   async getStatementItems(
     creditCardId: string,
     statementMonth?: string // YYYY-MM format, defaults to current month
   ): Promise<any[]> {
+    try {
+      const card = await accountApi.getAccountById(creditCardId);
+      if (card?.user_id) {
+        await this.generateEMIStatementLines(card.user_id);
+      }
+    } catch (err) {
+      console.error('Error running auto-generation in getStatementItems:', err);
+    }
+
     const targetMonth = statementMonth || new Date().toISOString().slice(0, 7);
 
     // Get all transactions for this credit card from the statement month
@@ -1824,6 +1979,15 @@ export const creditCardStatementApi = {
 
   // Get all statement lines for a credit card (for a specific month or all unpaid)
   async getUnpaidStatementLines(creditCardId: string): Promise<any[]> {
+    try {
+      const card = await accountApi.getAccountById(creditCardId);
+      if (card?.user_id) {
+        await this.generateEMIStatementLines(card.user_id);
+      }
+    } catch (err) {
+      console.error('Error running auto-generation in getUnpaidStatementLines:', err);
+    }
+
     const { data, error } = await supabase
       .from('credit_card_statement_lines')
       .select('*')
@@ -1847,6 +2011,15 @@ export const creditCardStatementApi = {
   // Get all unpaid statement lines up to a specific date (for repayment selection)
   // This fetches ALL pending items from any period up to the statement date
   async getUnpaidStatementLinesUpToDate(creditCardId: string, endDate: string): Promise<any[]> {
+    try {
+      const card = await accountApi.getAccountById(creditCardId);
+      if (card?.user_id) {
+        await this.generateEMIStatementLines(card.user_id);
+      }
+    } catch (err) {
+      console.error('Error running auto-generation in getUnpaidStatementLinesUpToDate:', err);
+    }
+
     const { data, error } = await supabase
       .from('credit_card_statement_lines')
       .select('*')

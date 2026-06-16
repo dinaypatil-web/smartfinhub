@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useHybridAuth as useAuth } from '@/contexts/HybridAuthContext';
-import { transactionApi, accountApi, emiApi, categoryApi } from '@/db/api';
+import { transactionApi, accountApi, emiApi, categoryApi, creditCardStatementApi } from '@/db/api';
 import type { Transaction, Account, EMITransaction, ExpenseCategory } from '@/types/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -62,6 +62,8 @@ export default function Reports() {
     `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
   );
   const [creditCardEMIs, setCreditCardEMIs] = useState<EMITransaction[]>([]);
+  const [statementLines, setStatementLines] = useState<any[]>([]);
+  const [generatingStatements, setGeneratingStatements] = useState(false);
 
   // Cash flow statement state
   const [cashFlowMonth, setCashFlowMonth] = useState<string>(
@@ -85,11 +87,12 @@ export default function Reports() {
   }, [accounts]);
 
   useEffect(() => {
-    // Load EMIs when credit card is selected
+    // Load EMIs and statement lines when credit card or month changes
     if (selectedCreditCard) {
       loadCreditCardEMIs();
+      loadStatementLines();
     }
-  }, [selectedCreditCard]);
+  }, [selectedCreditCard, selectedMonth]);
 
   const loadCreditCardEMIs = async () => {
     if (!selectedCreditCard) return;
@@ -99,6 +102,23 @@ export default function Reports() {
       setCreditCardEMIs(emis);
     } catch (error) {
       console.error('Error loading EMIs:', error);
+    }
+  };
+
+  const loadStatementLines = async () => {
+    if (!selectedCreditCard || !selectedMonth) return;
+    try {
+      setGeneratingStatements(true);
+      // Ensure EMI statement lines are generated for the user before fetching
+      if (user) {
+        await creditCardStatementApi.generateEMIStatementLines(user.id);
+      }
+      const lines = await creditCardStatementApi.getStatementLinesByMonth(selectedCreditCard, selectedMonth);
+      setStatementLines(lines);
+    } catch (error) {
+      console.error('Error loading statement lines:', error);
+    } finally {
+      setGeneratingStatements(false);
     }
   };
 
@@ -255,22 +275,74 @@ export default function Reports() {
     // Billing cycle end is the statement date
     const cycleEnd = statementDate;
 
-    // Get transactions for this account in the billing cycle
-    const accountTransactions = transactions.filter(t => {
-      const transactionDate = new Date(t.transaction_date);
-      const isInCycle = transactionDate >= cycleStart && transactionDate <= cycleEnd;
-      const isAccountTransaction = t.from_account_id === selectedCreditCard || t.to_account_id === selectedCreditCard;
-      return isInCycle && isAccountTransaction;
-    });
+    let dueAmount = 0;
+    let statementTransactions = [];
+    let statementEMIs = [];
 
-    // Get EMIs for this account
-    const accountEMIs = creditCardEMIs.filter(emi => {
-      const emiDate = new Date(emi.next_due_date);
-      return emiDate >= cycleStart && emiDate <= cycleEnd;
-    });
+    if (statementLines.length > 0) {
+      dueAmount = statementLines.reduce((sum, line) => sum + Number(line.amount), 0);
+      
+      // Separate into transactions and EMIs
+      statementTransactions = statementLines
+        .filter(line => !line.emi_id)
+        .map(line => {
+          const txn = transactions.find(t => t.id === line.transaction_id);
+          return {
+            id: line.id,
+            transaction_date: line.transaction_date,
+            description: line.description,
+            amount: Number(line.amount),
+            currency: line.currency,
+            transaction_type: txn ? txn.transaction_type : 'expense',
+            category: txn ? txn.category : 'Credit Card Transaction',
+            transaction_splits: txn ? txn.transaction_splits : undefined,
+            from_account_id: txn ? txn.from_account_id : selectedCreditCard,
+            to_account_id: txn ? txn.to_account_id : null,
+            status: line.status,
+            paid_amount: Number(line.paid_amount)
+          };
+        });
 
-    // Calculate due amount
-    const dueAmount = calculateTotalDueAmount(selectedCreditCard, accountTransactions, accountEMIs, account.statement_day);
+      statementEMIs = statementLines
+        .filter(line => line.emi_id)
+        .map(line => {
+          const emi = creditCardEMIs.find(e => e.id === line.emi_id);
+          return {
+            id: line.id,
+            next_due_date: line.transaction_date,
+            description: line.description,
+            monthly_emi: Number(line.amount),
+            remaining_installments: emi ? emi.remaining_installments : 0,
+            emi_months: emi ? emi.emi_months : 0,
+            status: line.status,
+            paid_amount: Number(line.paid_amount)
+          };
+        });
+    } else {
+      // Get transactions for this account in the billing cycle
+      const accountTransactions = transactions.filter(t => {
+        const transactionDate = new Date(t.transaction_date);
+        const isInCycle = transactionDate >= cycleStart && transactionDate <= cycleEnd;
+        const isAccountTransaction = t.from_account_id === selectedCreditCard || t.to_account_id === selectedCreditCard;
+        return isInCycle && isAccountTransaction;
+      });
+
+      // Get EMIs for this account
+      const accountEMIs = creditCardEMIs.filter(emi => {
+        const emiDate = new Date(emi.next_due_date);
+        return emiDate >= cycleStart && emiDate <= cycleEnd;
+      });
+
+      dueAmount = calculateTotalDueAmount(selectedCreditCard, accountTransactions, accountEMIs, account.statement_day);
+      
+      statementTransactions = accountTransactions.sort((a, b) =>
+        new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime()
+      );
+      statementEMIs = accountEMIs.map(emi => ({
+        ...emi,
+        status: 'pending'
+      }));
+    }
 
     return {
       account,
@@ -278,10 +350,8 @@ export default function Reports() {
       cycleEnd,
       statementDate,
       dueDate: new Date(billingInfo.dueDateStr),
-      transactions: accountTransactions.sort((a, b) =>
-        new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime()
-      ),
-      emis: accountEMIs,
+      transactions: statementTransactions,
+      emis: statementEMIs,
       dueAmount,
     };
   };
@@ -1135,6 +1205,7 @@ export default function Reports() {
                               <TableHead>Description</TableHead>
                               <TableHead>Category</TableHead>
                               <TableHead className="text-right">Amount</TableHead>
+                              <TableHead className="text-right">Status</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -1172,6 +1243,21 @@ export default function Reports() {
                                     {formatCurrency(transaction.amount, currency)}
                                   </span>
                                 </TableCell>
+                                <TableCell className="text-right font-medium">
+                                  {transaction.status ? (
+                                    <Badge className={
+                                      transaction.status === 'paid'
+                                        ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                                        : transaction.status === 'partial'
+                                          ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
+                                          : 'bg-slate-100 text-slate-800 dark:bg-slate-900/30 dark:text-slate-400'
+                                    }>
+                                      {transaction.status.toUpperCase()}
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="secondary">PENDING</Badge>
+                                  )}
+                                </TableCell>
                               </TableRow>
                             ))}
                           </TableBody>
@@ -1194,6 +1280,7 @@ export default function Reports() {
                               <TableHead>Description</TableHead>
                               <TableHead className="text-right">Monthly EMI</TableHead>
                               <TableHead className="text-right">Remaining</TableHead>
+                              <TableHead className="text-right">Status</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -1210,6 +1297,21 @@ export default function Reports() {
                                   <Badge variant="secondary">
                                     {emi.remaining_installments} / {emi.emi_months}
                                   </Badge>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {emi.status ? (
+                                    <Badge className={
+                                      emi.status === 'paid'
+                                        ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                                        : emi.status === 'partial'
+                                          ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
+                                          : 'bg-slate-100 text-slate-800 dark:bg-slate-900/30 dark:text-slate-400'
+                                    }>
+                                      {emi.status.toUpperCase()}
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="secondary">PENDING</Badge>
+                                  )}
                                 </TableCell>
                               </TableRow>
                             ))}
