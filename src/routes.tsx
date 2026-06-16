@@ -14,6 +14,7 @@ const Settings = lazy(() => import('./pages/Settings'));
 const BackupRestore = lazy(() => import('./pages/BackupRestore'));
 const AIAnalysisPage = lazy(() => import('./pages/AIAnalysisPage'));
 const LoanEMIHistory = lazy(() => import('./pages/LoanEMIHistory'));
+const CreditCardEMIs = lazy(() => import('./pages/CreditCardEMIs'));
 const LoanEMISimulator = lazy(() => import('./pages/LoanEMISimulator'));
 const VoiceTransactPage = lazy(() => import('./pages/VoiceTransactPage'));
 
@@ -81,6 +82,13 @@ const routes: RouteConfig[] = [
     name: 'Loan EMI History',
     path: '/loan-emi-history',
     element: <ProtectedRoute><LoanEMIHistory /></ProtectedRoute>,
+    visible: true,
+    protected: true,
+  },
+  {
+    name: 'Credit Card EMIs',
+    path: '/credit-card-emis',
+    element: <ProtectedRoute><CreditCardEMIs /></ProtectedRoute>,
     visible: true,
     protected: true,
   },

@@ -2301,6 +2301,45 @@ export const creditCardStatementApi = {
     return Array.isArray(data) ? data : [];
   },
 
+  // Get all repayment allocations with transaction dates for a user
+  async getRepaymentAllocationsWithDates(userId: string): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('credit_card_repayment_allocations')
+      .select('*, transactions!inner(transaction_date, user_id)')
+      .eq('transactions.user_id', userId);
+
+    if (error) throw error;
+    return Array.isArray(data) ? data : [];
+  },
+
+  // Manually add an EMI installment to statement lines
+  async addEMIInstallmentToStatement(emiId: string, statementMonth: string): Promise<any> {
+    const emi = await emiApi.getEMIById(emiId);
+    if (!emi) throw new Error('EMI transaction not found');
+
+    const card = await accountApi.getAccountById(emi.account_id);
+    if (!card) throw new Error('Credit card account not found');
+
+    const installmentNum = emi.emi_months - emi.remaining_installments + 1;
+    const description = `EMI Installment: ${emi.description} (${installmentNum}/${emi.emi_months})`;
+
+    const line = {
+      credit_card_id: card.id,
+      user_id: emi.user_id,
+      transaction_id: null,
+      emi_id: emi.id,
+      description,
+      amount: emi.monthly_emi,
+      transaction_date: emi.next_due_date,
+      statement_month: statementMonth,
+      status: 'pending',
+      paid_amount: 0,
+      currency: card.currency || 'INR'
+    };
+
+    return await this.createStatementLine(line);
+  },
+
   // Get statement lines by their IDs
   async getStatementLinesByIds(lineIds: string[]): Promise<any[]> {
     const { data, error } = await supabase
