@@ -279,7 +279,8 @@ export interface CreditCardStatement {
 
 export interface CreditCardStatementLine {
   id: string;
-  statement_id: string;
+  credit_card_id: string;
+  statement_month: string;
   transaction_id: string | null; // Can be null for EMI or other charges
   emi_id: string | null; // If it's from an EMI
   description: string;

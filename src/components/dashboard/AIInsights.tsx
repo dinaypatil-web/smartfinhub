@@ -286,17 +286,18 @@ export default function AIInsights() {
   }, [user]);
 
   return (
-    <Card className="border-primary/20">
+    <Card className="glass-card border-glow border-primary/30 hover-lift-premium shadow-glow bg-gradient-to-br from-primary/5 via-transparent to-purple-500/5 animate-slide-up animate-stagger-2">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" />
-            <CardTitle>AI Financial Insights</CardTitle>
+            <Sparkles className="h-5 w-5 text-primary animate-pulse-slow" />
+            <CardTitle className="gradient-text">AI Financial Insights</CardTitle>
           </div>
           <Button
             variant="ghost"
             size="sm"
             onClick={() => navigate('/ai-analysis')}
+            className="hover-lift"
           >
             View Details
           </Button>

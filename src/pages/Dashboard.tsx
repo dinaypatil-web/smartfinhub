@@ -479,7 +479,7 @@ export default function Dashboard() {
         <TabsContent value="overview" className="space-y-6 mt-6">
 
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 min-w-max md:min-w-0">
-            <Card className="glass-effect border-l-4 border-l-emerald-500 dark:hover:border-emerald-400 dark:hover:shadow-[0_0_30px_rgba(16,185,129,0.15)] hover-lift transition-smooth shadow-card animate-slide-up">
+            <Card className="glass-card border-l-4 border-l-emerald-500 hover-lift-premium border-glow animate-slide-up">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-bold text-emerald-600 dark:text-emerald-400 tracking-wide uppercase">Current Assets</CardTitle>
                 <div className="h-10 w-10 rounded-full bg-emerald-500/20 flex items-center justify-center border border-emerald-500/20">
@@ -496,7 +496,7 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            <Card className="glass-effect border-l-4 border-l-red-500 dark:hover:border-red-400 dark:hover:shadow-[0_0_30px_rgba(239,68,68,0.15)] hover-lift transition-smooth shadow-card animate-slide-up animate-stagger-1">
+            <Card className="glass-card border-l-4 border-l-red-500 hover-lift-premium border-glow animate-slide-up animate-stagger-1">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-bold text-red-600 dark:text-red-400 tracking-wide uppercase">Current Liabilities</CardTitle>
                 <div className="h-10 w-10 rounded-full bg-red-500/20 flex items-center justify-center border border-red-500/20">
@@ -521,7 +521,7 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            <Card className="glass-effect border-l-4 border-l-blue-500 dark:hover:border-blue-400 dark:hover:shadow-[0_0_30px_rgba(59,130,246,0.15)] hover-lift transition-smooth shadow-card animate-slide-up animate-stagger-2">
+            <Card className="glass-card border-l-4 border-l-blue-500 hover-lift-premium border-glow animate-slide-up animate-stagger-2">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-bold text-blue-600 dark:text-blue-400 tracking-wide uppercase">Liquid Assets</CardTitle>
                 <div className="h-10 w-10 rounded-full bg-blue-500/20 flex items-center justify-center border border-blue-500/20">
@@ -538,7 +538,7 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            <Card className={`glass-effect border-l-4 hover-lift transition-smooth shadow-card animate-slide-up animate-stagger-3 ${(summary?.working_capital || 0) >= 0 ? 'border-l-purple-500 dark:hover:border-purple-400 dark:hover:shadow-[0_0_30px_rgba(168,85,247,0.15)]' : 'border-l-amber-500 dark:hover:border-amber-400 dark:hover:shadow-[0_0_30px_rgba(245,158,11,0.15)]'}`}>
+            <Card className={`glass-card border-l-4 hover-lift-premium border-glow animate-slide-up animate-stagger-3 ${(summary?.working_capital || 0) >= 0 ? 'border-l-purple-500' : 'border-l-amber-500'}`}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className={`text-sm font-bold tracking-wide uppercase ${(summary?.working_capital || 0) >= 0 ? 'text-purple-600 dark:text-purple-400' : 'text-amber-600 dark:text-amber-400'}`}>Working Capital</CardTitle>
                 <div className={`h-10 w-10 rounded-full ${(summary?.working_capital || 0) >= 0 ? 'bg-purple-500/20 border border-purple-500/20' : 'bg-amber-500/20 border border-amber-500/20'} flex items-center justify-center`}>
@@ -670,7 +670,7 @@ export default function Dashboard() {
           )}
 
           <div className="grid gap-6 md:grid-cols-2 min-w-max md:min-w-0">
-            <Card className="shadow-card hover-lift animate-scale-in">
+            <Card className="glass-card hover-lift-premium border-glow animate-scale-in">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -681,26 +681,41 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent>
                 {bankAccountsData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={bankAccountsData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="value"
-                      >
-                        {bankAccountsData.map((_, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value: number) => formatCurrency(value, currency)} />
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  <div className="relative h-[300px] w-full flex items-center justify-center">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={bankAccountsData}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          innerRadius={65}
+                          outerRadius={85}
+                          paddingAngle={2}
+                          dataKey="value"
+                        >
+                          {bankAccountsData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip 
+                          contentStyle={{ 
+                            background: 'hsla(var(--popover) / 0.95)', 
+                            border: '1px solid hsl(var(--border) / 0.6)',
+                            borderRadius: 'var(--radius)',
+                            boxShadow: 'var(--shadow-card)'
+                          }}
+                          formatter={(value: number) => formatCurrency(value, currency)} 
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="absolute flex flex-col items-center justify-center pointer-events-none text-center">
+                      <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Total Liquid</span>
+                      <span className="text-base font-bold text-foreground mt-0.5">
+                        {formatCurrency(summary?.liquid_assets || 0, currency)}
+                      </span>
+                    </div>
+                  </div>
                 ) : (
                   <div className="h-[300px] flex items-center justify-center text-muted-foreground">
                     No bank accounts yet
@@ -709,7 +724,7 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            <Card className="shadow-card hover-lift animate-scale-in animate-stagger-1">
+            <Card className="glass-card hover-lift-premium border-glow animate-scale-in animate-stagger-1">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <div className="h-8 w-8 rounded-lg bg-secondary/10 flex items-center justify-center">
@@ -720,26 +735,41 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent>
                 {expenseData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={expenseData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="value"
-                      >
-                        {expenseData.map((_, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value: number) => formatCurrency(value, currency)} />
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  <div className="relative h-[300px] w-full flex items-center justify-center">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={expenseData}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          innerRadius={65}
+                          outerRadius={85}
+                          paddingAngle={2}
+                          dataKey="value"
+                        >
+                          {expenseData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip 
+                          contentStyle={{ 
+                            background: 'hsla(var(--popover) / 0.95)', 
+                            border: '1px solid hsl(var(--border) / 0.6)',
+                            borderRadius: 'var(--radius)',
+                            boxShadow: 'var(--shadow-card)'
+                          }}
+                          formatter={(value: number) => formatCurrency(value, currency)} 
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="absolute flex flex-col items-center justify-center pointer-events-none text-center">
+                      <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Spent</span>
+                      <span className="text-base font-bold text-danger mt-0.5">
+                        {formatCurrency(expenseData.reduce((sum, item) => sum + item.value, 0), currency)}
+                      </span>
+                    </div>
+                  </div>
                 ) : (
                   <div className="h-[300px] flex items-center justify-center text-muted-foreground">
                     No expenses yet
@@ -806,7 +836,7 @@ export default function Dashboard() {
                   {summary?.accounts_by_type.cash.map((account, index) => (
                     <div
                       key={account.id}
-                      className={`flex items-center justify-between p-4 border-l-4 border-l-emerald-500 rounded-lg bg-gradient-to-r from-emerald-50/50 to-transparent dark:from-emerald-950/20 hover-lift shadow-card cursor-pointer animate-slide-right animate-stagger-${Math.min(index + 1, 4)}`}
+                      className={`flex items-center justify-between p-4 border border-border/40 border-l-4 border-l-emerald-500 rounded-lg gradient-cash hover-lift-premium shadow-card cursor-pointer animate-slide-right animate-stagger-${Math.min(index + 1, 4)}`}
                       onClick={() => handleAccountClick(account)}
                     >
                       <div className="flex items-center gap-3">
@@ -829,7 +859,7 @@ export default function Dashboard() {
                     return (
                       <div
                         key={account.id}
-                        className={`p-4 border-l-4 border-l-blue-500 rounded-lg bg-gradient-to-r from-blue-50/50 to-transparent dark:from-blue-950/20 hover-lift shadow-card animate-slide-right animate-stagger-${Math.min(index + 1, 4)}`}
+                        className={`p-4 border border-border/40 border-l-4 border-l-blue-500 rounded-lg gradient-bank hover-lift-premium shadow-card animate-slide-right animate-stagger-${Math.min(index + 1, 4)}`}
                       >
                         <div
                           className="flex items-center justify-between cursor-pointer"
@@ -915,7 +945,7 @@ export default function Dashboard() {
                     return (
                       <div
                         key={account.id}
-                        className={`p-4 border-l-4 border-l-purple-500 rounded-lg bg-gradient-to-r from-purple-50/50 to-transparent dark:from-purple-950/20 hover:shadow-md transition-shadow space-y-3 cursor-pointer animate-slide-right animate-stagger-${Math.min(index + 1, 4)}`}
+                        className={`p-4 border border-border/40 border-l-4 border-l-purple-500 rounded-lg gradient-credit-card hover-lift-premium space-y-3 cursor-pointer animate-slide-right animate-stagger-${Math.min(index + 1, 4)}`}
                         onClick={() => handleAccountClick(account)}
                       >
                         <div className="flex items-center justify-between">
@@ -1067,7 +1097,7 @@ export default function Dashboard() {
                     return (
                       <div
                         key={account.id}
-                        className={`p-4 border-l-4 border-l-orange-500 rounded-lg bg-gradient-to-r from-orange-50/50 to-transparent dark:from-orange-950/20 hover:shadow-md transition-shadow animate-slide-right animate-stagger-${Math.min(index + 1, 4)}`}
+                        className={`p-4 border border-border/40 border-l-4 border-l-orange-500 rounded-lg gradient-loan hover-lift-premium animate-slide-right animate-stagger-${Math.min(index + 1, 4)}`}
                       >
                         <div
                           className="flex items-center justify-between cursor-pointer"

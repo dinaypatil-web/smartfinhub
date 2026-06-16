@@ -218,9 +218,9 @@ export default function QuickLinks({ countryCode, accounts = [] }: QuickLinksPro
       <div className="space-y-4">
         {/* User's Bank Apps */}
         {userBanks.length > 0 && (
-          <Card className="glass-effect border-white/10 dark:bg-card/75 shadow-lg backdrop-blur-md rounded-2xl p-2 animate-scale-in">
+          <Card className="glass-card border-glow animate-slide-up">
             <CardHeader>
-              <CardTitle className="gradient-text font-bold text-base flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <Building2 className="h-5 w-5 text-primary" />
                 Your Bank Apps
               </CardTitle>
@@ -241,8 +241,8 @@ export default function QuickLinks({ countryCode, accounts = [] }: QuickLinksPro
                   return (
                     <Button
                       key={bank.name}
-                      variant="ghost"
-                      className="h-auto flex-col items-start p-4 bg-background/40 hover:bg-primary/5 border border-border/40 hover:border-primary/50 text-white rounded-xl transition-smooth hover-lift hover:shadow-glow shadow-sm"
+                      variant="outline"
+                      className="h-auto flex-col items-start p-4 hover-lift-premium hover-border-glow bg-transparent transition-smooth"
                       onClick={() => handleOpenBank(bank)}
                     >
                       <div className="flex items-center gap-2.5 w-full mb-2.5">
@@ -277,9 +277,9 @@ export default function QuickLinks({ countryCode, accounts = [] }: QuickLinksPro
 
         {/* Payment Apps */}
         {paymentApps.length > 0 && (
-          <Card className="glass-effect border-white/10 dark:bg-card/75 shadow-lg backdrop-blur-md rounded-2xl p-2 animate-scale-in animate-stagger-1">
+          <Card className="glass-card border-glow animate-slide-up animate-stagger-1">
             <CardHeader>
-              <CardTitle className="gradient-text font-bold text-base flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <Smartphone className="h-5 w-5 text-primary" />
                 Quick Payment Apps
               </CardTitle>
@@ -292,8 +292,8 @@ export default function QuickLinks({ countryCode, accounts = [] }: QuickLinksPro
                 {paymentApps.map((app) => (
                   <Button
                     key={app.name}
-                    variant="ghost"
-                    className="h-auto flex-col items-start p-4 bg-background/40 hover:bg-primary/5 border border-border/40 hover:border-primary/50 text-white rounded-xl transition-smooth hover-lift hover:shadow-glow shadow-sm"
+                    variant="outline"
+                    className="h-auto flex-col items-start p-4 hover-lift-premium hover-border-glow bg-transparent transition-smooth"
                     onClick={() => handleOpenApp(app)}
                   >
                     <div className="flex items-center gap-2.5 w-full mb-2.5">
