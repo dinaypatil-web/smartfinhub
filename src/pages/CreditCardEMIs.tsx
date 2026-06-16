@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Calendar, CreditCard, TrendingUp, AlertCircle, RefreshCw, CheckCircle2, PlusCircle, ArrowLeft, Clock } from 'lucide-react';
 import { formatCurrency } from '@/utils/format';
+import { calculateFirstEMIDueDate } from '@/utils/emiCalculations';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Progress } from '@/components/ui/progress';
@@ -111,7 +112,45 @@ export default function CreditCardEMIs() {
       
       // Filter EMIs to only keep those linked to credit cards
       const cardIds = new Set(cards.map(c => c.id));
-      const cardEmis = emisData.filter((emi: EMITransaction) => cardIds.has(emi.account_id));
+      let cardEmis = emisData.filter((emi: EMITransaction) => cardIds.has(emi.account_id));
+
+      // Self-heal logic for active EMIs with miscalculated next_due_date
+      let hasFixedAny = false;
+      for (const emi of cardEmis) {
+        if (emi.status === 'active') {
+          const card = cards.find(c => c.id === emi.account_id);
+          if (!card) continue;
+          const stmtDay = card.statement_day || 15;
+          
+          // Calculate what the correct first due date should be
+          const correctFirstDueDateStr = calculateFirstEMIDueDate(emi.start_date, stmtDay);
+          
+          // Calculate correct next due date based on paid installments
+          const paidInstallments = emi.emi_months - emi.remaining_installments;
+          const correctNextDueDate = new Date(correctFirstDueDateStr);
+          correctNextDueDate.setMonth(correctNextDueDate.getMonth() + paidInstallments);
+          
+          // Adjust for safe day of the month
+          const lastDay = new Date(correctNextDueDate.getFullYear(), correctNextDueDate.getMonth() + 1, 0).getDate();
+          const safeDay = Math.min(stmtDay, lastDay);
+          correctNextDueDate.setDate(safeDay);
+          
+          const correctNextDueDateStr = correctNextDueDate.toISOString().split('T')[0];
+          
+          if (emi.next_due_date !== correctNextDueDateStr) {
+            console.log(`Self-healing EMI "${emi.description}": next_due_date corrected from ${emi.next_due_date} to ${correctNextDueDateStr}`);
+            await emiApi.updateEMI(emi.id, { next_due_date: correctNextDueDateStr });
+            hasFixedAny = true;
+          }
+        }
+      }
+
+      if (hasFixedAny) {
+        // Reload EMIs if we patched any
+        const updatedEmisData = await emiApi.getEMIsByUser(user.id);
+        cardEmis = updatedEmisData.filter((emi: EMITransaction) => cardIds.has(emi.account_id));
+      }
+
       setEmis(cardEmis);
       
       setStatementLines(statementLinesData);

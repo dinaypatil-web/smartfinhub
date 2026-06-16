@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
-import { calculateMonthlyEMI } from '@/utils/emiCalculations';
+import { calculateMonthlyEMI, calculateFirstEMIDueDate } from '@/utils/emiCalculations';
 import { 
   Sparkles, 
   Mic, 
@@ -1074,6 +1074,9 @@ export default function VoiceTransactPage() {
         const monthlyEMI = calculateMonthlyEMI(purchaseAmount, bankCharges, emiMonths);
         const totalAmount = purchaseAmount + bankCharges;
 
+        const account = accounts.find(a => a.id === draft.from_account_id);
+        const statementDay = account ? account.statement_day : null;
+
         const emiData = {
           user_id: user.id,
           account_id: draft.from_account_id,
@@ -1085,7 +1088,7 @@ export default function VoiceTransactPage() {
           monthly_emi: monthlyEMI,
           remaining_installments: emiMonths,
           start_date: transactionPayload.transaction_date,
-          next_due_date: transactionPayload.transaction_date,
+          next_due_date: calculateFirstEMIDueDate(transactionPayload.transaction_date, statementDay),
           description: transactionPayload.description || `EMI for ${draft.category || 'purchase'}`,
           status: 'active' as const,
         };

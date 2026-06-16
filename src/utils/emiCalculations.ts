@@ -111,14 +111,66 @@ export function getCreditLimitWarningMessage(
   return null;
 }
 
-/**
- * Calculate next due date for EMI (adds one month to start date)
- */
 export function calculateNextDueDate(startDate: string, monthsToAdd: number = 1): string {
   const date = new Date(startDate);
   date.setMonth(date.getMonth() + monthsToAdd);
   return date.toISOString().split('T')[0];
 }
+
+/**
+ * Calculates the first installment due date for a credit card EMI.
+ * 
+ * Typically, if a transaction is done on transactionDate, and the card's statement day is statementDay:
+ * - We find the statement date for the month of the transaction.
+ * - If the transaction date is within 3 days before the statement date, or after the statement date,
+ *   the first installment starts in the next statement cycle (next month).
+ * - Otherwise, it starts in the current month's statement cycle.
+ */
+export function calculateFirstEMIDueDate(
+  transactionDateStr: string,
+  statementDay: number | null | undefined
+): string {
+  if (!statementDay) {
+    // If no statement day is available, default to 1 month after transaction date
+    const date = new Date(transactionDateStr);
+    date.setMonth(date.getMonth() + 1);
+    return date.toISOString().split('T')[0];
+  }
+
+  const [year, monthVal, dayVal] = transactionDateStr.split('-').map(Number);
+  const txDate = new Date(year, monthVal - 1, dayVal);
+  
+  // Find safe statement date in the transaction's month
+  const getSafeDate = (y: number, m: number, d: number) => {
+    const lastDay = new Date(y, m + 1, 0).getDate();
+    const safeDay = Math.min(d, lastDay);
+    return new Date(y, m, safeDay);
+  };
+
+  let stmtDate = getSafeDate(year, monthVal - 1, statementDay);
+
+  // Difference in days: (stmtDate - txDate) in ms
+  const diffDays = (stmtDate.getTime() - txDate.getTime()) / (1000 * 60 * 60 * 24);
+
+  // If transaction is too close to statement day (less than 3 days) or after statement day,
+  // the first EMI starts in the next billing cycle.
+  if (diffDays < 3) {
+    // Move to next month
+    let nextMonth = monthVal; // (monthVal - 1) + 1
+    let nextYear = year;
+    if (nextMonth > 11) {
+      nextMonth = 0;
+      nextYear++;
+    }
+    stmtDate = getSafeDate(nextYear, nextMonth, statementDay);
+  }
+
+  const y = stmtDate.getFullYear();
+  const m = String(stmtDate.getMonth() + 1).padStart(2, '0');
+  const d = String(stmtDate.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 
 /**
  * Calculate remaining amount to be paid for an EMI

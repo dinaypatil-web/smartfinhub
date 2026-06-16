@@ -21,7 +21,8 @@ import {
   calculateMonthlyEMI,
   calculateEMIDetails,
   validateCreditLimit,
-  getCreditLimitWarningMessage
+  getCreditLimitWarningMessage,
+  calculateFirstEMIDueDate
 } from '@/utils/emiCalculations';
 import { calculateEMIBreakdown } from '@/utils/loanCalculations';
 import { getTransactionStatementInfo, getStatementPeriod } from '@/utils/statementCalculations';
@@ -1048,6 +1049,9 @@ export default function TransactionForm() {
           const monthlyEMI = calculateMonthlyEMI(purchaseAmount, bankCharges, emiMonths);
           const totalAmount = purchaseAmount + bankCharges;
 
+          const account = accounts.find((a: any) => a.id === formData.from_account_id);
+          const statementDay = account ? account.statement_day : null;
+
           const emiData = {
             user_id: user.id,
             account_id: formData.from_account_id,
@@ -1059,7 +1063,19 @@ export default function TransactionForm() {
             monthly_emi: monthlyEMI,
             remaining_installments: existingEMI ? existingEMI.remaining_installments : emiMonths,
             start_date: formData.transaction_date,
-            next_due_date: formData.transaction_date,
+            next_due_date: existingEMI && existingEMI.start_date === formData.transaction_date
+              ? existingEMI.next_due_date
+              : (() => {
+                  const firstDue = calculateFirstEMIDueDate(formData.transaction_date, statementDay);
+                  const paid = emiMonths - (existingEMI ? existingEMI.remaining_installments : emiMonths);
+                  const newDue = new Date(firstDue);
+                  newDue.setMonth(newDue.getMonth() + paid);
+                  if (statementDay) {
+                    const lastDay = new Date(newDue.getFullYear(), newDue.getMonth() + 1, 0).getDate();
+                    newDue.setDate(Math.min(statementDay, lastDay));
+                  }
+                  return newDue.toISOString().split('T')[0];
+                })(),
             description: formData.description || `EMI for ${formData.category || 'purchase'}`,
             status: 'active' as const,
           };
@@ -1463,6 +1479,9 @@ export default function TransactionForm() {
           const monthlyEMI = calculateMonthlyEMI(purchaseAmount, bank_charges, emiMonths);
           const totalAmount = purchaseAmount + bank_charges;
 
+          const account = accounts.find((a: any) => a.id === formData.from_account_id);
+          const statementDay = account ? account.statement_day : null;
+
           await emiApi.createEMI({
             user_id: user.id,
             account_id: formData.from_account_id!,
@@ -1474,7 +1493,7 @@ export default function TransactionForm() {
             monthly_emi: monthlyEMI,
             remaining_installments: emiMonths,
             start_date: formData.transaction_date,
-            next_due_date: formData.transaction_date,
+            next_due_date: calculateFirstEMIDueDate(formData.transaction_date, statementDay),
             description: formData.description || `EMI for ${formData.category || 'purchase'}`,
             status: 'active' as const,
           });
