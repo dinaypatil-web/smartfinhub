@@ -6,6 +6,7 @@ import { parseSmartChatbotCommand, type SmartChatbotResult } from '@/services/ai
 import { INCOME_CATEGORIES, getIncomeCategoryName } from '@/constants/incomeCategories';
 import { countries } from '@/utils/countries';
 import { getBanksByCountry, getBankLogo } from '@/utils/banks';
+import { cache } from '@/utils/cache';
 import type { Account, ExpenseCategory } from '@/types/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -1204,6 +1205,7 @@ export default function VoiceTransactPage() {
       }
 
       await loadData();
+      cache.clearPattern('dashboard-');
       setBatchDrafts([]);
       setIsLoading(false);
 
@@ -1330,20 +1332,32 @@ export default function VoiceTransactPage() {
         }
       ]);
       
-      setDraft({
-        transaction_type: null,
-        amount: null,
-        from_account_id: null,
-        to_account_id: null,
-        category: null,
-        income_category: null,
-        description: null,
-        transaction_date: null,
-        is_emi: null,
-        emi_months: null,
-        bank_charges: null
-      });
-      setMissingFields([]);
+      if (batchDrafts.length > 1) {
+        const remaining = batchDrafts.slice(1);
+        setBatchDrafts(remaining);
+        setDraft(remaining[0]);
+        toast({
+          title: 'Transaction Saved!',
+          description: `Loaded transaction 1 of ${remaining.length} remaining in batch for review.`,
+          variant: 'default'
+        });
+      } else {
+        setBatchDrafts([]);
+        setDraft({
+          transaction_type: null,
+          amount: null,
+          from_account_id: null,
+          to_account_id: null,
+          category: null,
+          income_category: null,
+          description: null,
+          transaction_date: null,
+          is_emi: null,
+          emi_months: null,
+          bank_charges: null
+        });
+        setMissingFields([]);
+      }
       
     } catch (e) {
       setIsLoading(false);
@@ -2788,13 +2802,13 @@ export default function VoiceTransactPage() {
                             className="bg-teal-500 hover:bg-teal-650 text-slate-950 text-xs h-8 flex-1 rounded-lg font-bold shadow-md shadow-teal-500/10 transition-all hover:scale-[1.02]"
                             onClick={
                               currentIntent === 'transaction' 
-                                ? handleSaveTransaction 
+                                ? (batchDrafts.length > 0 ? handleSaveBatchTransactions : handleSaveTransaction) 
                                 : currentIntent === 'account' 
                                   ? handleSaveAccount 
                                   : handleSaveBudget
                             }
                           >
-                            <Check className="h-3.5 w-3.5 mr-1 text-slate-950 font-bold" /> Confirm & Save
+                            <Check className="h-3.5 w-3.5 mr-1 text-slate-950 font-bold" /> {currentIntent === 'transaction' && batchDrafts.length > 0 ? `Submit & Post All (${batchDrafts.length})` : 'Confirm & Save'}
                           </Button>
                         </div>
                       </div>

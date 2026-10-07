@@ -14,6 +14,7 @@ import { transactionApi, accountApi, categoryApi, budgetApi, emiApi, interestRat
 import { parseSmartChatbotCommand, type SmartChatbotResult } from '@/services/aiService';
 import { calculateMonthlyEMI, calculateFirstEMIDueDate } from '@/utils/emiCalculations';
 import { INCOME_CATEGORIES, getIncomeCategoryName } from '@/constants/incomeCategories';
+import { cache } from '@/utils/cache';
 import type { Account, ExpenseCategory } from '@/types/types';
 
 interface ChatMessage {
@@ -734,20 +735,31 @@ export default function GlobalChatbot() {
         content: `🎉 Transaction 1 of 1 posted successfully!\n• Type: ${draft.transaction_type?.toUpperCase()} | Amount: ₹${Number(draft.amount).toLocaleString('en-IN')} | Description: "${transactionPayload.description}"${balanceInfo}\n\nWhat else can I help you with?`
       }]);
 
-      setDraft({
-        transaction_type: null,
-        amount: null,
-        from_account_id: null,
-        to_account_id: null,
-        category: null,
-        income_category: null,
-        description: null,
-        transaction_date: null,
-        is_emi: null,
-        emi_months: null,
-        bank_charges: null
-      });
-      setMissingFields([]);
+      if (batchDrafts.length > 1) {
+        const remaining = batchDrafts.slice(1);
+        setBatchDrafts(remaining);
+        setDraft(remaining[0]);
+        toast({
+          title: 'Transaction Saved!',
+          description: `Loaded transaction 1 of ${remaining.length} remaining in batch for review.`,
+        });
+      } else {
+        setBatchDrafts([]);
+        setDraft({
+          transaction_type: null,
+          amount: null,
+          from_account_id: null,
+          to_account_id: null,
+          category: null,
+          income_category: null,
+          description: null,
+          transaction_date: null,
+          is_emi: null,
+          emi_months: null,
+          bank_charges: null
+        });
+        setMissingFields([]);
+      }
     } catch (e) {
       setIsLoading(false);
       toast({
@@ -854,6 +866,7 @@ export default function GlobalChatbot() {
       }
 
       await loadData();
+      cache.clearPattern('dashboard-');
       setIsLoading(false);
 
       toast({
