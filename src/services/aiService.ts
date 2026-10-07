@@ -397,6 +397,17 @@ Be realistic and practical. Focus on sustainable changes.`;
   }
 }
 
+export interface BatchTransactionItem {
+  transaction_type: 'income' | 'expense';
+  amount: number;
+  from_account_id?: string | null;
+  to_account_id?: string | null;
+  category?: string | null;
+  income_category?: 'salaries' | 'allowances' | 'family_income' | 'others' | null;
+  description?: string | null;
+  transaction_date?: string | null;
+}
+
 export interface SmartChatbotResult {
   intent: 'transaction' | 'account' | 'budget' | 'financial_inquiry' | 'emi_calculator' | 'financial_analysis' | 'general_help';
   extractedInfo: {
@@ -446,10 +457,182 @@ export interface SmartChatbotResult {
     annual_rate?: number | null;
     tenure_months?: number | null;
   };
+  batchTransactions?: BatchTransactionItem[];
   isComplete: boolean;
   missingFields: string[];
+  reply?: string;
   clarificationQuestion: string;
   extraContext?: any;
+}
+
+// Local heuristic fallback for common queries or when API is unreachable
+function tryLocalHeuristicFallback(
+  command: string,
+  accounts: any[],
+  categories: any[],
+  currentDate: string
+): SmartChatbotResult | null {
+  const text = command.trim().toLowerCase();
+
+  // 1. Show bank balances
+  if (text.includes('balance') || text === 'show my bank balances' || text === 'balances') {
+    const list = accounts.length > 0
+      ? accounts.map(a => `• **${a.account_name}** (${a.account_type}): ₹${Number(a.balance).toLocaleString('en-IN')}`).join('\n')
+      : 'No accounts recorded yet.';
+    const reply = `Here are your current account balances:\n\n${list}`;
+    return {
+      intent: 'financial_inquiry',
+      extractedInfo: {},
+      isComplete: true,
+      missingFields: [],
+      reply,
+      clarificationQuestion: reply,
+      extraContext: { accounts }
+    };
+  }
+
+  // 2. What categories do I have
+  if (text.includes('category') || text.includes('categories')) {
+    const catList = categories.length > 0
+      ? categories.map(c => `• ${c.name}`).join('\n')
+      : '• Food & Dining\n• Groceries\n• Transportation\n• Utilities\n• Entertainment';
+    const reply = `Here are your available expense categories:\n\n${catList}\n\n**Income Categories:**\n• Salaries\n• Allowances\n• Family Income\n• Others`;
+    return {
+      intent: 'financial_inquiry',
+      extractedInfo: {},
+      isComplete: true,
+      missingFields: [],
+      reply,
+      clarificationQuestion: reply,
+      extraContext: { categories }
+    };
+  }
+
+  // 3. Quick transaction extraction fallback (supporting both single and multi-transaction)
+  // Check if multiple transactions are present (separated by 'and', commas, or newlines)
+  const segments = command.split(/\r?\n|(?:\s+and\s+)|(?:\s*,\s*(?=(?:spent|paid|received|got|salary|income|\d+)))/i).map(s => s.trim()).filter(Boolean);
+  
+  const extractedBatch: any[] = [];
+  
+  for (const seg of segments) {
+    const segText = seg.toLowerCase();
+    const segAmtMatch = seg.match(/(?:₹|rs\.?|inr)?\s*(\d+(?:,\d+)*(?:\.\d{1,2})?)/i);
+    if (!segAmtMatch) continue;
+
+    const segAmt = parseFloat(segAmtMatch[1].replace(/,/g, ''));
+    if (isNaN(segAmt) || segAmt <= 0) continue;
+
+    const isInc = segText.includes('salary') || segText.includes('income') || segText.includes('credit') || segText.includes('received') || segText.includes('deposit');
+    const matchedAcc = accounts.find(a => segText.includes(a.account_name.toLowerCase()));
+    const matchedCat = categories.find(c => segText.includes(c.name.toLowerCase()));
+
+    // Date check
+    let segDate = currentDate;
+    if (segText.includes('yesterday')) {
+      const d = new Date(currentDate);
+      d.setDate(d.getDate() - 1);
+      segDate = d.toISOString().slice(0, 10);
+    }
+
+    if (isInc) {
+      extractedBatch.push({
+        transaction_type: 'income',
+        amount: segAmt,
+        to_account_id: matchedAcc?.id || null,
+        income_category: 'others',
+        category: 'Others',
+        description: seg.trim(),
+        transaction_date: segDate
+      });
+    } else {
+      // Expense - category must NEVER remain blank
+      extractedBatch.push({
+        transaction_type: 'expense',
+        amount: segAmt,
+        from_account_id: matchedAcc?.id || null,
+        category: matchedCat ? matchedCat.name : (segText.includes('grocer') ? 'Groceries' : (segText.includes('petrol') || segText.includes('fuel') ? 'Transportation' : (categories[0]?.name || 'Others'))),
+        description: seg.trim(),
+        transaction_date: segDate
+      });
+    }
+  }
+
+  if (extractedBatch.length > 1) {
+    const reply = `I've prepared a batch of **${extractedBatch.length} transactions** (${extractedBatch.filter(b => b.transaction_type === 'expense').length} expenses, ${extractedBatch.filter(b => b.transaction_type === 'income').length} income). All categories are assigned and ready for review!`;
+    return {
+      intent: 'transaction',
+      extractedInfo: extractedBatch[0],
+      batchTransactions: extractedBatch,
+      isComplete: true,
+      missingFields: [],
+      reply,
+      clarificationQuestion: reply
+    };
+  }
+
+  // Single transaction extraction
+  const amountMatch = command.match(/(?:₹|rs\.?|inr)?\s*(\d+(?:,\d+)*(?:\.\d{1,2})?)/i);
+  if (amountMatch) {
+    const amountVal = parseFloat(amountMatch[1].replace(/,/g, ''));
+    if (!isNaN(amountVal) && amountVal > 0) {
+      // Check for salary / income
+      const isIncome = text.includes('salary') || text.includes('income') || text.includes('credit') || text.includes('received');
+      const isCCRepay = text.includes('repay') || text.includes('bill') || text.includes('credit card');
+
+      // Date check
+      let dateVal = currentDate;
+      if (text.includes('yesterday')) {
+        const d = new Date(currentDate);
+        d.setDate(d.getDate() - 1);
+        dateVal = d.toISOString().slice(0, 10);
+      }
+
+      // Matched account
+      const matchedAcc = accounts.find(a => text.includes(a.account_name.toLowerCase()));
+      // Matched category
+      const matchedCat = categories.find(c => text.includes(c.name.toLowerCase()));
+
+      const extractedInfo: any = {
+        amount: amountVal,
+        transaction_date: dateVal,
+        description: command.trim()
+      };
+
+      if (isCCRepay) {
+        extractedInfo.transaction_type = 'credit_card_repayment';
+        extractedInfo.to_account_id = accounts.find(a => a.account_type === 'credit_card')?.id || null;
+        extractedInfo.from_account_id = matchedAcc?.id || null;
+      } else if (isIncome) {
+        extractedInfo.transaction_type = 'income';
+        extractedInfo.income_category = text.includes('salary') ? 'salaries' : 'others';
+        extractedInfo.to_account_id = matchedAcc?.id || null;
+      } else {
+        extractedInfo.transaction_type = 'expense';
+        // Category must NEVER remain blank
+        extractedInfo.category = matchedCat ? matchedCat.name : (text.includes('grocer') ? 'Groceries' : (text.includes('petrol') || text.includes('fuel') ? 'Transportation' : (categories[0]?.name || 'Others')));
+        extractedInfo.from_account_id = matchedAcc?.id || null;
+      }
+
+      const missing: string[] = [];
+      if (!extractedInfo.from_account_id && extractedInfo.transaction_type === 'expense') {
+        missing.push('from_account_id');
+      }
+
+      const reply = `I've prepared a ${extractedInfo.transaction_type} of ₹${amountVal.toLocaleString('en-IN')}${extractedInfo.category ? ` for ${extractedInfo.category}` : ''} on ${dateVal}.${missing.length > 0 ? ' Which account did you pay from?' : ' Form is auto-filled and ready!'}`;
+
+      return {
+        intent: 'transaction',
+        extractedInfo,
+        batchTransactions: [extractedInfo],
+        isComplete: missing.length === 0,
+        missingFields: missing,
+        reply,
+        clarificationQuestion: reply
+      };
+    }
+  }
+
+  return null;
 }
 
 export async function parseSmartChatbotCommand(
@@ -465,9 +648,9 @@ export async function parseSmartChatbotCommand(
   onComplete: (result: SmartChatbotResult) => void,
   onError: (error: string) => void
 ): Promise<void> {
-  try {
-    const { command, accounts, categories, transactions, chatHistory, currentDate } = params;
+  const { command, accounts, categories, transactions, chatHistory, currentDate } = params;
 
+  try {
     const accountsContext = accounts.map(a => `- ID: "${a.id}", Name: "${a.account_name}", Type: "${a.account_type}", Balance: ${a.balance}, Currency: "${a.currency}"`).join('\n');
     const categoriesContext = categories.map(c => `- Name: "${c.name}", Icon: "${c.icon}"`).join('\n');
     
@@ -490,10 +673,10 @@ export async function parseSmartChatbotCommand(
     7. Provide general support instructions (intent: "general_help")
     
     Here is the context of the user's existing accounts:
-    ${accountsContext}
+    ${accountsContext || 'No accounts recorded yet.'}
     
     Here is the context of the user's available expense categories:
-    ${categoriesContext}
+    ${categoriesContext || 'No expense categories recorded yet.'}
     
     Static Income Categories are:
     - key: "salaries", Name: "Salaries"
@@ -512,6 +695,19 @@ export async function parseSmartChatbotCommand(
     - If the user provides a brief command (e.g., "spent 250 at Starbucks" or "McDonald's 500"), use the history to resolve the most likely "category" (e.g., matching "Starbucks" to "Food & Dining" because of previous transactions) and "from_account_id" (e.g., HDFC Bank account if they typically pay HDFC there).
     - Leverage this history to auto-fill missing details seamlessly, so the bot gets smarter with every transaction the user records!
 
+    CRITICAL RULES FOR "reply" AND "clarificationQuestion":
+    You MUST ALWAYS provide a friendly, helpful, natural conversational message in "reply" (and duplicate it in "clarificationQuestion").
+    - NEVER leave "reply" or "clarificationQuestion" empty or null!
+    - For intent "transaction":
+      - When complete: Confirm what was auto-filled (e.g., "Got it! I have set up an income of ₹50,000 for Salary deposited into HDFC Bank on 2026-09-19.").
+      - When incomplete: Acknowledge what was extracted, and gently prompt for what is still needed (e.g., "I've recorded ₹350 for Groceries on 2026-09-18. Which account was used for this payment?").
+    - For intent "financial_inquiry":
+      - Answer the user's question directly and thoroughly with clean markdown formatting. For example, for "Show my bank balances", list each account, its type, and its balance in INR (₹). For "What categories do I have?", list all categories.
+    - For intent "emi_calculator":
+      - Provide a clear summary with the monthly EMI amount, total interest payable, and total cost.
+    - For intent "general_help":
+      - Provide a friendly, concise list of examples of what you can do (recording expenses, checking balances, budget tracking, calculating EMIs).
+
     RULES FOR DETECTING INTENTS & REQUIRED FIELDS:
     
     1. intent: "transaction"
@@ -522,61 +718,46 @@ export async function parseSmartChatbotCommand(
          - income: to_account_id (matched from accounts), income_category (salaries/allowances/family_income/others).
          - transfer / withdrawal / loan_payment / credit_card_repayment: both from_account_id and to_account_id.
          - interest_charge: to_account_id.
-       - Special Credit Card EMI extraction: If the user mentions converting a credit card transaction or expense to EMI (e.g., "convert to 12 months EMI with 500 charges" or "make it a 6-month EMI"), extract:
+       - MULTI-TRANSACTION BATCH POSTING RULES:
+         * If the user specifies multiple transactions in the input (e.g. "spent 500 on groceries and 200 on petrol", pasted SMS/statements, or comma/newline separated items), set intent: "transaction".
+         * Multi-transaction batch posting ALLOWS ONLY "income" OR "expense" transactions. Transfers, withdrawals, loans, and repayments are NOT allowed in batch mode (omit or classify as expense/income).
+         * Populate "batchTransactions": an array of items with { transaction_type: "expense" | "income", amount: number, category: string, income_category: string, from_account_id: string | null, to_account_id: string | null, description: string, transaction_date: "YYYY-MM-DD" }.
+         * Also populate "extractedInfo" with the first transaction in the batch for backwards compatibility.
+         * CRITICAL CATEGORY RULE: Expense/Income Category SHALL NEVER REMAIN BLANK OR NULL.
+           - For each expense: "category" is STRICTLY REQUIRED. Match with the user's available expense categories (e.g., "Groceries", "Food & Dining", "Utilities", etc.). If no category fits, use "Others". Never leave it empty or null!
+           - For each income: "income_category" is STRICTLY REQUIRED. Must be one of ["salaries", "allowances", "family_income", "others"]. Default to "others" if unspecified. Never leave it empty or null!
+         * Reply clearly summarizing the batch count (e.g. "I have prepared 3 transactions (2 expenses, 1 income) for your review. Please verify the accounts and click Submit to post them!").
+       - Special Credit Card EMI extraction (single transaction): If the user mentions converting a credit card transaction or expense to EMI (e.g., "convert to 12 months EMI with 500 charges"), extract:
          - "is_emi": true (boolean)
          - "emi_months": total number of months (integer, e.g., 6 or 12)
          - "bank_charges": processing fee or bank charges amount (number, default 0 if not mentioned)
-       - Missing fields go in "missingFields". Ask for them in "clarificationQuestion".
+       - Missing fields go in "missingFields".
        
     2. intent: "account"
        - Triggered if the user wants to add/create a new account, card, cash wallet, or loan profile. E.g. "Create a new bank account named HDFC Savings with balance 10000" or "Add a new credit card named SBI Card with limit 150000".
-       - Extracted fields:
-         - "account_type" ('cash' | 'bank' | 'credit_card' | 'loan')
-         - "account_name" (e.g. HDFC Savings)
-         - "balance" (initial balance, default 0)
-         - "currency" (default "INR")
-         - "country" (e.g. 'IN', 'US', 'GB', 'EU'. Default to 'IN' if Indian banks like SBI/HDFC are mentioned, or 'US' if US banks are mentioned, otherwise ask).
-         - "institution_name" (e.g. HDFC Bank, SBI Bank, Chase, Citibank. Required for bank/credit_card/loan).
-         - "last_4_digits" (4 digit string or null, optional)
-         - "credit_limit" (number, required if card/credit_card)
-         - "loan_principal" (number, required if loan)
-         - "loan_tenure_months" (number, required if loan)
-         - "current_interest_rate" (number, required if loan)
-         - "loan_start_date" (string 'YYYY-MM-DD', required if loan)
-         - "due_date" (number, day of month 1-31, required if loan indicating EMI payment due day)
-         - "statement_day" (number, day of month 1-31, required if credit_card indicating the statement generation day)
-         - "due_day" (number, day of month 1-31, required if credit_card indicating the payment due day)
-         - "web_url" (standard website or login URL specified by user, e.g. "https://www.hdfcbank.com")
-         - "ios_app_url" (Apple app store link if mentioned)
-         - "android_app_url" (Google play store link if mentioned)
-         - "institution_logo" (custom logo image URL if specified)
        - Required fields by type:
          - cash: "account_type", "account_name".
          - bank: "account_type", "account_name", "country", "currency", "institution_name".
          - credit_card: "account_type", "account_name", "country", "currency", "institution_name", "credit_limit", "statement_day", "due_day".
          - loan: "account_type", "account_name", "country", "currency", "institution_name", "loan_principal", "loan_tenure_months", "current_interest_rate", "loan_start_date", "due_date".
-       - If any required fields are missing: set isComplete to false, list them in missingFields, and prompt for them conversationally in clarificationQuestion.
        
     3. intent: "budget"
-       - Triggered if the user wants to set a monthly budget or category budget. E.g. "Set a budget of 5000 for groceries in June 2026" or "Setup monthly expenses budget of 40000 for next month".
-       - Extracted fields: "month" (number 1-12, default to current month), "year" (4-digit number, default to current year), "budgeted_income" (number), "budgeted_expenses" (overall monthly expense budget), "category_budgets" (JSON object representing category name keys and budget numbers, e.g. {"Groceries": 5000}).
-       - Required fields: "month", "year". Must specify at least one budget limit (overall budgeted_expenses or category_budgets).
+       - Triggered if the user wants to set a monthly budget or category budget.
+       - Extracted fields: "month", "year", "budgeted_income", "budgeted_expenses", "category_budgets".
        
     4. intent: "emi_calculator"
-       - Triggered if the user wants to calculate, simulate, or compare loan payments. E.g. "What is the monthly payment for a loan of 500000 at 9.5% interest for 5 years?".
-       - Extracted fields: "principal" (loan amount), "annual_rate" (annual interest rate percentage), "tenure_months" (total loan tenure in months. Note: convert "5 years" to "60 months").
-       - Required fields: "principal", "annual_rate", "tenure_months".
-       - Calculation: If all fields are complete, perform the exact monthly EMI calculation: EMI = [P x r x (1+r)^n] / [(1+r)^n - 1] where P = principal, r = annual_rate/12/100, n = tenure_months. Put the calculated EMI, total interest, and a friendly summary inside "clarificationQuestion" and return the calculation details inside "extraContext" as: {"monthly_emi": X, "total_interest": Y, "total_payable": Z}.
+       - Triggered if the user wants to calculate or simulate loan payments.
+       - Calculation: If all fields are complete, perform the exact monthly EMI calculation: EMI = [P x r x (1+r)^n] / [(1+r)^n - 1] where P = principal, r = annual_rate/12/100, n = tenure_months. Put the calculated EMI, total interest, and a friendly summary inside "reply" and return calculation details inside "extraContext" as: {"monthly_emi": X, "total_interest": Y, "total_payable": Z}.
        
     5. intent: "financial_inquiry"
-       - Triggered if the user asks a question about balances, spent totals, or recent audits. E.g. "What is my ICICI Bank balance?" or "How much did I spend on Food & Dining this month?".
-       - Scan the accounts context or filter and sum transactions context for the current month. Return the calculated answer in "clarificationQuestion". Set "isComplete" to true.
+       - Triggered if the user asks a question about balances, spent totals, or available categories.
+       - Return the calculated answer directly in "reply". Set "isComplete" to true.
        
     6. intent: "financial_analysis"
-       - Triggered if the user wants a full AI analysis, budget report, or optimization advice. Perform the summary, and return a beautiful markdown analysis report in "clarificationQuestion".
+       - Return a markdown analysis report in "reply".
        
     7. intent: "general_help"
-       - Triggered if the user asks "What can you do?" or general help. Explain in a detailed, friendly way how they can operate transactions, accounts, budgets, and EMI calculations in "clarificationQuestion".
+       - Explain how the user can operate transactions, accounts, budgets, and EMI calculations in "reply".
 
     Current natural language input: "${command}"
     
@@ -627,8 +808,21 @@ export async function parseSmartChatbotCommand(
         "annual_rate": number | null,
         "tenure_months": number | null
       },
+      "batchTransactions": [
+        {
+          "transaction_type": "income" | "expense",
+          "amount": number,
+          "from_account_id": string | null,
+          "to_account_id": string | null,
+          "category": string,
+          "income_category": "salaries" | "allowances" | "family_income" | "others",
+          "description": string,
+          "transaction_date": "YYYY-MM-DD"
+        }
+      ],
       "isComplete": boolean,
       "missingFields": string[],
+      "reply": string,
       "clarificationQuestion": string,
       "extraContext": any
     }
@@ -735,21 +929,116 @@ export async function parseSmartChatbotCommand(
       }
       
       const parsedResult: SmartChatbotResult = JSON.parse(cleanedText);
+
+      // Sanitize & enforce non-blank categories for batch transactions
+      if (parsedResult.batchTransactions && Array.isArray(parsedResult.batchTransactions)) {
+        parsedResult.batchTransactions = parsedResult.batchTransactions
+          .filter(t => t && Number(t.amount) > 0)
+          .map(t => {
+            const isInc = t.transaction_type === 'income';
+            const matchedCat = categories.find(c => c.name.toLowerCase() === (t.category || '').toLowerCase());
+            return {
+              transaction_type: isInc ? 'income' : 'expense',
+              amount: Number(t.amount),
+              from_account_id: isInc ? null : (t.from_account_id || null),
+              to_account_id: isInc ? (t.to_account_id || null) : null,
+              // Expense category must NEVER remain blank
+              category: isInc ? null : (matchedCat ? matchedCat.name : (t.category && t.category.trim() ? t.category.trim() : (categories[0]?.name || 'Others'))),
+              // Income category must NEVER remain blank
+              income_category: isInc ? (['salaries', 'allowances', 'family_income', 'others'].includes(t.income_category as any) ? t.income_category : 'others') : null,
+              description: t.description || (isInc ? 'Income' : 'Expense'),
+              transaction_date: t.transaction_date || currentDate
+            };
+          });
+
+        if (parsedResult.batchTransactions.length > 0 && !parsedResult.extractedInfo?.amount) {
+          parsedResult.extractedInfo = parsedResult.batchTransactions[0] as any;
+        }
+      }
+
+      // Enforce non-blank category for single extractedInfo transaction as well
+      if (parsedResult.intent === 'transaction' && parsedResult.extractedInfo) {
+        if (parsedResult.extractedInfo.transaction_type === 'expense') {
+          if (!parsedResult.extractedInfo.category || !parsedResult.extractedInfo.category.trim()) {
+            parsedResult.extractedInfo.category = categories[0]?.name || 'Others';
+          }
+        } else if (parsedResult.extractedInfo.transaction_type === 'income') {
+          if (!parsedResult.extractedInfo.income_category) {
+            parsedResult.extractedInfo.income_category = 'others';
+          }
+        }
+      }
+
+      // Normalize reply and clarificationQuestion so neither is ever blank/null
+      let finalReply = parsedResult.reply || parsedResult.clarificationQuestion || '';
+
+      if (!finalReply || !finalReply.trim()) {
+        if (parsedResult.intent === 'transaction') {
+          if (parsedResult.batchTransactions && parsedResult.batchTransactions.length > 1) {
+            const count = parsedResult.batchTransactions.length;
+            const expCount = parsedResult.batchTransactions.filter(b => b.transaction_type === 'expense').length;
+            const incCount = parsedResult.batchTransactions.filter(b => b.transaction_type === 'income').length;
+            finalReply = `I've prepared a batch of **${count} transactions** (${expCount} expense${expCount !== 1 ? 's' : ''}, ${incCount} income). Categories are assigned and ready for review. Click **Submit** to post them!`;
+          } else {
+            const ext = parsedResult.extractedInfo || {};
+            const parts: string[] = [];
+            if (ext.amount) parts.push(`₹${Number(ext.amount).toLocaleString('en-IN')}`);
+            if (ext.category) parts.push(`for ${ext.category}`);
+            if (ext.transaction_type) parts.push(`(${ext.transaction_type})`);
+            if (ext.transaction_date) parts.push(`on ${ext.transaction_date}`);
+
+            if (parsedResult.missingFields && parsedResult.missingFields.length > 0) {
+              const readableMissing = parsedResult.missingFields.map(f => f.replace(/_/g, ' ')).join(', ');
+              finalReply = parts.length > 0
+                ? `I've prepared ${parts.join(' ')}. Please specify: ${readableMissing}.`
+                : `Please specify the missing details: ${readableMissing}.`;
+            } else {
+              finalReply = parts.length > 0
+                ? `I've auto-filled the transaction form with ${parts.join(' ')}. Ready to submit!`
+                : `Transaction details have been applied to the form!`;
+            }
+          }
+        } else if (parsedResult.intent === 'financial_inquiry') {
+          const fallbackInquiry = tryLocalHeuristicFallback(command, accounts, categories, currentDate);
+          finalReply = fallbackInquiry?.reply || "Here are your financial inquiry results based on your accounts and records.";
+        } else {
+          finalReply = "I've processed your request. Let me know if you need to adjust any transaction or account details!";
+        }
+      }
+
+      parsedResult.reply = finalReply;
+      parsedResult.clarificationQuestion = finalReply;
       onComplete(parsedResult);
     } catch (e) {
       console.error('Failed to parse final AI output as JSON:', e, fullResponseText);
       
+      // Check if heuristic fallback can handle it
+      const fallback = tryLocalHeuristicFallback(command, accounts, categories, currentDate);
+      if (fallback) {
+        onComplete(fallback);
+        return;
+      }
+
       // Return a structured error fallback
       onComplete({
         intent: 'general_help',
         extractedInfo: {},
         isComplete: false,
         missingFields: [],
-        clarificationQuestion: fullResponseText || "I'm here to help you manage Transactions, Accounts, Budgets, and simulate EMIs! What would you like to operate today?"
+        reply: "I'm here to help you manage Transactions, Accounts, Budgets, and simulate EMIs! What would you like to operate today?",
+        clarificationQuestion: "I'm here to help you manage Transactions, Accounts, Budgets, and simulate EMIs! What would you like to operate today?"
       });
     }
   } catch (error) {
     console.error('AI Service Error:', error);
+
+    // If API failed (network error, app ID, rate limit), attempt heuristic fallback first
+    const fallback = tryLocalHeuristicFallback(command, accounts, categories, currentDate);
+    if (fallback) {
+      onComplete(fallback);
+      return;
+    }
+
     onError(error instanceof Error ? error.message : 'Failed to parse command');
   }
 }

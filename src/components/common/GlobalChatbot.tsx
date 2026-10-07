@@ -124,6 +124,7 @@ export default function GlobalChatbot() {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Active drafts
+  const [batchDrafts, setBatchDrafts] = useState<DraftTransaction[]>([]);
   const [draft, setDraft] = useState<DraftTransaction>({
     transaction_type: null,
     amount: null,
@@ -427,30 +428,88 @@ export default function GlobalChatbot() {
           const ext = parsedResult.extractedInfo;
           
           if (parsedResult.intent === 'transaction') {
-            const updatedDraft: DraftTransaction = {
-              transaction_type: ext.transaction_type || draft.transaction_type,
-              amount: ext.amount || draft.amount,
-              from_account_id: ext.from_account_id || draft.from_account_id,
-              to_account_id: ext.to_account_id || draft.to_account_id,
-              category: ext.category || draft.category,
-              income_category: ext.income_category || draft.income_category,
-              description: ext.description || draft.description,
-              transaction_date: ext.transaction_date || draft.transaction_date || today,
-              is_emi: ext.is_emi !== undefined && ext.is_emi !== null ? ext.is_emi : draft.is_emi,
-              emi_months: ext.emi_months || draft.emi_months,
-              bank_charges: ext.bank_charges !== undefined && ext.bank_charges !== null ? ext.bank_charges : draft.bank_charges,
-            };
-            
-            const clientMissing = validateCurrentDraft('transaction', updatedDraft);
-            setDraft(updatedDraft);
-            setMissingFields(clientMissing);
-            
-            setChatMessages(prev => [...prev, {
-              id: botMsgId,
-              role: 'model',
-              content: friendlyQuestion,
-              isInteractive: clientMissing.length === 0
-            }]);
+            if (parsedResult.batchTransactions && parsedResult.batchTransactions.length > 0) {
+              const defaultAcc = accounts.find(a => a.account_type === 'bank' || a.account_type === 'cash') || accounts[0];
+              const defaultAccId = defaultAcc ? defaultAcc.id : null;
+              const defaultExpenseCategory = categories[0]?.name || 'Others';
+
+              const stagedBatch: DraftTransaction[] = parsedResult.batchTransactions
+                .filter(item => item.transaction_type === 'income' || item.transaction_type === 'expense')
+                .map(item => {
+                  const isIncome = item.transaction_type === 'income';
+                  let accId = item.from_account_id || defaultAccId;
+                  if (item.account_name) {
+                    const matchedAcc = accounts.find(a => a.account_name.toLowerCase().includes(item.account_name!.toLowerCase()));
+                    if (matchedAcc) accId = matchedAcc.id;
+                  }
+
+                  const finalCategory = !isIncome ? (item.category?.trim() || defaultExpenseCategory) : null;
+                  const finalIncomeCategory = isIncome ? ((item.income_category as any) || 'others') : null;
+
+                  return {
+                    transaction_type: isIncome ? 'income' : 'expense',
+                    amount: item.amount > 0 ? item.amount : null,
+                    from_account_id: !isIncome ? accId : null,
+                    to_account_id: isIncome ? accId : null,
+                    category: finalCategory,
+                    income_category: finalIncomeCategory,
+                    description: item.description?.trim() || (isIncome ? getIncomeCategoryName(finalIncomeCategory || 'others') : (finalCategory || 'Expense')),
+                    transaction_date: item.transaction_date || today,
+                    is_emi: false,
+                    emi_months: null,
+                    bank_charges: null,
+                  };
+                });
+
+              setBatchDrafts(stagedBatch);
+              setDraft({
+                transaction_type: null,
+                amount: null,
+                from_account_id: null,
+                to_account_id: null,
+                category: null,
+                income_category: null,
+                description: null,
+                transaction_date: null,
+                is_emi: null,
+                emi_months: null,
+                bank_charges: null
+              });
+              setMissingFields([]);
+
+              setChatMessages(prev => [...prev, {
+                id: botMsgId,
+                role: 'model',
+                content: friendlyQuestion,
+                isInteractive: stagedBatch.length > 0
+              }]);
+            } else {
+              setBatchDrafts([]);
+              const updatedDraft: DraftTransaction = {
+                transaction_type: ext.transaction_type || draft.transaction_type,
+                amount: ext.amount || draft.amount,
+                from_account_id: ext.from_account_id || draft.from_account_id,
+                to_account_id: ext.to_account_id || draft.to_account_id,
+                category: ext.category || draft.category,
+                income_category: ext.income_category || draft.income_category,
+                description: ext.description || draft.description,
+                transaction_date: ext.transaction_date || draft.transaction_date || today,
+                is_emi: ext.is_emi !== undefined && ext.is_emi !== null ? ext.is_emi : draft.is_emi,
+                emi_months: ext.emi_months || draft.emi_months,
+                bank_charges: ext.bank_charges !== undefined && ext.bank_charges !== null ? ext.bank_charges : draft.bank_charges,
+              };
+              
+              const clientMissing = validateCurrentDraft('transaction', updatedDraft);
+              setDraft(updatedDraft);
+              setMissingFields(clientMissing);
+              
+              setChatMessages(prev => [...prev, {
+                id: botMsgId,
+                role: 'model',
+                content: friendlyQuestion,
+                isInteractive: clientMissing.length === 0
+              }]);
+            }
           } else if (parsedResult.intent === 'account') {
             const updatedAccount: DraftAccount = {
               account_type: ext.account_type || draftAccount.account_type,
@@ -553,6 +612,7 @@ export default function GlobalChatbot() {
       emi_months: null,
       bank_charges: null
     });
+    setBatchDrafts([]);
     
     setDraftAccount({
       account_type: null,
@@ -648,15 +708,30 @@ export default function GlobalChatbot() {
 
       await loadData();
       setIsLoading(false);
+
+      // Fetch post-transaction balance for related account
+      let balanceInfo = '';
+      const relatedAccId = draft.transaction_type === 'income' ? draft.to_account_id : draft.from_account_id;
+      if (relatedAccId) {
+        try {
+          const updatedAcc = await accountApi.getAccountById(relatedAccId);
+          if (updatedAcc) {
+            balanceInfo = `\n💳 Related Account: ${updatedAcc.account_name} | Balance after posting: ₹${Number(updatedAcc.balance).toLocaleString('en-IN')}`;
+          }
+        } catch (err) {
+          console.error('Failed to fetch updated account balance:', err);
+        }
+      }
+
       toast({
         title: 'Transaction Saved Successfully!',
-        description: `Recorded ${draft.transaction_type} of ₹${draft.amount}.`,
+        description: `Transaction 1 of 1 posted successfully. Recorded ${draft.transaction_type} of ₹${draft.amount}.${balanceInfo ? ` ${balanceInfo.replace('\n', '')}` : ''}`,
       });
 
       setChatMessages(prev => [...prev, {
         id: Math.random().toString(),
         role: 'model',
-        content: `🎉 Transaction recorded! Saved "${transactionPayload.description}" for ₹${Number(draft.amount).toLocaleString('en-IN')}. What else can I help you with?`
+        content: `🎉 Transaction 1 of 1 posted successfully!\n• Type: ${draft.transaction_type?.toUpperCase()} | Amount: ₹${Number(draft.amount).toLocaleString('en-IN')} | Description: "${transactionPayload.description}"${balanceInfo}\n\nWhat else can I help you with?`
       }]);
 
       setDraft({
@@ -678,6 +753,133 @@ export default function GlobalChatbot() {
       toast({
         title: 'Failed to Save Transaction',
         description: e instanceof Error ? e.message : 'Database error',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  // Save Batch Transactions sequentially
+  const handleSaveBatchTransactions = async () => {
+    if (!user || batchDrafts.length === 0) return;
+
+    // Validate that only income/expense are present and required fields are set
+    for (let i = 0; i < batchDrafts.length; i++) {
+      const item = batchDrafts[i];
+      if (!item.amount || item.amount <= 0) {
+        toast({
+          title: `Validation Error in #${i + 1}`,
+          description: `Transaction #${i + 1} has an invalid or missing amount.`,
+          variant: 'destructive'
+        });
+        return;
+      }
+      if (item.transaction_type !== 'income' && item.transaction_type !== 'expense') {
+        toast({
+          title: `Batch Error in #${i + 1}`,
+          description: `Only Income and Expense transactions are supported in multi-transaction batches.`,
+          variant: 'destructive'
+        });
+        return;
+      }
+      const accId = item.transaction_type === 'income' ? item.to_account_id : item.from_account_id;
+      if (!accId) {
+        toast({
+          title: `Account missing in #${i + 1}`,
+          description: `Please select an account for transaction #${i + 1}.`,
+          variant: 'destructive'
+        });
+        return;
+      }
+      if (item.transaction_type === 'income' && !item.income_category) {
+        toast({
+          title: `Category missing in #${i + 1}`,
+          description: `Income category cannot remain blank for transaction #${i + 1}.`,
+          variant: 'destructive'
+        });
+        return;
+      }
+      if (item.transaction_type === 'expense' && !item.category?.trim()) {
+        toast({
+          title: `Category missing in #${i + 1}`,
+          description: `Expense category cannot remain blank for transaction #${i + 1}.`,
+          variant: 'destructive'
+        });
+        return;
+      }
+    }
+
+    const updatedMessages = chatMessages.map(m => m.isInteractive ? { ...m, isInteractive: false } : m);
+    setChatMessages(updatedMessages);
+    setIsLoading(true);
+
+    const total = batchDrafts.length;
+    const progressReports: string[] = [];
+
+    try {
+      for (let idx = 0; idx < total; idx++) {
+        const item = batchDrafts[idx];
+        const isIncome = item.transaction_type === 'income';
+        const accId = isIncome ? item.to_account_id : item.from_account_id;
+
+        const payload = {
+          user_id: user.id,
+          transaction_type: item.transaction_type!,
+          from_account_id: isIncome ? null : accId,
+          to_account_id: isIncome ? accId : null,
+          amount: Number(item.amount),
+          currency: 'INR',
+          category: !isIncome ? (item.category || 'Others') : null,
+          income_category: isIncome ? (item.income_category || 'others') : null,
+          description: item.description?.trim() || (!isIncome ? (item.category || 'Expense') : getIncomeCategoryName(item.income_category || 'others')),
+          transaction_date: item.transaction_date || new Date().toISOString().slice(0, 10),
+        };
+
+        await transactionApi.createTransaction(payload);
+
+        // Fetch updated account balance after posting
+        let postBalanceText = '';
+        if (accId) {
+          try {
+            const updatedAcc = await accountApi.getAccountById(accId);
+            if (updatedAcc) {
+              postBalanceText = `\n💳 Related Account: ${updatedAcc.account_name} | Balance after posting: ₹${Number(updatedAcc.balance).toLocaleString('en-IN')}`;
+            }
+          } catch (err) {
+            console.error('Failed to fetch updated account balance:', err);
+          }
+        }
+
+        const report = `✅ Transaction ${idx + 1} of ${total} posted successfully!\n• Type: ${payload.transaction_type.toUpperCase()} | Amount: ₹${payload.amount.toLocaleString('en-IN')} | Description: "${payload.description}"${postBalanceText}`;
+        progressReports.push(report);
+      }
+
+      await loadData();
+      setIsLoading(false);
+
+      toast({
+        title: 'Batch Posting Completed!',
+        description: `Successfully posted ${total} of ${total} transactions.`,
+      });
+
+      const fullSummary = `🎉 **Batch Posting Complete!**\n\nAll ${total} transactions have been successfully posted:\n\n` + progressReports.join('\n\n---\n\n');
+
+      setChatMessages(prev => [
+        ...prev,
+        {
+          id: Math.random().toString(),
+          role: 'model',
+          content: fullSummary
+        }
+      ]);
+
+      setBatchDrafts([]);
+      setMissingFields([]);
+    } catch (e) {
+      setIsLoading(false);
+      console.error(e);
+      toast({
+        title: 'Batch Posting Error',
+        description: e instanceof Error ? e.message : 'Database error while saving batch',
         variant: 'destructive'
       });
     }
@@ -889,8 +1091,42 @@ export default function GlobalChatbot() {
           </div>
         </SheetHeader>
 
-        {/* 1. DIGITAL INVOICE RECEIPT PREVIEW */}
-        {currentIntent === 'transaction' && draft.transaction_type && (
+        {/* 1. DIGITAL INVOICE RECEIPT PREVIEW (BATCH OR SINGLE) */}
+        {currentIntent === 'transaction' && batchDrafts.length > 0 ? (
+          <div className="mx-5 mt-4 p-4 bg-slate-950/80 border border-teal-500/30 rounded-2xl text-[11px] space-y-3 shrink-0 animate-in slide-in-from-top-3 duration-300 shadow-xl relative overflow-hidden">
+            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-teal-400 via-emerald-400 to-indigo-500"></div>
+            
+            <div className="flex justify-between items-center">
+              <span className="font-bold text-slate-300 uppercase tracking-widest text-[9px] flex items-center gap-1.5 font-mono">
+                <Calendar className="h-3.5 w-3.5 text-teal-400" /> BATCH TRANSACTION DRAFT
+              </span>
+              <Badge className="bg-teal-500/20 text-teal-300 border border-teal-500/30 text-[9px] font-bold px-2 py-0.5 rounded-full">
+                {batchDrafts.length} Transactions
+              </Badge>
+            </div>
+
+            <div className="border-t border-dashed border-slate-800 my-2"></div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="p-2 rounded-xl bg-red-950/20 border border-red-500/20 text-center">
+                <span className="text-[9px] text-red-400 font-semibold uppercase">Total Expenses</span>
+                <div className="text-sm font-black font-mono text-red-400 mt-0.5">
+                  ₹{batchDrafts.filter(b => b.transaction_type === 'expense').reduce((sum, b) => sum + Number(b.amount || 0), 0).toLocaleString('en-IN')}
+                </div>
+              </div>
+              <div className="p-2 rounded-xl bg-emerald-950/20 border border-emerald-500/20 text-center">
+                <span className="text-[9px] text-emerald-400 font-semibold uppercase">Total Income</span>
+                <div className="text-sm font-black font-mono text-emerald-400 mt-0.5">
+                  ₹{batchDrafts.filter(b => b.transaction_type === 'income').reduce((sum, b) => sum + Number(b.amount || 0), 0).toLocaleString('en-IN')}
+                </div>
+              </div>
+            </div>
+
+            <p className="text-slate-400 text-[10px] text-center pt-1 font-medium">
+              Only income/expenses allowed. Click <strong>Submit & Post All</strong> in the chat to save.
+            </p>
+          </div>
+        ) : currentIntent === 'transaction' && draft.transaction_type ? (
           <div className="mx-5 mt-4 p-4 bg-slate-950/60 border border-white/5 rounded-2xl text-[11px] space-y-3 shrink-0 animate-in slide-in-from-top-3 duration-300 shadow-xl relative overflow-hidden">
             {/* Top color tag */}
             <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-teal-500 via-primary to-indigo-500 opacity-80"></div>
@@ -944,7 +1180,7 @@ export default function GlobalChatbot() {
               </div>
             </div>
           </div>
-        )}
+        ) : null}
 
         {/* 2. VIRTUAL BANK PASSBOOK CARD PREVIEW */}
         {currentIntent === 'account' && draftAccount.account_type && (
@@ -1025,32 +1261,76 @@ export default function GlobalChatbot() {
 
                   {msg.isInteractive && (
                     <div className="bg-slate-950/80 border border-teal-500/20 rounded-xl p-3 flex flex-col gap-2.5 animate-in slide-in-from-bottom-2 duration-300 shadow-lg">
-                      <div className="flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full bg-teal-400 animate-pulse"></span>
-                        <span className="text-[10px] text-slate-300 font-semibold tracking-wide">CONFIRM DRAFT INFORMATION</span>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="h-2 w-2 rounded-full bg-teal-400 animate-pulse"></span>
+                          <span className="text-[10px] text-slate-300 font-semibold tracking-wide">
+                            {batchDrafts.length > 0 ? `BATCH POSTING REVIEW (${batchDrafts.length} TRANSACTIONS)` : 'CONFIRM DRAFT INFORMATION'}
+                          </span>
+                        </div>
+                        {batchDrafts.length > 0 && (
+                          <Badge variant="outline" className="text-[9px] border-teal-500/30 text-teal-300">
+                            Income / Expenses Only
+                          </Badge>
+                        )}
                       </div>
+
+                      {batchDrafts.length > 0 && (
+                        <div className="max-h-48 overflow-y-auto space-y-1.5 my-1 pr-1">
+                          {batchDrafts.map((item, idx) => (
+                            <div key={idx} className="bg-slate-900/80 border border-white/5 rounded-lg p-2 text-[10px] space-y-1">
+                              <div className="flex justify-between items-center font-bold">
+                                <span className="text-teal-400">#{idx + 1} of {batchDrafts.length}</span>
+                                <Badge className={item.transaction_type === 'income' ? 'bg-emerald-500/20 text-emerald-300 text-[9px] py-0 px-1.5' : 'bg-red-500/20 text-red-300 text-[9px] py-0 px-1.5'}>
+                                  {item.transaction_type?.toUpperCase()} • ₹{Number(item.amount || 0).toLocaleString('en-IN')}
+                                </Badge>
+                              </div>
+                              <div className="flex justify-between text-slate-300">
+                                <span>Category: <strong className="text-white">{item.transaction_type === 'income' ? getIncomeCategoryName(item.income_category || 'others') : (item.category || 'Others')}</strong></span>
+                                <span>Account: <strong className="text-white">{getAccountName(item.transaction_type === 'income' ? item.to_account_id : item.from_account_id) || 'Default'}</strong></span>
+                              </div>
+                              {item.description && (
+                                <p className="text-slate-400 italic truncate">"{item.description}"</p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
                       <div className="flex gap-2 w-full">
                         <Button
                           variant="ghost"
                           size="sm"
                           className="text-[10px] h-7 flex-1 rounded-lg border border-red-500/20 hover:bg-red-500/10 hover:text-red-400 text-red-300 bg-red-950/20"
                           onClick={handleResetDraft}
+                          disabled={isLoading}
                         >
                           <Trash2 className="h-3 w-3 mr-1" /> Discard
                         </Button>
                         <Button
                           variant="default"
                           size="sm"
-                          className="bg-teal-500 hover:bg-teal-650 text-slate-950 text-[10px] h-7 flex-1 rounded-lg font-bold shadow-md shadow-teal-500/10 transition-all hover:scale-[1.02]"
+                          className="bg-teal-500 hover:bg-teal-600 text-slate-950 text-[10px] h-7 flex-1 rounded-lg font-bold shadow-md shadow-teal-500/10 transition-all hover:scale-[1.02]"
+                          disabled={isLoading}
                           onClick={
                             currentIntent === 'transaction' 
-                              ? handleSaveTransaction 
+                              ? (batchDrafts.length > 0 ? handleSaveBatchTransactions : handleSaveTransaction) 
                               : currentIntent === 'account' 
                                 ? handleSaveAccount 
                                 : handleSaveBudget
                           }
                         >
-                          <Check className="h-3 w-3 mr-1" /> Confirm & Save
+                          {isLoading ? (
+                            <span className="flex items-center gap-1">
+                              <Loader2 className="h-3 w-3 animate-spin text-slate-950" />
+                              Posting...
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1">
+                              <Check className="h-3 w-3 mr-1" />
+                              {batchDrafts.length > 0 ? `Submit & Post All (${batchDrafts.length})` : 'Confirm & Save'}
+                            </span>
+                          )}
                         </Button>
                       </div>
                     </div>

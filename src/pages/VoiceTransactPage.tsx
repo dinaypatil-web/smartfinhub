@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { calculateMonthlyEMI, calculateFirstEMIDueDate } from '@/utils/emiCalculations';
 import { 
   Sparkles, 
@@ -103,6 +104,7 @@ export default function VoiceTransactPage() {
   
   // UI & Chat states
   const [currentIntent, setCurrentIntent] = useState<'transaction' | 'account' | 'budget' | 'financial_inquiry' | 'emi_calculator' | 'financial_analysis' | 'general_help'>('general_help');
+  const [batchDrafts, setBatchDrafts] = useState<DraftTransaction[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',
@@ -695,31 +697,69 @@ export default function VoiceTransactPage() {
           const ext = parsedResult.extractedInfo;
           
           if (parsedResult.intent === 'transaction') {
-            const updatedDraft: DraftTransaction = {
-              transaction_type: ext.transaction_type || draft.transaction_type,
-              amount: ext.amount || draft.amount,
-              from_account_id: ext.from_account_id || draft.from_account_id,
-              to_account_id: ext.to_account_id || draft.to_account_id,
-              category: ext.category || draft.category,
-              income_category: ext.income_category || draft.income_category,
-              description: ext.description || draft.description,
-              transaction_date: ext.transaction_date || draft.transaction_date || today,
-              is_emi: ext.is_emi !== undefined && ext.is_emi !== null ? ext.is_emi : draft.is_emi,
-              emi_months: ext.emi_months || draft.emi_months,
-              bank_charges: ext.bank_charges !== undefined && ext.bank_charges !== null ? ext.bank_charges : draft.bank_charges,
-            };
-            
-            const clientMissing = validateCurrentDraft('transaction', updatedDraft);
-            setDraft(updatedDraft);
-            setMissingFields(clientMissing);
-            
-            const botMessage: ChatMessage = {
-              id: botMsgId,
-              role: 'model',
-              content: friendlyQuestion + generateFunctionsAndLogicsDetails('transaction'),
-              isInteractive: clientMissing.length === 0
-            };
-            setChatMessages(prev => [...prev, botMessage]);
+            if (parsedResult.batchTransactions && parsedResult.batchTransactions.length > 1) {
+              const defaultFromAcc = accounts.find(a => a.account_type === 'bank' || a.account_type === 'cash')?.id || accounts[0]?.id || null;
+              const defaultToAcc = accounts.find(a => a.account_type === 'bank')?.id || accounts[0]?.id || null;
+
+              const sanitizedBatch: DraftTransaction[] = parsedResult.batchTransactions.map(bt => {
+                const isInc = bt.transaction_type === 'income';
+                return {
+                  transaction_type: isInc ? 'income' : 'expense',
+                  amount: Number(bt.amount) || 0,
+                  from_account_id: isInc ? null : (bt.from_account_id || defaultFromAcc),
+                  to_account_id: isInc ? (bt.to_account_id || defaultToAcc) : null,
+                  // Ensure category is NEVER blank
+                  category: isInc ? null : (bt.category || categories[0]?.name || 'Others'),
+                  income_category: isInc ? (bt.income_category || 'others') : null,
+                  description: bt.description || (isInc ? 'Income' : 'Expense'),
+                  transaction_date: bt.transaction_date || today,
+                  is_emi: false,
+                  emi_months: null,
+                  bank_charges: null
+                };
+              });
+
+              setBatchDrafts(sanitizedBatch);
+              setDraft(sanitizedBatch[0]);
+              setMissingFields([]);
+
+              const botMessage: ChatMessage = {
+                id: botMsgId,
+                role: 'model',
+                content: `📋 I have prepared a batch of **${sanitizedBatch.length} transactions** (${sanitizedBatch.filter(b => b.transaction_type === 'expense').length} expenses, ${sanitizedBatch.filter(b => b.transaction_type === 'income').length} income).\n\n` +
+                  `Categories are assigned and will not remain blank. Please verify the accounts in the review card on the right.\n\n` +
+                  `⚠️ **Note**: Transactions will only be accepted and posted to the database once you click **Submit & Post All (${sanitizedBatch.length}) Transactions**.`
+              };
+              setChatMessages(prev => [...prev, botMessage]);
+            } else {
+              setBatchDrafts([]);
+              const updatedDraft: DraftTransaction = {
+                transaction_type: ext.transaction_type || draft.transaction_type,
+                amount: ext.amount || draft.amount,
+                from_account_id: ext.from_account_id || draft.from_account_id,
+                to_account_id: ext.to_account_id || draft.to_account_id,
+                // Ensure category is NEVER blank
+                category: ext.transaction_type === 'income' ? null : (ext.category || draft.category || categories[0]?.name || 'Others'),
+                income_category: ext.transaction_type === 'income' ? (ext.income_category || draft.income_category || 'others') : null,
+                description: ext.description || draft.description,
+                transaction_date: ext.transaction_date || draft.transaction_date || today,
+                is_emi: ext.is_emi !== undefined && ext.is_emi !== null ? ext.is_emi : draft.is_emi,
+                emi_months: ext.emi_months || draft.emi_months,
+                bank_charges: ext.bank_charges !== undefined && ext.bank_charges !== null ? ext.bank_charges : draft.bank_charges,
+              };
+              
+              const clientMissing = validateCurrentDraft('transaction', updatedDraft);
+              setDraft(updatedDraft);
+              setMissingFields(clientMissing);
+              
+              const botMessage: ChatMessage = {
+                id: botMsgId,
+                role: 'model',
+                content: friendlyQuestion + generateFunctionsAndLogicsDetails('transaction'),
+                isInteractive: clientMissing.length === 0
+              };
+              setChatMessages(prev => [...prev, botMessage]);
+            }
           }
           else if (parsedResult.intent === 'account') {
             const updatedAccount: DraftAccount = {
@@ -984,6 +1024,7 @@ export default function VoiceTransactPage() {
         emi_months: null,
         bank_charges: null
       });
+      setBatchDrafts([]);
     } else if (currentIntent === 'account') {
       setDraftAccount({
         account_type: null,
@@ -1034,7 +1075,164 @@ export default function VoiceTransactPage() {
     });
   };
 
-  // Save draft to database
+  const handleUpdateBatchDraftItem = (index: number, updates: Partial<DraftTransaction>) => {
+    setBatchDrafts(prev => {
+      const next = [...prev];
+      next[index] = { ...next[index], ...updates };
+      return next;
+    });
+  };
+
+  const handleRemoveBatchDraftItem = (index: number) => {
+    setBatchDrafts(prev => prev.filter((_, i) => i !== index));
+    toast({
+      title: 'Item Removed',
+      description: `Removed transaction #${index + 1} from batch.`
+    });
+  };
+
+  // Save batch transactions to database sequentially
+  const handleSaveBatchTransactions = async () => {
+    if (!user || batchDrafts.length === 0) return;
+    
+    // Validate each item: only income or expense, account required, category required (must not be blank!)
+    for (let i = 0; i < batchDrafts.length; i++) {
+      const item = batchDrafts[i];
+      if (!item.amount || item.amount <= 0) {
+        toast({
+          title: 'Validation Error',
+          description: `Transaction #${i + 1} has an invalid amount.`,
+          variant: 'destructive'
+        });
+        return;
+      }
+      if (item.transaction_type !== 'income' && item.transaction_type !== 'expense') {
+        toast({
+          title: 'Invalid Transaction Type',
+          description: `Transaction #${i + 1} is '${item.transaction_type}'. Batch posting allows only Income or Expense transactions.`,
+          variant: 'destructive'
+        });
+        return;
+      }
+      if (item.transaction_type === 'expense') {
+        if (!item.from_account_id) {
+          toast({
+            title: 'Missing Account',
+            description: `Transaction #${i + 1} is missing a source account (Paid From).`,
+            variant: 'destructive'
+          });
+          return;
+        }
+        if (!item.category || !item.category.trim()) {
+          toast({
+            title: 'Missing Category',
+            description: `Transaction #${i + 1}: Expense category cannot remain blank.`,
+            variant: 'destructive'
+          });
+          return;
+        }
+      }
+      if (item.transaction_type === 'income') {
+        if (!item.to_account_id) {
+          toast({
+            title: 'Missing Account',
+            description: `Transaction #${i + 1} is missing a destination account (Received In).`,
+            variant: 'destructive'
+          });
+          return;
+        }
+        if (!item.income_category || !item.income_category.trim()) {
+          toast({
+            title: 'Missing Income Category',
+            description: `Transaction #${i + 1}: Income category cannot remain blank.`,
+            variant: 'destructive'
+          });
+          return;
+        }
+      }
+    }
+
+    setIsLoading(true);
+    const total = batchDrafts.length;
+    const today = new Date().toISOString().slice(0, 10);
+
+    try {
+      for (let i = 0; i < total; i++) {
+        const item = batchDrafts[i];
+        const transactionPayload = {
+          user_id: user.id,
+          transaction_type: item.transaction_type!,
+          from_account_id: item.from_account_id,
+          to_account_id: item.to_account_id,
+          amount: Number(item.amount),
+          currency: 'INR',
+          category: item.category || 'Others',
+          income_category: item.income_category || 'others',
+          description: item.description || item.category || (item.income_category ? getIncomeCategoryName(item.income_category) : 'Transaction'),
+          transaction_date: item.transaction_date || today
+        };
+
+        await transactionApi.createTransaction(transactionPayload);
+
+        // Fetch updated account balance
+        const relatedAccountId = item.transaction_type === 'expense' ? item.from_account_id : item.to_account_id;
+        let accountName = 'Related Account';
+        let updatedBalanceStr = 'N/A';
+
+        if (relatedAccountId) {
+          const updatedAcc = await accountApi.getAccountById(relatedAccountId);
+          if (updatedAcc) {
+            accountName = updatedAcc.account_name;
+            updatedBalanceStr = `₹${Number(updatedAcc.balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+          }
+        }
+
+        const catDisplay = item.transaction_type === 'expense'
+          ? (item.category || 'Expense')
+          : (item.income_category ? getIncomeCategoryName(item.income_category) : 'Income');
+
+        const successMsg = `✅ **Transaction ${i + 1} of ${total} posted successfully!**\n- Amount: ₹${Number(item.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })} (${item.transaction_type === 'income' ? 'Income' : 'Expense'} - ${catDisplay})\n- Account: **${accountName}**\n- **Balance after posting: ${updatedBalanceStr}**`;
+
+        setChatMessages(prev => [
+          ...prev,
+          {
+            id: Math.random().toString(),
+            role: 'model',
+            content: successMsg
+          }
+        ]);
+      }
+
+      await loadData();
+      setBatchDrafts([]);
+      setIsLoading(false);
+
+      toast({
+        title: 'Batch Posting Completed! 🎉',
+        description: `Successfully posted ${total} of ${total} transactions.`,
+        variant: 'default'
+      });
+
+      setChatMessages(prev => [
+        ...prev,
+        {
+          id: Math.random().toString(),
+          role: 'model',
+          content: `🎉 **All ${total} of ${total} transactions have been accepted and posted.** All account balances have been updated!`
+        }
+      ]);
+    } catch (err: any) {
+      console.error('Batch posting error:', err);
+      setIsLoading(false);
+      toast({
+        title: 'Batch Posting Failed',
+        description: err.message || 'Error occurred while saving batch transactions',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  // Save single draft to database
   const handleSaveTransaction = async () => {
     if (!user || validateCurrentDraft('transaction', draft).length > 0) return;
     
@@ -1058,8 +1256,8 @@ export default function VoiceTransactPage() {
         to_account_id: draft.to_account_id,
         amount: Number(draft.amount),
         currency: 'INR',
-        category: draft.category,
-        income_category: draft.income_category,
+        category: draft.category || 'Others',
+        income_category: draft.income_category || 'others',
         description: draft.description || draft.category || getIncomeCategoryName(draft.income_category || 'others'),
         transaction_date: draft.transaction_date || new Date().toISOString().slice(0, 10)
       };
@@ -1097,6 +1295,23 @@ export default function VoiceTransactPage() {
       }
 
       await loadData();
+
+      // Fetch updated account balance
+      const relatedAccountId = draft.transaction_type === 'expense' ? draft.from_account_id : draft.to_account_id;
+      let accountName = 'Related Account';
+      let updatedBalanceStr = 'N/A';
+
+      if (relatedAccountId) {
+        const updatedAcc = await accountApi.getAccountById(relatedAccountId);
+        if (updatedAcc) {
+          accountName = updatedAcc.account_name;
+          updatedBalanceStr = `₹${Number(updatedAcc.balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+        }
+      }
+
+      const catDisplay = draft.transaction_type === 'expense'
+        ? (draft.category || 'Expense')
+        : (draft.income_category ? getIncomeCategoryName(draft.income_category) : 'Income');
       
       setIsLoading(false);
       toast({
@@ -1111,7 +1326,7 @@ export default function VoiceTransactPage() {
         {
           id: successBotMsgId,
           role: 'model',
-          content: `🎉 Success! I have verified and saved your transaction of ₹${Number(draft.amount).toFixed(2)} to the database. Your balances are updated! What else can I do for you?`
+          content: `✅ **Transaction 1 of 1 posted successfully!**\n- Amount: ₹${Number(draft.amount).toFixed(2)} (${draft.transaction_type} - ${catDisplay})\n- Account: **${accountName}**\n- **Balance after posting: ${updatedBalanceStr}**`
         }
       ]);
       
@@ -1332,7 +1547,11 @@ export default function VoiceTransactPage() {
 
   const handleConfirmSaveDraft = async () => {
     if (currentIntent === 'transaction') {
-      await handleSaveTransaction();
+      if (batchDrafts.length > 0) {
+        await handleSaveBatchTransactions();
+      } else {
+        await handleSaveTransaction();
+      }
     } else if (currentIntent === 'account') {
       await handleSaveAccount();
     } else if (currentIntent === 'budget') {
@@ -2482,7 +2701,9 @@ export default function VoiceTransactPage() {
   const getPanelHeader = () => {
     switch (currentIntent) {
       case 'transaction':
-        return { title: 'Draft Receipt', subtitle: 'Live interactive receipt preview' };
+        return batchDrafts.length > 0
+          ? { title: 'Batch Transactions Receipt', subtitle: `${batchDrafts.length} transactions ready for review & submit` }
+          : { title: 'Draft Receipt', subtitle: 'Live interactive receipt preview' };
       case 'account':
         return { title: 'Bank Passbook', subtitle: 'New account preview' };
       case 'budget':
@@ -2820,8 +3041,153 @@ export default function VoiceTransactPage() {
               {/* Intent-based Morphing Details Area */}
               <div className="space-y-6 flex-grow">
                 
-                {/* 1. TRANSACTION PREVIEW */}
-                {currentIntent === 'transaction' && (
+                {/* 1. TRANSACTION PREVIEW (BATCH MODE) */}
+                {currentIntent === 'transaction' && batchDrafts.length > 0 && (
+                  <div className="space-y-4 animate-in slide-in-from-top-3 duration-300">
+                    <div className="p-4 bg-slate-950/80 border border-teal-500/30 rounded-2xl text-xs space-y-3 shadow-2xl relative overflow-hidden">
+                      <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-teal-500 via-primary to-indigo-500"></div>
+                      
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold text-teal-400 uppercase tracking-widest text-[11px] flex items-center gap-1.5 font-mono">
+                          <Calendar className="h-4 w-4 text-teal-400" /> BATCH TRANSACTION REVIEW
+                        </span>
+                        <Badge className="bg-teal-500/20 text-teal-300 border border-teal-500/30 text-[10px] font-bold px-2 py-0.5">
+                          {batchDrafts.length} Transactions
+                        </Badge>
+                      </div>
+
+                      <div className="bg-slate-900/80 rounded-xl p-3 border border-white/5 flex justify-around text-center">
+                        <div>
+                          <div className="text-[10px] text-slate-400 font-semibold uppercase">Total Expenses</div>
+                          <div className="text-sm font-bold font-mono text-rose-400">
+                            ₹{batchDrafts.filter(t => t.transaction_type === 'expense').reduce((sum, t) => sum + (Number(t.amount) || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </div>
+                        </div>
+                        <div className="w-px bg-slate-800"></div>
+                        <div>
+                          <div className="text-[10px] text-slate-400 font-semibold uppercase">Total Income</div>
+                          <div className="text-sm font-bold font-mono text-emerald-400">
+                            ₹{batchDrafts.filter(t => t.transaction_type === 'income').reduce((sum, t) => sum + (Number(t.amount) || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </div>
+                        </div>
+                      </div>
+
+                      <p className="text-[10px] text-slate-400 italic">
+                        Verify categories and accounts below. Transactions are accepted only after clicking <strong>Submit</strong>.
+                      </p>
+
+                      {/* Scrollable list of items */}
+                      <ScrollArea className="max-h-[300px] pr-2">
+                        <div className="space-y-3">
+                          {batchDrafts.map((item, idx) => {
+                            const isExpense = item.transaction_type === 'expense';
+                            return (
+                              <div
+                                key={idx}
+                                className="p-3 bg-slate-900/90 border border-slate-800 hover:border-slate-700 rounded-xl space-y-2 text-xs relative group"
+                              >
+                                <div className="flex justify-between items-center">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-slate-300 font-mono text-[11px]">
+                                      #{idx + 1} of {batchDrafts.length}
+                                    </span>
+                                    <Badge className={isExpense ? "bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[10px]" : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px]"}>
+                                      {isExpense ? 'Expense' : 'Income'}
+                                    </Badge>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold font-mono text-teal-300 text-sm">
+                                      ₹{Number(item.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                    </span>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6 text-slate-400 hover:text-rose-400"
+                                      onClick={() => handleRemoveBatchDraftItem(idx)}
+                                      title="Remove transaction"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-2 pt-1">
+                                  <div>
+                                    <label className="text-[10px] text-slate-400 block mb-0.5 font-medium">
+                                      Category (Required) *
+                                    </label>
+                                    {isExpense ? (
+                                      <Select
+                                        value={item.category || ''}
+                                        onValueChange={(val) => handleUpdateBatchDraftItem(idx, { category: val })}
+                                      >
+                                        <SelectTrigger className="h-7 text-[11px] bg-slate-950/60 border-slate-700">
+                                          <SelectValue placeholder="Select Category" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {categories.map(c => (
+                                            <SelectItem key={c.id || c.name} value={c.name} className="text-xs">
+                                              {c.name}
+                                            </SelectItem>
+                                          ))}
+                                          <SelectItem value="Others" className="text-xs">Others</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    ) : (
+                                      <Select
+                                        value={item.income_category || 'others'}
+                                        onValueChange={(val: any) => handleUpdateBatchDraftItem(idx, { income_category: val })}
+                                      >
+                                        <SelectTrigger className="h-7 text-[11px] bg-slate-950/60 border-slate-700">
+                                          <SelectValue placeholder="Select Income Category" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {INCOME_CATEGORIES.map(c => (
+                                            <SelectItem key={c.key} value={c.key} className="text-xs">
+                                              {c.icon} {c.name}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    )}
+                                  </div>
+
+                                  <div>
+                                    <label className="text-[10px] text-slate-400 block mb-0.5 font-medium">
+                                      {isExpense ? 'Paid From Account *' : 'Received In Account *'}
+                                    </label>
+                                    <Select
+                                      value={isExpense ? (item.from_account_id || '') : (item.to_account_id || '')}
+                                      onValueChange={(val) => handleUpdateBatchDraftItem(idx, isExpense ? { from_account_id: val } : { to_account_id: val })}
+                                    >
+                                      <SelectTrigger className="h-7 text-[11px] bg-slate-950/60 border-slate-700">
+                                        <SelectValue placeholder="Select Account" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {accounts.map(acc => (
+                                          <SelectItem key={acc.id} value={acc.id} className="text-xs">
+                                            {acc.account_name} ({acc.account_type})
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                </div>
+
+                                <div className="text-[11px] text-slate-400 truncate pt-0.5">
+                                  <strong>Desc:</strong> {item.description || 'N/A'} • <strong>Date:</strong> {item.transaction_date || 'Today'}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </ScrollArea>
+                    </div>
+                  </div>
+                )}
+
+                {/* 1. TRANSACTION PREVIEW (SINGLE MODE) */}
+                {currentIntent === 'transaction' && batchDrafts.length === 0 && (
                   <div className="space-y-4 animate-in slide-in-from-top-3 duration-300">
                     <div className="p-5 bg-slate-950/70 dark:bg-slate-950/70 border border-white/5 rounded-2xl text-xs space-y-4 shadow-2xl relative overflow-hidden">
                       {/* Top color tag */}
@@ -3161,7 +3527,7 @@ export default function VoiceTransactPage() {
               {['transaction', 'account', 'budget'].includes(currentIntent) && (
                 <div className="space-y-3 pt-6 border-t border-muted/40">
                   
-                  {missingFields.length > 0 && (
+                  {missingFields.length > 0 && batchDrafts.length === 0 && (
                     <div className="text-xs text-amber-400 bg-amber-950/20 border border-amber-500/20 rounded-lg p-3 flex gap-2">
                       <AlertCircle className="h-4 w-4 shrink-0 text-amber-500 mt-0.5" />
                       <span>
@@ -3175,29 +3541,31 @@ export default function VoiceTransactPage() {
                       variant="outline"
                       className="border-muted hover:bg-destructive/10 hover:text-destructive shrink-0 w-12 h-12 rounded-xl text-foreground"
                       onClick={handleResetDraft}
-                      title="Discard current draft"
+                      title={batchDrafts.length > 0 ? "Discard all batch drafts" : "Discard current draft"}
                     >
                       <Trash2 className="h-5 w-5 animate-none text-foreground" />
                     </Button>
                     
                     <Button
                       className={`flex-grow h-12 text-sm font-semibold rounded-xl shadow-lg transition-all duration-300 ${
-                        missingFields.length === 0
+                        (currentIntent === 'transaction' && batchDrafts.length > 0) || missingFields.length === 0
                           ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-950/30'
                           : 'bg-muted text-muted-foreground cursor-not-allowed border'
                       }`}
-                      disabled={missingFields.length > 0 || isLoading}
+                      disabled={currentIntent === 'transaction' && batchDrafts.length > 0 ? isLoading : (missingFields.length > 0 || isLoading)}
                       onClick={handleConfirmSaveDraft}
                     >
                       {isLoading ? (
                         <span className="flex items-center gap-2">
                           <Loader2 className="h-4 w-4 animate-spin text-white" />
-                          Saving to Database...
+                          Posting Transactions...
                         </span>
                       ) : (
                         <span className="flex items-center justify-center gap-1.5 text-white">
                           <Check className="h-5 w-5 text-white" />
-                          Confirm & Save Draft
+                          {currentIntent === 'transaction' && batchDrafts.length > 0
+                            ? `Submit & Post All (${batchDrafts.length}) Transactions`
+                            : 'Confirm & Save Draft'}
                         </span>
                       )}
                     </Button>

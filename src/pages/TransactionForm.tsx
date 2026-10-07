@@ -622,11 +622,20 @@ export default function TransactionForm() {
 
   const handleSendChatMessage = async (customCommand?: string) => {
     const text = customCommand !== undefined ? customCommand : chatInput;
-    if (!text.trim() || !user) return;
+    if (!text.trim()) return;
+
+    if (!user) {
+      toast({
+        title: 'Sign In Required',
+        description: 'Please sign in to record transactions and view your accounts.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     setChatInput('');
     setIsChatLoading(true);
-    setChatStreamingText('');
+    setChatStreamingText('Analyzing details...');
     setLastUpdatedFields([]);
 
     const userMessageId = Math.random().toString();
@@ -639,8 +648,6 @@ export default function TransactionForm() {
         content: m.content
       }));
 
-      let streamingResponse = '';
-
       await parseSmartChatbotCommand(
         {
           command: text,
@@ -650,18 +657,18 @@ export default function TransactionForm() {
           chatHistory: history,
           currentDate: today
         },
-        (chunk) => {
-          streamingResponse += chunk;
-          setChatStreamingText(streamingResponse);
+        (_chunk) => {
+          setChatStreamingText('Processing transaction...');
         },
         (result: any) => {
           setIsChatLoading(false);
           setChatStreamingText('');
 
+          const botResponse = result.reply || result.clarificationQuestion || "I've updated the transaction details for you!";
           const botMessageId = Math.random().toString();
           setChatMessages(prev => [
             ...prev,
-            { id: botMessageId, role: 'model', content: result.clarificationQuestion }
+            { id: botMessageId, role: 'model', content: botResponse }
           ]);
 
           // Apply extracted updates if the intent is transaction
@@ -674,26 +681,60 @@ export default function TransactionForm() {
               updates.transaction_type = ext.transaction_type;
               updatedNames.push('Transaction Type');
             }
-            if (ext.amount !== undefined && ext.amount !== null) {
+            if (ext.amount !== undefined && ext.amount !== null && !isNaN(Number(ext.amount))) {
               updates.amount = ext.amount.toString();
               updatedNames.push('Amount');
             }
+
+            // Resolve From Account: match by id or account name
             if (ext.from_account_id) {
-              updates.from_account_id = ext.from_account_id;
-              updatedNames.push('From Account');
+              const matchedFrom = accounts.find(a => 
+                a.id === ext.from_account_id || 
+                a.account_name.toLowerCase() === ext.from_account_id.toLowerCase() ||
+                a.account_name.toLowerCase().includes(ext.from_account_id.toLowerCase()) ||
+                ext.from_account_id.toLowerCase().includes(a.account_name.toLowerCase())
+              );
+              if (matchedFrom) {
+                updates.from_account_id = matchedFrom.id;
+                updatedNames.push('From Account');
+              }
             }
+
+            // Resolve To Account: match by id or account name
             if (ext.to_account_id) {
-              updates.to_account_id = ext.to_account_id;
-              updatedNames.push('To Account');
+              const matchedTo = accounts.find(a => 
+                a.id === ext.to_account_id || 
+                a.account_name.toLowerCase() === ext.to_account_id.toLowerCase() ||
+                a.account_name.toLowerCase().includes(ext.to_account_id.toLowerCase()) ||
+                ext.to_account_id.toLowerCase().includes(a.account_name.toLowerCase())
+              );
+              if (matchedTo) {
+                updates.to_account_id = matchedTo.id;
+                updatedNames.push('To Account');
+              }
             }
+
+            // Resolve Expense Category: case-insensitive match
             if (ext.category) {
-              updates.category = ext.category;
+              const matchedCat = categories.find(c => 
+                c.name.toLowerCase() === ext.category.toLowerCase() ||
+                c.name.toLowerCase().includes(ext.category.toLowerCase()) ||
+                ext.category.toLowerCase().includes(c.name.toLowerCase())
+              );
+              updates.category = matchedCat ? matchedCat.name : ext.category;
               updatedNames.push('Category');
             }
+
+            // Resolve Income Category
             if (ext.income_category) {
-              updates.income_category = ext.income_category;
+              const matchedInc = INCOME_CATEGORIES.find(ic => 
+                ic.key.toLowerCase() === ext.income_category.toLowerCase() ||
+                ic.name.toLowerCase() === ext.income_category.toLowerCase()
+              );
+              updates.income_category = matchedInc ? matchedInc.key : ext.income_category;
               updatedNames.push('Income Category');
             }
+
             if (ext.description) {
               updates.description = ext.description;
               updatedNames.push('Description');
@@ -781,10 +822,28 @@ export default function TransactionForm() {
       return;
     }
 
+    if (formData.transaction_type === 'income' && !formData.income_category) {
+      toast({
+        title: 'Error',
+        description: 'Please select an income category. Income category cannot remain blank.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (formData.transaction_type === 'expense' && !formData.from_account_id) {
       toast({
         title: 'Error',
         description: 'Please select a source account for expense',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (formData.transaction_type === 'expense' && !isSplitCategory && !formData.category) {
+      toast({
+        title: 'Error',
+        description: 'Please select an expense category. Expense category cannot remain blank.',
         variant: 'destructive',
       });
       return;
@@ -2782,27 +2841,15 @@ export default function TransactionForm() {
                   </div>
                 ))}
                 
-                {/* Chat streaming response text */}
-                {chatStreamingText && (
-                  <div className="flex gap-2.5 max-w-[85%] mr-auto">
+                {/* Chat loading / thinking animation */}
+                {isChatLoading && (
+                  <div className="flex gap-2.5 max-w-[85%] mr-auto items-center animate-in fade-in duration-200">
                     <div className="h-7 w-7 rounded-lg bg-purple-100 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 flex items-center justify-center flex-shrink-0 border border-purple-200/50 dark:border-purple-900/30">
-                      <Bot className="h-4 w-4" />
+                      <Bot className="h-4 w-4 animate-bounce text-purple-600" />
                     </div>
-                    <div className="rounded-2xl px-3 py-2.5 text-xs shadow-sm bg-white dark:bg-slate-800 border border-purple-100/50 dark:border-purple-950/30 text-slate-800 dark:text-slate-200 rounded-tl-none animate-pulse">
-                      {chatStreamingText}
-                    </div>
-                  </div>
-                )}
-
-                {/* Chat loading animation */}
-                {isChatLoading && !chatStreamingText && (
-                  <div className="flex gap-2.5 max-w-[85%] mr-auto items-center">
-                    <div className="h-7 w-7 rounded-lg bg-purple-100 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 flex items-center justify-center flex-shrink-0 border border-purple-200/50 dark:border-purple-900/30">
-                      <Bot className="h-4 w-4 animate-bounce" />
-                    </div>
-                    <div className="bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-2xl px-3 py-2 text-xs flex items-center gap-1.5">
-                      <Loader2 className="h-3 w-3 animate-spin text-purple-600" />
-                      Thinking...
+                    <div className="bg-white dark:bg-slate-800 border border-purple-100/60 dark:border-purple-950/40 text-slate-700 dark:text-slate-200 rounded-2xl rounded-tl-none px-3.5 py-2 text-xs shadow-sm flex items-center gap-2">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-purple-600" />
+                      <span>{chatStreamingText || 'Analyzing details...'}</span>
                     </div>
                   </div>
                 )}
