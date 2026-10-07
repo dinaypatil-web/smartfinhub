@@ -25,7 +25,6 @@ import {
   X, 
   AlertCircle, 
   Calendar, 
-  CreditCard, 
   Loader2,
   Trash2,
   Volume2,
@@ -1175,24 +1174,29 @@ export default function VoiceTransactPage() {
 
         await transactionApi.createTransaction(transactionPayload);
 
-        // Fetch updated account balance
-        const relatedAccountId = item.transaction_type === 'expense' ? item.from_account_id : item.to_account_id;
-        let accountName = 'Related Account';
-        let updatedBalanceStr = 'N/A';
-
-        if (relatedAccountId) {
-          const updatedAcc = await accountApi.getAccountById(relatedAccountId);
-          if (updatedAcc) {
-            accountName = updatedAcc.account_name;
-            updatedBalanceStr = `₹${Number(updatedAcc.balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
-          }
-        }
+        // Fetch updated account balance for all associated accounts
+        const associatedIds = [item.from_account_id, item.to_account_id].filter(Boolean) as string[];
+        const updatedAccounts = await Promise.all(
+          associatedIds.map(async (accId) => {
+            try {
+              return await accountApi.getAccountById(accId);
+            } catch {
+              return null;
+            }
+          })
+        );
+        const validAccs = updatedAccounts.filter(Boolean) as Account[];
+        const balanceReportLines = validAccs.map(acc => {
+          const isFrom = acc.id === item.from_account_id;
+          const role = isFrom ? 'Debited' : 'Credited';
+          return `  • **${acc.account_name}** (${role}): **₹${Number(acc.balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}**`;
+        }).join('\n');
 
         const catDisplay = item.transaction_type === 'expense'
           ? (item.category || 'Expense')
           : (item.income_category ? getIncomeCategoryName(item.income_category) : 'Income');
 
-        const successMsg = `✅ **Transaction ${i + 1} of ${total} posted successfully!**\n- Amount: ₹${Number(item.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })} (${item.transaction_type === 'income' ? 'Income' : 'Expense'} - ${catDisplay})\n- Account: **${accountName}**\n- **Balance after posting: ${updatedBalanceStr}**`;
+        const successMsg = `✅ **Transaction ${i + 1} of ${total} posted successfully!**\n- Amount: ₹${Number(item.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })} (${item.transaction_type === 'income' ? 'Income' : 'Expense'} - ${catDisplay})\n- **Post-Posting Account Balances:**\n${balanceReportLines || '  • N/A'}`;
 
         setChatMessages(prev => [
           ...prev,
@@ -1298,18 +1302,26 @@ export default function VoiceTransactPage() {
 
       await loadData();
 
-      // Fetch updated account balance
-      const relatedAccountId = draft.transaction_type === 'expense' ? draft.from_account_id : draft.to_account_id;
-      let accountName = 'Related Account';
-      let updatedBalanceStr = 'N/A';
+      // Fetch updated account balance for all associated accounts
+      const associatedAccountIds = [draft.from_account_id, draft.to_account_id].filter(Boolean) as string[];
+      const updatedAccs = await Promise.all(
+        associatedAccountIds.map(async (accId) => {
+          try {
+            return await accountApi.getAccountById(accId);
+          } catch {
+            return null;
+          }
+        })
+      );
+      const validAccounts = updatedAccs.filter(Boolean) as Account[];
 
-      if (relatedAccountId) {
-        const updatedAcc = await accountApi.getAccountById(relatedAccountId);
-        if (updatedAcc) {
-          accountName = updatedAcc.account_name;
-          updatedBalanceStr = `₹${Number(updatedAcc.balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
-        }
-      }
+      const balanceReportLines = validAccounts.map(acc => {
+        const isFrom = acc.id === draft.from_account_id;
+        const role = isFrom ? 'Debited' : 'Credited';
+        return `  • **${acc.account_name}** (${role}): **₹${Number(acc.balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}**`;
+      }).join('\n');
+
+      const toastBalances = validAccounts.map(a => `${a.account_name}: ₹${Number(a.balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`).join(' • ');
 
       const catDisplay = draft.transaction_type === 'expense'
         ? (draft.category || 'Expense')
@@ -1318,7 +1330,7 @@ export default function VoiceTransactPage() {
       setIsLoading(false);
       toast({
         title: 'Transaction Saved Successfully!',
-        description: `Saved ₹${Number(draft.amount).toFixed(2)} as ${draft.transaction_type}.`,
+        description: toastBalances ? `Balances after posting: ${toastBalances}` : `Saved ₹${Number(draft.amount).toFixed(2)} as ${draft.transaction_type}.`,
         variant: 'default'
       });
       
@@ -1328,7 +1340,7 @@ export default function VoiceTransactPage() {
         {
           id: successBotMsgId,
           role: 'model',
-          content: `✅ **Transaction 1 of 1 posted successfully!**\n- Amount: ₹${Number(draft.amount).toFixed(2)} (${draft.transaction_type} - ${catDisplay})\n- Account: **${accountName}**\n- **Balance after posting: ${updatedBalanceStr}**`
+          content: `✅ **Transaction 1 of 1 posted successfully!**\n- Amount: ₹${Number(draft.amount).toFixed(2)} (${draft.transaction_type} - ${catDisplay})\n- **Post-Posting Account Balances:**\n${balanceReportLines || '  • N/A'}`
         }
       ]);
       
@@ -2703,13 +2715,6 @@ export default function VoiceTransactPage() {
     if (!accountId) return '';
     const acc = accounts.find(a => a.id === accountId);
     return acc ? acc.account_name : '';
-  };
-
-  // Lookup account balance helper
-  const getAccountBalance = (accountId: string | null) => {
-    if (!accountId) return null;
-    const acc = accounts.find(a => a.id === accountId);
-    return acc ? acc.balance : null;
   };
 
   const getPanelHeader = () => {

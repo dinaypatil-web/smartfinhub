@@ -27,8 +27,9 @@ import {
   SlidersHorizontal,
   X,
   Sparkles,
+  CheckCircle2,
 } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { cache } from '@/utils/cache';
 import {
@@ -53,6 +54,7 @@ import {
 export default function Transactions() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -60,6 +62,16 @@ export default function Transactions() {
   const [loading, setLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
+
+  // Post-Posting Balances Banner State
+  const [postPostingBanner, setPostPostingBanner] = useState<any>(location.state?.postPostingSummary || null);
+
+  useEffect(() => {
+    if (location.state?.postPostingSummary) {
+      setPostPostingBanner(location.state.postPostingSummary);
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   // Filter States
   const [searchQuery, setSearchQuery] = useState('');
@@ -365,6 +377,57 @@ export default function Transactions() {
           </Link>
         </div>
       </div>
+
+      {/* Post-Posting Account Balances Success Banner */}
+      {postPostingBanner && postPostingBanner.accounts && postPostingBanner.accounts.length > 0 && (
+        <Card className="border-emerald-500/40 bg-emerald-50/60 dark:bg-emerald-950/20 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="h-9 w-9 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 flex items-center justify-center shrink-0 text-emerald-600 dark:text-emerald-400 mt-0.5">
+                  <CheckCircle2 className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-semibold text-emerald-950 dark:text-emerald-200">
+                      {postPostingBanner.isEdit ? 'Transaction Updated Successfully!' : 'Transaction Posted Successfully!'}
+                    </h3>
+                    <Badge variant="outline" className="bg-emerald-100/60 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border-emerald-300 text-xs capitalize">
+                      {postPostingBanner.transaction_type?.replace('_', ' ')}: {formatCurrency(postPostingBanner.amount, postPostingBanner.currency)}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Updated Balances of associated accounts post-posting:
+                  </p>
+                  <div className="flex flex-wrap gap-2.5 mt-3">
+                    {postPostingBanner.accounts.map((acc: any) => (
+                      <div
+                        key={acc.id}
+                        className="px-3 py-1.5 rounded-lg bg-background border border-emerald-200/80 dark:border-emerald-800/50 shadow-xs flex items-center gap-2"
+                      >
+                        <span className="text-xs font-semibold text-foreground">{acc.name}</span>
+                        <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded bg-muted font-medium">{acc.roleLabel}</span>
+                        <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                          {formatCurrency(acc.postBalance, acc.currency)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-foreground shrink-0"
+                onClick={() => setPostPostingBanner(null)}
+                title="Dismiss"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {transactions.length === 0 ? (
         <Card>

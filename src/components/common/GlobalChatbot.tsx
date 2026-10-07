@@ -8,12 +8,12 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { 
-  Bot, Sparkles, Mic, MicOff, Send, X, AlertCircle, Calendar, CreditCard, Loader2, Trash2, Volume2, Check
+  Bot, Sparkles, Mic, MicOff, Send, X, Calendar, Loader2, Trash2, Volume2, Check
 } from 'lucide-react';
 import { transactionApi, accountApi, categoryApi, budgetApi, emiApi, interestRateApi, userCustomBankLinksApi } from '@/db/api';
 import { parseSmartChatbotCommand, type SmartChatbotResult } from '@/services/aiService';
 import { calculateMonthlyEMI, calculateFirstEMIDueDate } from '@/utils/emiCalculations';
-import { INCOME_CATEGORIES, getIncomeCategoryName } from '@/constants/incomeCategories';
+import { getIncomeCategoryName } from '@/constants/incomeCategories';
 import { cache } from '@/utils/cache';
 import type { Account, ExpenseCategory } from '@/types/types';
 
@@ -68,15 +68,6 @@ interface DraftBudget {
   category_budgets: Record<string, number> | null;
 }
 
-interface DraftEMI {
-  principal: number | null;
-  annual_rate: number | null;
-  tenure_months: number | null;
-  monthly_emi?: number | null;
-  total_interest?: number | null;
-  total_payable?: number | null;
-}
-
 // Inline helper for bank logos if needed
 const getBankLogo = (bankName: string) => {
   const normalized = bankName.toLowerCase();
@@ -114,7 +105,6 @@ export default function GlobalChatbot() {
   const [isListening, setIsListening] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [streamingText, setStreamingText] = useState('');
-  const [missingFields, setMissingFields] = useState<string[]>([]);
 
   // Autocomplete suggestions
   const [suggestions, setSuggestions] = useState<{ text: string; type: 'reason' | 'account' }[]>([]);
@@ -168,12 +158,6 @@ export default function GlobalChatbot() {
     budgeted_income: null,
     budgeted_expenses: null,
     category_budgets: null
-  });
-
-  const [draftEMI, setDraftEMI] = useState<DraftEMI>({
-    principal: null,
-    annual_rate: null,
-    tenure_months: null
   });
 
   // Exclude rendering on auth pages
@@ -710,17 +694,29 @@ export default function GlobalChatbot() {
       await loadData();
       setIsLoading(false);
 
-      // Fetch post-transaction balance for related account
+      // Fetch post-transaction balances for all associated accounts
       let balanceInfo = '';
-      const relatedAccId = draft.transaction_type === 'income' ? draft.to_account_id : draft.from_account_id;
-      if (relatedAccId) {
+      const associatedIds = [draft.from_account_id, draft.to_account_id].filter(Boolean) as string[];
+      if (associatedIds.length > 0) {
         try {
-          const updatedAcc = await accountApi.getAccountById(relatedAccId);
-          if (updatedAcc) {
-            balanceInfo = `\n💳 Related Account: ${updatedAcc.account_name} | Balance after posting: ₹${Number(updatedAcc.balance).toLocaleString('en-IN')}`;
+          const updatedAccs = await Promise.all(
+            associatedIds.map(async id => {
+              try {
+                return await accountApi.getAccountById(id);
+              } catch {
+                return null;
+              }
+            })
+          );
+          const validAccs = updatedAccs.filter(Boolean) as Account[];
+          if (validAccs.length > 0) {
+            balanceInfo = '\n💳 ' + validAccs.map(acc => {
+              const role = acc.id === draft.from_account_id ? 'Debited' : 'Credited';
+              return `${acc.account_name} (${role}): Balance after posting: ₹${Number(acc.balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+            }).join(' | ');
           }
         } catch (err) {
-          console.error('Failed to fetch updated account balance:', err);
+          console.error('Failed to fetch updated account balances:', err);
         }
       }
 
@@ -848,16 +844,29 @@ export default function GlobalChatbot() {
 
         await transactionApi.createTransaction(payload);
 
-        // Fetch updated account balance after posting
+        // Fetch updated account balances after posting
         let postBalanceText = '';
-        if (accId) {
+        const itemAccIds = [item.from_account_id, item.to_account_id].filter(Boolean) as string[];
+        if (itemAccIds.length > 0) {
           try {
-            const updatedAcc = await accountApi.getAccountById(accId);
-            if (updatedAcc) {
-              postBalanceText = `\n💳 Related Account: ${updatedAcc.account_name} | Balance after posting: ₹${Number(updatedAcc.balance).toLocaleString('en-IN')}`;
+            const updatedAccs = await Promise.all(
+              itemAccIds.map(async id => {
+                try {
+                  return await accountApi.getAccountById(id);
+                } catch {
+                  return null;
+                }
+              })
+            );
+            const validAccs = updatedAccs.filter(Boolean) as Account[];
+            if (validAccs.length > 0) {
+              postBalanceText = '\n💳 ' + validAccs.map(acc => {
+                const role = acc.id === item.from_account_id ? 'Debited' : 'Credited';
+                return `${acc.account_name} (${role}): Balance after posting: ₹${Number(acc.balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+              }).join(' | ');
             }
           } catch (err) {
-            console.error('Failed to fetch updated account balance:', err);
+            console.error('Failed to fetch updated account balances:', err);
           }
         }
 

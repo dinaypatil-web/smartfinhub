@@ -402,6 +402,7 @@ export interface BatchTransactionItem {
   amount: number;
   from_account_id?: string | null;
   to_account_id?: string | null;
+  account_name?: string | null;
   category?: string | null;
   income_category?: 'salaries' | 'allowances' | 'family_income' | 'others' | null;
   description?: string | null;

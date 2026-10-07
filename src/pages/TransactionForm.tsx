@@ -12,7 +12,33 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, ArrowLeft, TrendingDown, CreditCard, AlertCircle, Plus, Info, Trash2, Sparkles, X, Send, Bot, Check } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import {
+  Loader2,
+  ArrowLeft,
+  TrendingDown,
+  CreditCard,
+  AlertCircle,
+  Plus,
+  Info,
+  Trash2,
+  Sparkles,
+  X,
+  Send,
+  Bot,
+  Check,
+  CheckCircle2,
+  Wallet,
+  Landmark,
+  Building,
+  ArrowRight,
+} from 'lucide-react';
 import { parseSmartChatbotCommand } from '@/services/aiService';
 import { formatCurrency } from '@/utils/format';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -29,6 +55,31 @@ import { calculateEMIBreakdown } from '@/utils/loanCalculations';
 import { getTransactionStatementInfo, getStatementPeriod } from '@/utils/statementCalculations';
 import { INCOME_CATEGORIES, getIncomeCategoryName } from '@/constants/incomeCategories';
 import { cache } from '@/utils/cache';
+
+export interface PostPostingAccountDetail {
+  id: string;
+  name: string;
+  type: string;
+  institution_name?: string;
+  roleLabel: string;
+  previousBalance?: number;
+  postBalance: number;
+  currency: string;
+  credit_limit?: number | null;
+  changeAmount?: number;
+}
+
+export interface PostPostingSummary {
+  isEdit: boolean;
+  transaction_type: TransactionType;
+  amount: number;
+  currency: string;
+  category?: string;
+  income_category?: string;
+  description?: string;
+  transaction_date: string;
+  accounts: PostPostingAccountDetail[];
+}
 
 // Transaction form for creating and editing transactions
 export default function TransactionForm() {
@@ -100,6 +151,10 @@ export default function TransactionForm() {
     { category: '', amount: '', description: '' }
   ]);
   const [splitBudgets, setSplitBudgets] = useState<Record<string, { budgeted: number; spent: number; remaining: number } | null>>({});
+
+  // Post-Posting Balances Display State
+  const [postPostingSummary, setPostPostingSummary] = useState<PostPostingSummary | null>(null);
+  const [isPostPostingModalOpen, setIsPostPostingModalOpen] = useState(false);
 
   // Multi-Transaction Batch Posting State
   interface BatchDraftItem {
@@ -1024,27 +1079,30 @@ export default function TransactionForm() {
 
         await transactionApi.createTransaction(payload);
 
-        // Fetch updated account balance
-        const relatedAccId = isInc ? item.to_account_id : item.from_account_id;
-        let accountName = 'Related Account';
-        let postBalanceStr = 'N/A';
-        if (relatedAccId) {
-          try {
-            const updatedAcc = await accountApi.getAccountById(relatedAccId);
-            if (updatedAcc) {
-              accountName = updatedAcc.account_name;
-              postBalanceStr = `₹${Number(updatedAcc.balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+        // Fetch updated account balance for all associated accounts
+        const associatedIds = [item.from_account_id, item.to_account_id].filter(Boolean) as string[];
+        const updatedAccounts = await Promise.all(
+          associatedIds.map(async (accId) => {
+            try {
+              return await accountApi.getAccountById(accId);
+            } catch {
+              return null;
             }
-          } catch (e) {
-            console.error(e);
-          }
-        }
+          })
+        );
+        const validAccs = updatedAccounts.filter(Boolean) as Account[];
+
+        const balanceReportLines = validAccs.map(acc => {
+          const isFrom = acc.id === item.from_account_id;
+          const role = isFrom ? 'Debited' : 'Credited';
+          return `  • **${acc.account_name}** (${role}): **₹${Number(acc.balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}**`;
+        }).join('\n');
 
         const catDisplay = isInc
           ? (item.income_category ? getIncomeCategoryName(item.income_category as any) : 'Income')
           : (item.category || 'Expense');
 
-        const successMsg = `✅ **Transaction ${i + 1} of ${total} posted successfully!**\n- Amount: ₹${Number(item.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })} (${item.transaction_type === 'income' ? 'Income' : 'Expense'} - ${catDisplay})\n- Account: **${accountName}**\n- **Balance after posting: ${postBalanceStr}**`;
+        const successMsg = `✅ **Transaction ${i + 1} of ${total} posted successfully!**\n- Amount: ₹${Number(item.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })} (${item.transaction_type === 'income' ? 'Income' : 'Expense'} - ${catDisplay})\n- **Post-Posting Account Balances:**\n${balanceReportLines || '  • N/A'}`;
 
         setChatMessages(prev => [
           ...prev,
@@ -1054,7 +1112,7 @@ export default function TransactionForm() {
 
       toast({
         title: 'Batch Posting Completed! 🎉',
-        description: `Successfully posted ${total} of ${total} transactions.`,
+        description: `Successfully posted ${total} of ${total} transactions. All account balances updated.`,
         variant: 'default',
       });
 
@@ -1082,6 +1140,166 @@ export default function TransactionForm() {
       setIsBatchSaving(false);
       setLoading(false);
     }
+  };
+
+  const handleResetForNewTransaction = async () => {
+    setIsPostPostingModalOpen(false);
+    setPostPostingSummary(null);
+    setFormData({
+      transaction_type: 'expense',
+      from_account_id: '',
+      to_account_id: '',
+      amount: '',
+      currency: profile?.default_currency || 'INR',
+      category: '',
+      income_category: '',
+      description: '',
+      transaction_date: new Date().toISOString().split('T')[0],
+      is_emi: false,
+      emi_months: '',
+      bank_charges: '',
+    });
+    setIsSplitCategory(false);
+    setSplitCategories([{ category: '', amount: '', description: '' }]);
+    setIsSplitRepayment(false);
+    setSplitSources([]);
+    setCalculatedEMI(null);
+    setLoanBreakdown(null);
+    setExistingEMI(null);
+    setCreditLimitWarning(null);
+    setStatementInfo(null);
+    if (id) {
+      navigate('/transactions/new');
+    } else if (user) {
+      try {
+        const freshAccs = await accountApi.getAccounts(user.id);
+        setAccounts(freshAccs);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  };
+
+  const resolvePostPostingAccountBalances = async (prevAccountsMap: Map<string, Account>) => {
+    // Determine all associated accounts
+    const associatedItems: { id: string; roleLabel: string }[] = [];
+
+    if (formData.transaction_type === 'expense') {
+      if (formData.from_account_id && !formData.from_account_id.startsWith('advance_balance')) {
+        associatedItems.push({ id: formData.from_account_id, roleLabel: 'Debited (Paid From)' });
+      }
+    } else if (formData.transaction_type === 'income') {
+      if (formData.to_account_id) {
+        associatedItems.push({ id: formData.to_account_id, roleLabel: 'Credited (Received In)' });
+      }
+    } else if (formData.transaction_type === 'transfer') {
+      if (formData.from_account_id) {
+        associatedItems.push({ id: formData.from_account_id, roleLabel: 'Transferred From (Debited)' });
+      }
+      if (formData.to_account_id) {
+        associatedItems.push({ id: formData.to_account_id, roleLabel: 'Transferred To (Credited)' });
+      }
+    } else if (formData.transaction_type === 'withdrawal') {
+      if (formData.from_account_id) {
+        associatedItems.push({ id: formData.from_account_id, roleLabel: 'Source Account (Debited)' });
+      }
+      if (formData.to_account_id) {
+        associatedItems.push({ id: formData.to_account_id, roleLabel: 'Cash Account (Credited)' });
+      }
+    } else if (formData.transaction_type === 'loan_payment') {
+      if (formData.from_account_id) {
+        associatedItems.push({ id: formData.from_account_id, roleLabel: 'Payment Account (Debited)' });
+      }
+      if (formData.to_account_id) {
+        associatedItems.push({ id: formData.to_account_id, roleLabel: 'Loan Account (Principal Reduced)' });
+      }
+    } else if (formData.transaction_type === 'credit_card_repayment') {
+      if (isSplitRepayment) {
+        splitSources.forEach(s => {
+          if (s.accountId && !s.accountId.startsWith('advance_balance')) {
+            associatedItems.push({
+              id: s.accountId,
+              roleLabel: `Repayment Source (${formatCurrency(parseFloat(s.amount) || 0, formData.currency)})`
+            });
+          }
+        });
+      } else if (formData.from_account_id && !formData.from_account_id.startsWith('advance_balance')) {
+        associatedItems.push({ id: formData.from_account_id, roleLabel: 'Payment Account (Debited)' });
+      }
+      if (formData.to_account_id) {
+        associatedItems.push({ id: formData.to_account_id, roleLabel: 'Credit Card (Debt Repaid)' });
+      }
+    }
+
+    // If update and account changed, include original account
+    if (id && originalAccountId && originalAccountId !== formData.from_account_id && !originalAccountId.startsWith('advance_balance')) {
+      associatedItems.push({ id: originalAccountId, roleLabel: 'Previous Account (Reverted)' });
+    }
+
+    const postAccounts: PostPostingAccountDetail[] = [];
+    const seenIds = new Set<string>();
+    for (const item of associatedItems) {
+      if (seenIds.has(item.id)) continue;
+      seenIds.add(item.id);
+      try {
+        const updated = await accountApi.getAccountById(item.id);
+        if (updated) {
+          const prev = prevAccountsMap.get(item.id);
+          const prevBal = prev ? Number(prev.balance) : undefined;
+          const newBal = Number(updated.balance);
+          const change = prevBal !== undefined ? newBal - prevBal : undefined;
+          postAccounts.push({
+            id: updated.id,
+            name: updated.account_name,
+            type: updated.account_type,
+            institution_name: updated.institution_name,
+            roleLabel: item.roleLabel,
+            previousBalance: prevBal,
+            postBalance: newBal,
+            currency: updated.currency || formData.currency,
+            credit_limit: updated.credit_limit,
+            changeAmount: change
+          });
+        }
+      } catch (e) {
+        console.error('Failed to fetch updated account balance:', e);
+      }
+    }
+
+    try {
+      if (user) {
+        const freshAccs = await accountApi.getAccounts(user.id);
+        setAccounts(freshAccs);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+
+    const summary: PostPostingSummary = {
+      isEdit: !!id,
+      transaction_type: formData.transaction_type,
+      amount: parseFloat(formData.amount),
+      currency: formData.currency,
+      category: formData.category || undefined,
+      income_category: formData.income_category || undefined,
+      description: formData.description || undefined,
+      transaction_date: formData.transaction_date,
+      accounts: postAccounts
+    };
+
+    setPostPostingSummary(summary);
+    setIsPostPostingModalOpen(true);
+
+    const toastBalances = postAccounts
+      .map(a => `${a.name}: ${formatCurrency(a.postBalance, a.currency)}`)
+      .join(' • ');
+
+    toast({
+      title: id ? 'Transaction Updated Successfully! 🎉' : 'Transaction Posted Successfully! 🎉',
+      description: toastBalances ? `Balances after posting: ${toastBalances}` : (id ? 'Transaction updated successfully' : 'Transaction created successfully'),
+    });
+
+    return summary;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1372,6 +1590,8 @@ export default function TransactionForm() {
     }
 
     setLoading(true);
+    const prevAccountsMap = new Map<string, Account>();
+    accounts.forEach(a => prevAccountsMap.set(a.id, a));
 
     try {
       const transactionData: any = {
@@ -1856,26 +2076,28 @@ export default function TransactionForm() {
 
         // --- BATCH TRANSACTION QUEUE HANDLING ---
         if (batchDrafts.length > 0 && batchCurrentIndex < batchDrafts.length - 1) {
-          const relatedAccId = formData.transaction_type === 'income' ? formData.to_account_id : formData.from_account_id;
-          let accountName = 'Related Account';
-          let postBalanceStr = 'N/A';
-          if (relatedAccId) {
-            try {
-              const updatedAcc = await accountApi.getAccountById(relatedAccId);
-              if (updatedAcc) {
-                accountName = updatedAcc.account_name;
-                postBalanceStr = `₹${Number(updatedAcc.balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+          const accIds = [formData.from_account_id, formData.to_account_id].filter(Boolean) as string[];
+          const updatedAccounts = await Promise.all(
+            accIds.map(async (accId) => {
+              try {
+                return await accountApi.getAccountById(accId);
+              } catch {
+                return null;
               }
-            } catch (e) {
-              console.error(e);
-            }
-          }
+            })
+          );
+          const validAccs = updatedAccounts.filter(Boolean) as Account[];
+          const balanceReportLines = validAccs.map(acc => {
+            const isFrom = acc.id === formData.from_account_id;
+            const role = isFrom ? 'Debited' : 'Credited';
+            return `  • **${acc.account_name}** (${role}): **₹${Number(acc.balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}**`;
+          }).join('\n');
 
           const catDisplay = formData.transaction_type === 'income'
             ? (formData.income_category ? getIncomeCategoryName(formData.income_category as any) : 'Income')
             : (formData.category || 'Expense');
 
-          const progressMsg = `✅ **Transaction ${batchCurrentIndex + 1} of ${batchDrafts.length} posted successfully!**\n- Amount: ₹${Number(formData.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })} (${formData.transaction_type} - ${catDisplay})\n- Account: **${accountName}**\n- **Balance after posting: ${postBalanceStr}**`;
+          const progressMsg = `✅ **Transaction ${batchCurrentIndex + 1} of ${batchDrafts.length} posted successfully!**\n- Amount: ₹${Number(formData.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })} (${formData.transaction_type} - ${catDisplay})\n- **Post-Posting Account Balances:**\n${balanceReportLines || '  • N/A'}`;
 
           setChatMessages(prev => [
             ...prev,
@@ -1886,9 +2108,10 @@ export default function TransactionForm() {
           setBatchCurrentIndex(nextIdx);
           loadBatchItemIntoForm(batchDrafts[nextIdx]);
 
+          const balSummary = validAccs.map(a => `${a.account_name}: ₹${Number(a.balance).toLocaleString('en-IN')}`).join(' • ');
           toast({
             title: `Transaction ${batchCurrentIndex + 1} of ${batchDrafts.length} Saved!`,
-            description: `Loaded Transaction ${nextIdx + 1} of ${batchDrafts.length} for review.`,
+            description: balSummary ? `Post-posting Balances: ${balSummary}` : `Loaded Transaction ${nextIdx + 1} of ${batchDrafts.length} for review.`,
           });
 
           cache.clearPattern('dashboard-');
@@ -1903,49 +2126,41 @@ export default function TransactionForm() {
           setLoading(false);
           return;
         } else if (batchDrafts.length > 0 && batchCurrentIndex === batchDrafts.length - 1) {
-          const relatedAccId = formData.transaction_type === 'income' ? formData.to_account_id : formData.from_account_id;
-          let accountName = 'Related Account';
-          let postBalanceStr = 'N/A';
-          if (relatedAccId) {
-            try {
-              const updatedAcc = await accountApi.getAccountById(relatedAccId);
-              if (updatedAcc) {
-                accountName = updatedAcc.account_name;
-                postBalanceStr = `₹${Number(updatedAcc.balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+          const accIds = [formData.from_account_id, formData.to_account_id].filter(Boolean) as string[];
+          const updatedAccounts = await Promise.all(
+            accIds.map(async (accId) => {
+              try {
+                return await accountApi.getAccountById(accId);
+              } catch {
+                return null;
               }
-            } catch (e) {
-              console.error(e);
-            }
-          }
+            })
+          );
+          const validAccs = updatedAccounts.filter(Boolean) as Account[];
+          const balanceReportLines = validAccs.map(acc => {
+            const isFrom = acc.id === formData.from_account_id;
+            const role = isFrom ? 'Debited' : 'Credited';
+            return `  • **${acc.account_name}** (${role}): **₹${Number(acc.balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}**`;
+          }).join('\n');
 
           const catDisplay = formData.transaction_type === 'income'
             ? (formData.income_category ? getIncomeCategoryName(formData.income_category as any) : 'Income')
             : (formData.category || 'Expense');
 
-          const progressMsg = `✅ **Transaction ${batchDrafts.length} of ${batchDrafts.length} posted successfully!**\n- Amount: ₹${Number(formData.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })} (${formData.transaction_type} - ${catDisplay})\n- Account: **${accountName}**\n- **Balance after posting: ${postBalanceStr}**\n\n🎉 **All ${batchDrafts.length} of ${batchDrafts.length} batch transactions have been accepted and posted.** All account balances have been updated!`;
+          const progressMsg = `✅ **Transaction ${batchDrafts.length} of ${batchDrafts.length} posted successfully!**\n- Amount: ₹${Number(formData.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })} (${formData.transaction_type} - ${catDisplay})\n- **Post-Posting Account Balances:**\n${balanceReportLines || '  • N/A'}\n\n🎉 **All ${batchDrafts.length} of ${batchDrafts.length} batch transactions have been accepted and posted.** All account balances have been updated!`;
 
           setChatMessages(prev => [
             ...prev,
             { id: Math.random().toString(), role: 'model', content: progressMsg }
           ]);
 
-          toast({
-            title: 'Batch Posting Completed! 🎉',
-            description: `All ${batchDrafts.length} of ${batchDrafts.length} transactions posted successfully.`,
-          });
-
           setBatchDrafts([]);
           setBatchCurrentIndex(0);
-        } else {
-          toast({
-            title: 'Success',
-            description: 'Transaction created successfully',
-          });
         }
       }
 
       cache.clearPattern('dashboard-');
-      navigate('/transactions');
+      await resolvePostPostingAccountBalances(prevAccountsMap);
     } catch (error: any) {
       console.error('Error saving transaction:', error);
       toast({
@@ -3433,6 +3648,185 @@ export default function TransactionForm() {
       </div>
     )}
   </div>
+
+  {/* Post-Posting Account Balances Confirmation Dialog */}
+  <Dialog
+    open={isPostPostingModalOpen}
+    onOpenChange={(open) => {
+      setIsPostPostingModalOpen(open);
+      if (!open && postPostingSummary) {
+        navigate('/transactions', { state: { postPostingSummary } });
+      }
+    }}
+  >
+    <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto p-0 gap-0 border-emerald-500/30">
+      <div className="bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent p-6 pb-4 border-b">
+        <div className="flex items-center gap-3">
+          <div className="h-12 w-12 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 ring-4 ring-emerald-500/10">
+            <CheckCircle2 className="h-6 w-6" />
+          </div>
+          <div>
+            <DialogTitle className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+              {postPostingSummary?.isEdit ? 'Transaction Updated!' : 'Transaction Posted!'}
+              <Badge variant="outline" className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border-emerald-300 text-xs">
+                Success
+              </Badge>
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground mt-0.5">
+              Transaction recorded successfully. Below are the updated balances of associated accounts.
+            </DialogDescription>
+          </div>
+        </div>
+
+        {/* Transaction Snapshot */}
+        {postPostingSummary && (
+          <div className="mt-4 p-3.5 rounded-lg bg-background/80 backdrop-blur-xs border border-border shadow-xs flex items-center justify-between">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="capitalize text-xs font-semibold">
+                  {postPostingSummary.transaction_type.replace('_', ' ')}
+                </Badge>
+                <span className="text-xs text-muted-foreground">
+                  {postPostingSummary.transaction_date}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground line-clamp-1">
+                {postPostingSummary.description || postPostingSummary.category || (postPostingSummary.income_category ? getIncomeCategoryName(postPostingSummary.income_category as any) : 'Transaction')}
+              </p>
+            </div>
+            <div className="text-right">
+              <span className="text-[11px] text-muted-foreground block">Amount</span>
+              <span className="text-base font-bold text-foreground">
+                {formatCurrency(postPostingSummary.amount, postPostingSummary.currency)}
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Post-Posting Associated Account Balances */}
+      <div className="p-6 space-y-4">
+        <div>
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-2.5">
+            <Wallet className="h-3.5 w-3.5 text-primary" />
+            Balances of Associated Accounts (Post-Posting)
+          </h4>
+
+          {postPostingSummary?.accounts && postPostingSummary.accounts.length > 0 ? (
+            <div className="space-y-2.5">
+              {postPostingSummary.accounts.map((acc) => {
+                const isCard = acc.type === 'credit_card';
+                const isLoan = acc.type === 'loan';
+                const isBank = acc.type === 'bank';
+
+                return (
+                  <div
+                    key={acc.id}
+                    className="p-3.5 rounded-xl border border-border bg-card hover:bg-muted/30 transition-colors shadow-xs"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-2.5">
+                        <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center shrink-0 mt-0.5 text-muted-foreground">
+                          {isCard ? (
+                            <CreditCard className="h-4.5 w-4.5 text-purple-600 dark:text-purple-400" />
+                          ) : isLoan ? (
+                            <Building className="h-4.5 w-4.5 text-amber-600 dark:text-amber-400" />
+                          ) : isBank ? (
+                            <Landmark className="h-4.5 w-4.5 text-blue-600 dark:text-blue-400" />
+                          ) : (
+                            <Wallet className="h-4.5 w-4.5 text-emerald-600 dark:text-emerald-400" />
+                          )}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold text-sm text-foreground">
+                              {acc.name}
+                            </span>
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 uppercase tracking-wider">
+                              {acc.type.replace('_', ' ')}
+                            </Badge>
+                          </div>
+                          <span className="text-[11px] text-muted-foreground font-medium">
+                            {acc.roleLabel}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <span className="text-[10px] text-muted-foreground block font-medium">
+                          {isCard ? 'Outstanding Debt' : isLoan ? 'Loan Balance' : 'Post-Posting Balance'}
+                        </span>
+                        <span className="text-base font-bold text-emerald-600 dark:text-emerald-400">
+                          {formatCurrency(acc.postBalance, acc.currency)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Prior Balance & Change */}
+                    <div className="mt-2.5 pt-2 border-t border-border/60 flex items-center justify-between text-xs text-muted-foreground">
+                      <div className="flex items-center gap-1.5 text-[11px]">
+                        <span>Previous:</span>
+                        <span className="font-medium text-foreground/80">
+                          {acc.previousBalance !== undefined
+                            ? formatCurrency(acc.previousBalance, acc.currency)
+                            : '—'}
+                        </span>
+                        <ArrowRight className="h-3 w-3 text-muted-foreground/60" />
+                        <span className="font-semibold text-foreground">
+                          {formatCurrency(acc.postBalance, acc.currency)}
+                        </span>
+                      </div>
+
+                      {acc.changeAmount !== undefined && (
+                        <span className={`text-[11px] font-semibold ${acc.changeAmount >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                          {acc.changeAmount >= 0 ? `+${formatCurrency(acc.changeAmount, acc.currency)}` : formatCurrency(acc.changeAmount, acc.currency)}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Card limit or loan details if applicable */}
+                    {isCard && acc.credit_limit && (
+                      <div className="mt-2 p-2 rounded-md bg-purple-500/5 text-[11px] text-purple-700 dark:text-purple-300 flex items-center justify-between">
+                        <span>Available Credit Limit:</span>
+                        <span className="font-semibold">
+                          {formatCurrency(Math.max(0, acc.credit_limit - acc.postBalance), acc.currency)} / {formatCurrency(acc.credit_limit, acc.currency)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">No accounts associated with this transaction.</p>
+          )}
+        </div>
+      </div>
+
+      <DialogFooter className="p-4 bg-muted/30 border-t flex-col sm:flex-row gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full sm:w-auto text-xs"
+          onClick={handleResetForNewTransaction}
+        >
+          <Plus className="h-3.5 w-3.5 mr-1.5" />
+          Add Another Transaction
+        </Button>
+        <Button
+          type="button"
+          className="w-full sm:w-auto text-xs bg-primary text-primary-foreground hover:bg-primary/90"
+          onClick={() => {
+            setIsPostPostingModalOpen(false);
+            navigate('/transactions', { state: { postPostingSummary } });
+          }}
+        >
+          <ArrowRight className="h-3.5 w-3.5 mr-1.5" />
+          View Transactions
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </div>
   );
 }
