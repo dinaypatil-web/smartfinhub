@@ -413,6 +413,60 @@ export default function Transactions() {
                       </div>
                     ))}
                   </div>
+
+                  {postPostingBanner.categoryBudgets && postPostingBanner.categoryBudgets.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-emerald-200/80 dark:border-emerald-800/50 space-y-2">
+                      <span className="text-[11px] font-semibold text-emerald-950 dark:text-emerald-200 block">
+                        Category Budget Status (Post-Posting):
+                      </span>
+                      <div className="flex flex-wrap gap-2.5">
+                        {postPostingBanner.categoryBudgets.map((cat: any, idx: number) => {
+                          const isOver = cat.hasBudget && cat.remaining < 0;
+                          return (
+                            <div
+                              key={idx}
+                              className="px-3 py-1.5 rounded-lg bg-background border border-emerald-200/80 dark:border-emerald-800/50 shadow-xs flex items-center gap-2 text-xs flex-wrap"
+                            >
+                              <span className="font-semibold text-foreground">{cat.category}:</span>
+                              <span className="text-muted-foreground">
+                                Spent Now{' '}
+                                <strong className="text-purple-600 dark:text-purple-400 font-bold">
+                                  {formatCurrency(cat.spent, postPostingBanner.currency)}
+                                </strong>
+                              </span>
+                              <span className="text-muted-foreground">•</span>
+                              <span className="text-muted-foreground">
+                                Balance Budget{' '}
+                                <strong
+                                  className={
+                                    !cat.hasBudget
+                                      ? 'text-muted-foreground'
+                                      : isOver
+                                      ? 'text-rose-600 dark:text-rose-400 font-bold'
+                                      : 'text-emerald-600 dark:text-emerald-400 font-bold'
+                                  }
+                                >
+                                  {cat.hasBudget ? formatCurrency(cat.remaining, postPostingBanner.currency) : 'No limit'}
+                                </strong>
+                              </span>
+                              {cat.hasBudget && (
+                                <Badge
+                                  variant="outline"
+                                  className={`text-[10px] px-1.5 py-0 h-4 font-semibold ${
+                                    isOver
+                                      ? 'border-rose-300 text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40'
+                                      : 'border-emerald-300 text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40'
+                                  }`}
+                                >
+                                  {isOver ? 'Exceeded' : `${cat.percentageUsed.toFixed(0)}% Used`}
+                                </Badge>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
               <Button

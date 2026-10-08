@@ -1161,17 +1161,25 @@ export const budgetApi = {
     };
   },
 
-  async getCategoryBudgetInfo(userId: string, categoryName: string, month: number, year: number): Promise<{ budgeted: number; spent: number; remaining: number } | null> {
+  async getCategoryBudgetInfo(
+    userId: string,
+    categoryName: string,
+    month: number,
+    year: number,
+    includeUnbudgeted = false
+  ): Promise<{ budgeted: number; spent: number; remaining: number; hasBudget: boolean } | null> {
     const budget = await this.getBudget(userId, month, year);
-    if (!budget) return null;
+    if (!budget && !includeUnbudgeted) return null;
 
     // Find category ID by name
     const categories = await categoryApi.getCategories(userId);
-    const category = categories.find(c => c.name === categoryName);
-    if (!category) return null;
+    const category = categories.find(c => c.name.toLowerCase() === categoryName.trim().toLowerCase());
 
-    const budgeted = Number(budget.category_budgets[category.id] || 0);
-    if (budgeted === 0) return null;
+    const budgeted = category && budget?.category_budgets?.[category.id]
+      ? Number(budget.category_budgets[category.id] || 0)
+      : 0;
+
+    if (budgeted === 0 && !includeUnbudgeted) return null;
 
     // Calculate spent amount for this category in the current month
     const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
@@ -1179,15 +1187,16 @@ export const budgetApi = {
     const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
     const transactions = await transactionApi.getTransactionsByDateRange(userId, startDate, endDate);
+    const targetCatLower = categoryName.trim().toLowerCase();
     const spent = transactions
       .reduce((sum, t) => {
         if (t.transaction_splits && t.transaction_splits.length > 0) {
           const splitSum = t.transaction_splits
-            .filter(s => s.category === categoryName && (t.transaction_type === 'expense' || t.transaction_type === 'loan_payment'))
+            .filter(s => s.category?.trim().toLowerCase() === targetCatLower && (t.transaction_type === 'expense' || t.transaction_type === 'loan_payment'))
             .reduce((sSum, s) => sSum + Number(s.amount), 0);
           return sum + splitSum;
         } else {
-          const isMatch = t.category === categoryName && (t.transaction_type === 'expense' || t.transaction_type === 'loan_payment');
+          const isMatch = t.category?.trim().toLowerCase() === targetCatLower && (t.transaction_type === 'expense' || t.transaction_type === 'loan_payment');
           return sum + (isMatch ? Number(t.amount) : 0);
         }
       }, 0);
@@ -1195,7 +1204,8 @@ export const budgetApi = {
     return {
       budgeted,
       spent,
-      remaining: budgeted - spent
+      remaining: budgeted - spent,
+      hasBudget: budgeted > 0
     };
   }
 };

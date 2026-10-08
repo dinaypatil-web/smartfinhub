@@ -38,6 +38,7 @@ import {
   Landmark,
   Building,
   ArrowRight,
+  PieChart,
 } from 'lucide-react';
 import { parseSmartChatbotCommand } from '@/services/aiService';
 import { formatCurrency } from '@/utils/format';
@@ -69,6 +70,16 @@ export interface PostPostingAccountDetail {
   changeAmount?: number;
 }
 
+export interface PostPostingCategoryBudgetDetail {
+  category: string;
+  budgeted: number;
+  spent: number;
+  remaining: number;
+  hasBudget: boolean;
+  percentageUsed: number;
+  transactionAmount?: number;
+}
+
 export interface PostPostingSummary {
   isEdit: boolean;
   transaction_type: TransactionType;
@@ -79,6 +90,7 @@ export interface PostPostingSummary {
   description?: string;
   transaction_date: string;
   accounts: PostPostingAccountDetail[];
+  categoryBudgets?: PostPostingCategoryBudgetDetail[];
 }
 
 // Transaction form for creating and editing transactions
@@ -1275,6 +1287,66 @@ export default function TransactionForm() {
       console.error(e);
     }
 
+    // Resolve category budget & spent now for category/categories used in this transaction
+    const postCategoryBudgets: PostPostingCategoryBudgetDetail[] = [];
+    const categoriesToInspect: Array<{ category: string; amount?: number }> = [];
+
+    if (formData.transaction_type === 'expense') {
+      if (isSplitCategory && splitCategories.length > 0) {
+        splitCategories.forEach(s => {
+          if (s.category && s.category.trim()) {
+            categoriesToInspect.push({
+              category: s.category.trim(),
+              amount: parseFloat(s.amount) || 0
+            });
+          }
+        });
+      } else if (formData.category && formData.category.trim()) {
+        categoriesToInspect.push({
+          category: formData.category.trim(),
+          amount: parseFloat(formData.amount) || 0
+        });
+      }
+    } else if (formData.transaction_type === 'loan_payment' && formData.category && formData.category.trim()) {
+      categoriesToInspect.push({
+        category: formData.category.trim(),
+        amount: parseFloat(formData.amount) || 0
+      });
+    }
+
+    if (user && categoriesToInspect.length > 0) {
+      const txDate = new Date(formData.transaction_date);
+      const month = txDate.getMonth() + 1;
+      const year = txDate.getFullYear();
+
+      // Deduplicate categories while summing amounts if multiple splits use the same category
+      const mergedCats = new Map<string, number>();
+      for (const item of categoriesToInspect) {
+        const currentAmt = mergedCats.get(item.category) || 0;
+        mergedCats.set(item.category, currentAmt + (item.amount || 0));
+      }
+
+      for (const [catName, catAmt] of mergedCats.entries()) {
+        try {
+          const catInfo = await budgetApi.getCategoryBudgetInfo(user.id, catName, month, year, true);
+          if (catInfo) {
+            const percentageUsed = catInfo.budgeted > 0 ? (catInfo.spent / catInfo.budgeted) * 100 : 0;
+            postCategoryBudgets.push({
+              category: catName,
+              budgeted: catInfo.budgeted,
+              spent: catInfo.spent,
+              remaining: catInfo.remaining,
+              hasBudget: catInfo.hasBudget,
+              percentageUsed,
+              transactionAmount: catAmt
+            });
+          }
+        } catch (e) {
+          console.error(`Failed to fetch post-posting budget info for ${catName}:`, e);
+        }
+      }
+    }
+
     const summary: PostPostingSummary = {
       isEdit: !!id,
       transaction_type: formData.transaction_type,
@@ -1284,7 +1356,8 @@ export default function TransactionForm() {
       income_category: formData.income_category || undefined,
       description: formData.description || undefined,
       transaction_date: formData.transaction_date,
-      accounts: postAccounts
+      accounts: postAccounts,
+      categoryBudgets: postCategoryBudgets
     };
 
     setPostPostingSummary(summary);
@@ -1294,9 +1367,18 @@ export default function TransactionForm() {
       .map(a => `${a.name}: ${formatCurrency(a.postBalance, a.currency)}`)
       .join(' • ');
 
+    const toastBudget = postCategoryBudgets
+      .map(b => `${b.category}: Spent Now ${formatCurrency(b.spent, formData.currency)}${b.hasBudget ? ` (Bal: ${formatCurrency(b.remaining, formData.currency)})` : ''}`)
+      .join(' • ');
+
+    const toastDesc = [
+      toastBalances ? `Balances: ${toastBalances}` : '',
+      toastBudget ? `Budget: ${toastBudget}` : ''
+    ].filter(Boolean).join(' | ');
+
     toast({
       title: id ? 'Transaction Updated Successfully! 🎉' : 'Transaction Posted Successfully! 🎉',
-      description: toastBalances ? `Balances after posting: ${toastBalances}` : (id ? 'Transaction updated successfully' : 'Transaction created successfully'),
+      description: toastDesc || (id ? 'Transaction updated successfully' : 'Transaction created successfully'),
     });
 
     return summary;
@@ -3673,7 +3755,7 @@ export default function TransactionForm() {
               </Badge>
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground mt-0.5">
-              Transaction recorded successfully. Below are the updated balances of associated accounts.
+              Transaction recorded successfully. Below are the category budget status and updated account balances.
             </DialogDescription>
           </div>
         </div>
@@ -3704,8 +3786,159 @@ export default function TransactionForm() {
         )}
       </div>
 
-      {/* Post-Posting Associated Account Balances */}
-      <div className="p-6 space-y-4">
+      <div className="p-6 space-y-5">
+        {/* Post-Posting Category Budget & Spent Now */}
+        {postPostingSummary?.categoryBudgets && postPostingSummary.categoryBudgets.length > 0 && (
+          <div>
+            <div className="flex items-center justify-between mb-2.5">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <PieChart className="h-3.5 w-3.5 text-primary" />
+                Category Budget & Spent Now
+              </h4>
+              <Badge variant="outline" className="text-[10px] px-2 py-0.5 h-5 font-normal text-muted-foreground bg-muted/30">
+                {new Date(postPostingSummary.transaction_date).toLocaleString('default', { month: 'short', year: 'numeric' })}
+              </Badge>
+            </div>
+
+            <div className="space-y-3">
+              {postPostingSummary.categoryBudgets.map((catBudget, idx) => {
+                const isOverBudget = catBudget.hasBudget && catBudget.remaining < 0;
+                const isNearBudget = catBudget.hasBudget && !isOverBudget && catBudget.percentageUsed >= 80;
+
+                return (
+                  <div
+                    key={`${catBudget.category}-${idx}`}
+                    className={`p-3.5 rounded-xl border transition-colors shadow-xs ${
+                      isOverBudget
+                        ? 'bg-rose-50/70 dark:bg-rose-950/20 border-rose-300 dark:border-rose-900/50'
+                        : isNearBudget
+                        ? 'bg-amber-50/70 dark:bg-amber-950/20 border-amber-300 dark:border-amber-900/50'
+                        : 'bg-card border-border hover:bg-muted/30'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-2.5">
+                        <div className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
+                          isOverBudget
+                            ? 'bg-rose-100 dark:bg-rose-900/40 text-rose-600 dark:text-rose-400'
+                            : isNearBudget
+                            ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400'
+                            : 'bg-primary/10 text-primary'
+                        }`}>
+                          <PieChart className="h-4.5 w-4.5" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold text-sm text-foreground">
+                              {catBudget.category}
+                            </span>
+                            {catBudget.hasBudget ? (
+                              isOverBudget ? (
+                                <Badge variant="outline" className="bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 border-rose-300 text-[10px] px-1.5 py-0 h-4 font-semibold">
+                                  Exceeded by {formatCurrency(Math.abs(catBudget.remaining), postPostingSummary.currency)}
+                                </Badge>
+                              ) : isNearBudget ? (
+                                <Badge variant="outline" className="bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border-amber-300 text-[10px] px-1.5 py-0 h-4 font-semibold">
+                                  {catBudget.percentageUsed.toFixed(0)}% Used
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300 text-[10px] px-1.5 py-0 h-4 font-semibold">
+                                  Within Budget
+                                </Badge>
+                              )
+                            ) : (
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 text-muted-foreground border-muted-foreground/30">
+                                No Budget Limit Set
+                              </Badge>
+                            )}
+                          </div>
+                          <span className="text-[11px] text-muted-foreground font-medium">
+                            {catBudget.transactionAmount !== undefined && catBudget.transactionAmount > 0
+                              ? `This Transaction: +${formatCurrency(catBudget.transactionAmount, postPostingSummary.currency)}`
+                              : 'Category spending updated'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <span className="text-[10px] text-muted-foreground block font-medium">
+                          Balance Budget
+                        </span>
+                        <span className={`text-base font-bold ${
+                          !catBudget.hasBudget
+                            ? 'text-muted-foreground'
+                            : catBudget.remaining < 0
+                            ? 'text-rose-600 dark:text-rose-400'
+                            : 'text-emerald-600 dark:text-emerald-400'
+                        }`}>
+                          {catBudget.hasBudget
+                            ? formatCurrency(catBudget.remaining, postPostingSummary.currency)
+                            : '—'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Metric Cards Row: Allocated Budget vs Spent Now vs Balance Budget */}
+                    <div className="mt-3 grid grid-cols-3 gap-2 p-2.5 rounded-lg bg-background/80 dark:bg-background/50 border border-border/60 text-xs">
+                      <div>
+                        <span className="text-[10px] text-muted-foreground block font-medium">Budgeted</span>
+                        <span className="font-semibold text-foreground">
+                          {catBudget.hasBudget ? formatCurrency(catBudget.budgeted, postPostingSummary.currency) : '—'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-muted-foreground block font-medium">Spent Now</span>
+                        <span className="font-bold text-purple-600 dark:text-purple-400">
+                          {formatCurrency(catBudget.spent, postPostingSummary.currency)}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-muted-foreground block font-medium">Balance Budget</span>
+                        <span className={`font-bold ${
+                          !catBudget.hasBudget
+                            ? 'text-muted-foreground'
+                            : catBudget.remaining < 0
+                            ? 'text-rose-600 dark:text-rose-400'
+                            : 'text-emerald-600 dark:text-emerald-400'
+                        }`}>
+                          {catBudget.hasBudget ? formatCurrency(catBudget.remaining, postPostingSummary.currency) : 'No limit'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Progress Bar & Indicators */}
+                    {catBudget.hasBudget && (
+                      <div className="mt-2.5 space-y-1">
+                        <div className="w-full bg-muted/80 rounded-full h-1.5 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${
+                              isOverBudget
+                                ? 'bg-rose-500'
+                                : isNearBudget
+                                ? 'bg-amber-500'
+                                : 'bg-emerald-500'
+                            }`}
+                            style={{ width: `${Math.min(100, Math.max(0, catBudget.percentageUsed))}%` }}
+                          />
+                        </div>
+                        <div className="flex justify-between items-center text-[10px] text-muted-foreground font-medium">
+                          <span>{catBudget.percentageUsed.toFixed(1)}% spent</span>
+                          <span>
+                            {isOverBudget
+                              ? `Exceeded by ${formatCurrency(Math.abs(catBudget.remaining), postPostingSummary.currency)}`
+                              : `${formatCurrency(catBudget.remaining, postPostingSummary.currency)} remaining`}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Post-Posting Associated Account Balances */}
         <div>
           <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-2.5">
             <Wallet className="h-3.5 w-3.5 text-primary" />
