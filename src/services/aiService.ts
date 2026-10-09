@@ -1043,3 +1043,346 @@ export async function parseSmartChatbotCommand(
     onError(error instanceof Error ? error.message : 'Failed to parse command');
   }
 }
+
+export interface TransactionInsightParams {
+  transaction: {
+    isEdit: boolean;
+    transaction_type: string;
+    amount: number;
+    currency: string;
+    category?: string;
+    income_category?: string;
+    description?: string;
+    transaction_date: string;
+  };
+  accounts: Array<{
+    id?: string;
+    name: string;
+    type: string;
+    roleLabel: string;
+    previousBalance?: number;
+    postBalance: number;
+    currency: string;
+    credit_limit?: number | null;
+    changeAmount?: number;
+  }>;
+  categoryBudgets?: Array<{
+    category: string;
+    budgeted: number;
+    spent: number;
+    remaining: number;
+    hasBudget: boolean;
+    percentageUsed: number;
+    transactionAmount?: number;
+  }>;
+}
+
+export interface PostPostingAIInsight {
+  status: 'positive' | 'warning' | 'caution' | 'neutral';
+  statusBadge: string;
+  headline: string;
+  budgetInsight?: string;
+  cashFlowInsight?: string;
+  smartTip?: string;
+  generatedVia?: 'ai' | 'heuristic';
+}
+
+const formatInsightCurrency = (amount: number, currency = 'INR'): string => {
+  const sym = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : '₹';
+  return `${sym}${Math.abs(amount).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+};
+
+export function generateHeuristicTransactionInsight(params: TransactionInsightParams): PostPostingAIInsight {
+  const { transaction: tx, accounts, categoryBudgets } = params;
+  const curr = tx.currency || 'INR';
+  const txAmt = Number(tx.amount || 0);
+
+  // 1. Expense analysis
+  if (tx.transaction_type === 'expense') {
+    const overBudget = categoryBudgets?.find(b => b.hasBudget && b.remaining < 0);
+    const nearBudget = categoryBudgets?.find(b => b.hasBudget && b.remaining >= 0 && b.percentageUsed >= 80);
+    const normalBudget = categoryBudgets?.find(b => b.hasBudget && b.percentageUsed < 80);
+    const primaryCat = tx.category || categoryBudgets?.[0]?.category || 'General Spending';
+
+    // Credit card check
+    const ccAccount = accounts.find(a => a.type === 'credit_card');
+    let cashFlowInsight = '';
+    if (ccAccount && ccAccount.credit_limit) {
+      const util = (ccAccount.postBalance / ccAccount.credit_limit) * 100;
+      const avail = Math.max(0, ccAccount.credit_limit - ccAccount.postBalance);
+      if (util > 50) {
+        cashFlowInsight = `Credit card utilization is high at ${util.toFixed(0)}% (${formatInsightCurrency(ccAccount.postBalance, curr)} of ${formatInsightCurrency(ccAccount.credit_limit, curr)} limit). Available credit is ${formatInsightCurrency(avail, curr)}.`;
+      } else {
+        cashFlowInsight = `Credit card utilization is at a safe ${util.toFixed(0)}%. Available credit is ${formatInsightCurrency(avail, curr)}.`;
+      }
+    } else {
+      const debitedAcc = accounts.find(a => a.roleLabel.toLowerCase().includes('debit') || a.roleLabel.toLowerCase().includes('paid'));
+      if (debitedAcc) {
+        cashFlowInsight = `Post-transaction balance in ${debitedAcc.name} is ${formatInsightCurrency(debitedAcc.postBalance, curr)}.`;
+      }
+    }
+
+    if (overBudget) {
+      const overAmt = Math.abs(overBudget.remaining);
+      return {
+        status: 'warning',
+        statusBadge: 'Budget Exceeded',
+        headline: `Budget alert: Spending in ${overBudget.category} has exceeded your monthly limit by ${formatInsightCurrency(overAmt, curr)} (${overBudget.percentageUsed.toFixed(0)}% spent).`,
+        budgetInsight: `Allocated budget was ${formatInsightCurrency(overBudget.budgeted, curr)}, while cumulative spend now totals ${formatInsightCurrency(overBudget.spent, curr)}.`,
+        cashFlowInsight: cashFlowInsight || `This expense directly impacts your end-of-month discretionary cash reserves.`,
+        smartTip: `Consider pausing non-essential purchases in ${overBudget.category} or reallocating surplus from an under-utilized budget category to restore balance.`,
+        generatedVia: 'heuristic'
+      };
+    }
+
+    if (nearBudget) {
+      return {
+        status: 'caution',
+        statusBadge: 'Approaching Budget',
+        headline: `Heads up: You have consumed ${nearBudget.percentageUsed.toFixed(0)}% of your monthly ${nearBudget.category} budget.`,
+        budgetInsight: `Only ${formatInsightCurrency(nearBudget.remaining, curr)} remains available for ${nearBudget.category} for the remainder of this cycle.`,
+        cashFlowInsight: cashFlowInsight || `Account liquidity remains sufficient, but category pacing needs attention.`,
+        smartTip: `Pace discretionary spending in ${nearBudget.category} over the remaining days of this month to stay within your target.`,
+        generatedVia: 'heuristic'
+      };
+    }
+
+    if (normalBudget) {
+      return {
+        status: 'positive',
+        statusBadge: 'Within Budget',
+        headline: `Healthy spending: ${normalBudget.category} is at a comfortable ${normalBudget.percentageUsed.toFixed(0)}% of your monthly budget.`,
+        budgetInsight: `You still have ${formatInsightCurrency(normalBudget.remaining, curr)} in remaining budget buffer for this category.`,
+        cashFlowInsight: cashFlowInsight || `Your spending pace is sustainable and aligned with your savings plan.`,
+        smartTip: `Consistent budget discipline like this maximizes your monthly savings rate for investments!`,
+        generatedVia: 'heuristic'
+      };
+    }
+
+    return {
+      status: 'neutral',
+      statusBadge: 'Spend Recorded',
+      headline: `Transaction of ${formatInsightCurrency(txAmt, curr)} recorded under ${primaryCat}.`,
+      budgetInsight: `No active monthly budget cap is configured for ${primaryCat}.`,
+      cashFlowInsight: cashFlowInsight || `Associated account balances have been synchronized.`,
+      smartTip: `Setting a monthly target for ${primaryCat} in Budgets will give you proactive burn-rate tracking!`,
+      generatedVia: 'heuristic'
+    };
+  }
+
+  // 2. Income analysis
+  if (tx.transaction_type === 'income') {
+    const creditedAcc = accounts.find(a => a.roleLabel.toLowerCase().includes('credit') || a.roleLabel.toLowerCase().includes('received')) || accounts[0];
+    return {
+      status: 'positive',
+      statusBadge: 'Income Boost',
+      headline: `Inflow of ${formatInsightCurrency(txAmt, curr)} successfully credited to ${creditedAcc ? creditedAcc.name : 'your account'}.`,
+      budgetInsight: `New income elevates your monthly cash flow buffer and widens your savings margin.`,
+      cashFlowInsight: creditedAcc ? `Updated balance in ${creditedAcc.name} is now ${formatInsightCurrency(creditedAcc.postBalance, curr)}.` : `Liquid wealth increased.`,
+      smartTip: `Pro-tip: Allocate at least 20% of fresh income immediately toward emergency savings or mutual funds before spending!`,
+      generatedVia: 'heuristic'
+    };
+  }
+
+  // 3. Loan Payment analysis
+  if (tx.transaction_type === 'loan_payment') {
+    const loanAcc = accounts.find(a => a.type === 'loan');
+    return {
+      status: 'positive',
+      statusBadge: 'Debt Reduced',
+      headline: `Loan installment of ${formatInsightCurrency(txAmt, curr)} posted successfully.`,
+      budgetInsight: `EMI payments systematically lower outstanding liability and build long-term net worth.`,
+      cashFlowInsight: loanAcc ? `Remaining loan principal balance reduced to ${formatInsightCurrency(loanAcc.postBalance, curr)}.` : `Principal reduced.`,
+      smartTip: `Every on-time EMI enhances your CIBIL/credit score and saves compounding interest charges!`,
+      generatedVia: 'heuristic'
+    };
+  }
+
+  // 4. Credit Card Repayment analysis
+  if (tx.transaction_type === 'credit_card_repayment') {
+    const cardAcc = accounts.find(a => a.type === 'credit_card');
+    return {
+      status: 'positive',
+      statusBadge: 'Credit Restored',
+      headline: `Card repayment of ${formatInsightCurrency(txAmt, curr)} processed successfully.`,
+      budgetInsight: `Clearing credit card dues protects you from steep APR finance charges (up to 42% p.a.).`,
+      cashFlowInsight: cardAcc ? `Outstanding card balance dropped to ${formatInsightCurrency(cardAcc.postBalance, curr)}. Available limit refreshed.` : `Card debt paid down.`,
+      smartTip: `Paying credit card bills before the due date builds a sterling credit score and guarantees zero interest charges.`,
+      generatedVia: 'heuristic'
+    };
+  }
+
+  // 5. Transfer / Withdrawal
+  return {
+    status: 'neutral',
+    statusBadge: 'Funds Reallocated',
+    headline: `Internal transfer of ${formatInsightCurrency(txAmt, curr)} successfully completed between accounts.`,
+    budgetInsight: `Transfer transactions do not alter your net monthly expense or income totals.`,
+    cashFlowInsight: `Liquidity has been re-balanced across your accounts post-transaction.`,
+    smartTip: `Distributing liquid funds between high-yield bank accounts and daily operating accounts maximizes interest earnings.`,
+    generatedVia: 'heuristic'
+  };
+}
+
+export async function generateTransactionAIInsight(
+  params: TransactionInsightParams
+): Promise<PostPostingAIInsight> {
+  const fallback = generateHeuristicTransactionInsight(params);
+
+  try {
+    const { transaction: tx, accounts, categoryBudgets } = params;
+
+    const accountsText = accounts.map(a => {
+      let text = `- ${a.name} (${a.type.replace('_', ' ')}): Balance ₹${Number(a.postBalance).toLocaleString('en-IN')}`;
+      if (a.previousBalance !== undefined) {
+        text += `, Previous: ₹${Number(a.previousBalance).toLocaleString('en-IN')}`;
+      }
+      if (a.changeAmount !== undefined) {
+        text += `, Net Change: ${a.changeAmount >= 0 ? '+' : ''}₹${Number(a.changeAmount).toLocaleString('en-IN')}`;
+      }
+      if (a.type === 'credit_card' && a.credit_limit) {
+        const util = ((a.postBalance / a.credit_limit) * 100).toFixed(1);
+        text += `, Limit: ₹${Number(a.credit_limit).toLocaleString('en-IN')} (Utilization: ${util}%)`;
+      }
+      return text;
+    }).join('\n');
+
+    const budgetsText = (categoryBudgets && categoryBudgets.length > 0)
+      ? categoryBudgets.map(b => {
+          return `- Category "${b.category}": Spent Now ₹${Number(b.spent).toLocaleString('en-IN')}, Budgeted: ${b.hasBudget ? `₹${Number(b.budgeted).toLocaleString('en-IN')}` : 'No limit'}, Remaining: ${b.hasBudget ? `₹${Number(b.remaining).toLocaleString('en-IN')} (${b.percentageUsed.toFixed(1)}% used)` : 'N/A'}`;
+        }).join('\n')
+      : 'No monthly category budget cap active for this transaction.';
+
+    const prompt = `You are an expert personal finance coach and transaction analyst for SmartFinHub.
+A user just submitted the following financial transaction:
+- Action: ${tx.isEdit ? 'Updated Transaction' : 'New Transaction'}
+- Type: ${tx.transaction_type}
+- Amount: ₹${Number(tx.amount).toLocaleString('en-IN')} (${tx.currency})
+- Category: ${tx.category || tx.income_category || 'N/A'}
+- Description: "${tx.description || 'N/A'}"
+- Date: ${tx.transaction_date}
+
+Post-Posting Account Balances:
+${accountsText || 'None'}
+
+Post-Posting Category Budget Status:
+${budgetsText}
+
+Provide an ultra-concise, high-impact financial insight on this transaction.
+Respond strictly in JSON format matching this schema:
+{
+  "status": "positive" | "warning" | "caution" | "neutral",
+  "statusBadge": "2-4 words badge (e.g., 'Budget Healthy', 'Budget Exceeded', 'High Credit Utilization', 'Income Boost', 'Debt Reduced')",
+  "headline": "1 punchy sentence summarizing this specific transaction's financial impact.",
+  "budgetInsight": "1-2 concise sentences analyzing the budget impact, category pace, or burn rate.",
+  "cashFlowInsight": "1-2 concise sentences on liquidity, cash reserves, debt reduction, or credit card utilization.",
+  "smartTip": "1 practical, actionable, encouraging tip for the user going forward."
+}
+
+Do not include any extra text, commentary, or markdown formatting outside the JSON object.`;
+
+    const payload = {
+      contents: [
+        {
+          role: 'user' as const,
+          parts: [{ text: prompt }],
+        },
+      ],
+    };
+
+    if (!APP_ID) {
+      return fallback;
+    }
+
+    const response = await fetch(AI_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-App-Id': APP_ID,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      return fallback;
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      return fallback;
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let completed = false;
+    let fullResponseText = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith('data: ')) continue;
+
+        const dataStr = trimmed.slice(6);
+        if (dataStr === '[DONE]') {
+          completed = true;
+          break;
+        }
+
+        try {
+          const parsedData = JSON.parse(dataStr);
+          const text = parsedData.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) {
+            fullResponseText += text;
+          }
+
+          const finishReason = parsedData.candidates?.[0]?.finishReason;
+          if (finishReason === 'STOP' && !completed) {
+            completed = true;
+            break;
+          }
+        } catch {
+          // ignore chunk parse error
+        }
+      }
+
+      if (completed) {
+        break;
+      }
+    }
+
+    // Clean JSON text
+    let cleanJson = fullResponseText.trim();
+    if (cleanJson.startsWith('```json')) {
+      cleanJson = cleanJson.replace(/^```json\s*/, '').replace(/```\s*$/, '');
+    } else if (cleanJson.startsWith('```')) {
+      cleanJson = cleanJson.replace(/^```\s*/, '').replace(/```\s*$/, '');
+    }
+
+    const parsed = JSON.parse(cleanJson);
+    if (parsed && typeof parsed.headline === 'string') {
+      const validStatuses = ['positive', 'warning', 'caution', 'neutral'];
+      const status = validStatuses.includes(parsed.status) ? parsed.status : fallback.status;
+      return {
+        status,
+        statusBadge: parsed.statusBadge || fallback.statusBadge,
+        headline: parsed.headline || fallback.headline,
+        budgetInsight: parsed.budgetInsight || fallback.budgetInsight,
+        cashFlowInsight: parsed.cashFlowInsight || fallback.cashFlowInsight,
+        smartTip: parsed.smartTip || fallback.smartTip,
+        generatedVia: 'ai'
+      };
+    }
+
+    return fallback;
+  } catch (error) {
+    console.warn('generateTransactionAIInsight failed, using heuristic fallback:', error);
+    return fallback;
+  }
+}

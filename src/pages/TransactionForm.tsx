@@ -39,8 +39,15 @@ import {
   Building,
   ArrowRight,
   PieChart,
+  RefreshCw,
+  AlertTriangle,
 } from 'lucide-react';
-import { parseSmartChatbotCommand } from '@/services/aiService';
+import {
+  parseSmartChatbotCommand,
+  generateTransactionAIInsight,
+  generateHeuristicTransactionInsight,
+  type PostPostingAIInsight,
+} from '@/services/aiService';
 import { formatCurrency } from '@/utils/format';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -91,6 +98,7 @@ export interface PostPostingSummary {
   transaction_date: string;
   accounts: PostPostingAccountDetail[];
   categoryBudgets?: PostPostingCategoryBudgetDetail[];
+  aiInsight?: PostPostingAIInsight;
 }
 
 // Transaction form for creating and editing transactions
@@ -167,6 +175,7 @@ export default function TransactionForm() {
   // Post-Posting Balances Display State
   const [postPostingSummary, setPostPostingSummary] = useState<PostPostingSummary | null>(null);
   const [isPostPostingModalOpen, setIsPostPostingModalOpen] = useState(false);
+  const [isGeneratingAiInsight, setIsGeneratingAiInsight] = useState(false);
 
   // Multi-Transaction Batch Posting State
   interface BatchDraftItem {
@@ -1157,6 +1166,7 @@ export default function TransactionForm() {
   const handleResetForNewTransaction = async () => {
     setIsPostPostingModalOpen(false);
     setPostPostingSummary(null);
+    setIsGeneratingAiInsight(false);
     setFormData({
       transaction_type: 'expense',
       from_account_id: '',
@@ -1189,6 +1199,32 @@ export default function TransactionForm() {
       } catch (err) {
         console.error(err);
       }
+    }
+  };
+
+  const handleRegenerateInsight = async () => {
+    if (!postPostingSummary) return;
+    setIsGeneratingAiInsight(true);
+    try {
+      const insight = await generateTransactionAIInsight({
+        transaction: {
+          isEdit: postPostingSummary.isEdit,
+          transaction_type: postPostingSummary.transaction_type,
+          amount: postPostingSummary.amount,
+          currency: postPostingSummary.currency,
+          category: postPostingSummary.category,
+          income_category: postPostingSummary.income_category,
+          description: postPostingSummary.description,
+          transaction_date: postPostingSummary.transaction_date,
+        },
+        accounts: postPostingSummary.accounts,
+        categoryBudgets: postPostingSummary.categoryBudgets,
+      });
+      setPostPostingSummary(prev => prev ? { ...prev, aiInsight: insight } : null);
+    } catch (e) {
+      console.warn('Failed to regenerate AI insight:', e);
+    } finally {
+      setIsGeneratingAiInsight(false);
     }
   };
 
@@ -1347,6 +1383,22 @@ export default function TransactionForm() {
       }
     }
 
+    // Generate initial instant heuristic insight
+    const initialInsight = generateHeuristicTransactionInsight({
+      transaction: {
+        isEdit: !!id,
+        transaction_type: formData.transaction_type,
+        amount: parseFloat(formData.amount) || 0,
+        currency: formData.currency,
+        category: formData.category || undefined,
+        income_category: formData.income_category || undefined,
+        description: formData.description || undefined,
+        transaction_date: formData.transaction_date,
+      },
+      accounts: postAccounts,
+      categoryBudgets: postCategoryBudgets
+    });
+
     const summary: PostPostingSummary = {
       isEdit: !!id,
       transaction_type: formData.transaction_type,
@@ -1357,11 +1409,41 @@ export default function TransactionForm() {
       description: formData.description || undefined,
       transaction_date: formData.transaction_date,
       accounts: postAccounts,
-      categoryBudgets: postCategoryBudgets
+      categoryBudgets: postCategoryBudgets,
+      aiInsight: initialInsight
     };
 
     setPostPostingSummary(summary);
     setIsPostPostingModalOpen(true);
+    setIsGeneratingAiInsight(true);
+
+    // Call Gemini AI asynchronously to enrich and upgrade the insight
+    generateTransactionAIInsight({
+      transaction: {
+        isEdit: !!id,
+        transaction_type: formData.transaction_type,
+        amount: parseFloat(formData.amount) || 0,
+        currency: formData.currency,
+        category: formData.category || undefined,
+        income_category: formData.income_category || undefined,
+        description: formData.description || undefined,
+        transaction_date: formData.transaction_date,
+      },
+      accounts: postAccounts,
+      categoryBudgets: postCategoryBudgets
+    }).then((aiInsight) => {
+      setPostPostingSummary(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          aiInsight
+        };
+      });
+    }).catch(err => {
+      console.warn('AI insight fetch error:', err);
+    }).finally(() => {
+      setIsGeneratingAiInsight(false);
+    });
 
     const toastBalances = postAccounts
       .map(a => `${a.name}: ${formatCurrency(a.postBalance, a.currency)}`)
@@ -3787,6 +3869,108 @@ export default function TransactionForm() {
       </div>
 
       <div className="p-6 space-y-5">
+        {/* Post-Posting AI Transaction Insights */}
+        {postPostingSummary?.aiInsight && (
+          <div className="rounded-xl border border-indigo-200/80 dark:border-indigo-800/60 bg-gradient-to-br from-indigo-50/80 via-purple-50/30 to-background dark:from-indigo-950/40 dark:via-purple-950/20 dark:to-background p-4 shadow-xs space-y-3 relative overflow-hidden transition-all">
+            {/* Header: AI Badge, Title & Status */}
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <div className="h-7 w-7 rounded-lg bg-indigo-500/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                  <Sparkles className={`h-4 w-4 ${isGeneratingAiInsight ? 'animate-spin text-purple-600' : 'animate-pulse text-indigo-600 dark:text-indigo-400'}`} />
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-xs font-bold uppercase tracking-wider text-indigo-950 dark:text-indigo-200">
+                    AI Transaction Insights
+                  </span>
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-indigo-100/60 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border-indigo-300/80 dark:border-indigo-700/60 font-medium">
+                    {isGeneratingAiInsight ? 'AI Analyzing...' : (postPostingSummary.aiInsight.generatedVia === 'ai' ? 'Gemini AI' : 'SmartFin Copilot')}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <Badge
+                  variant="outline"
+                  className={`text-[11px] font-semibold px-2 py-0.5 capitalize flex items-center gap-1 ${
+                    postPostingSummary.aiInsight.status === 'positive'
+                      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border-emerald-300'
+                      : postPostingSummary.aiInsight.status === 'warning'
+                      ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 border-rose-300'
+                      : postPostingSummary.aiInsight.status === 'caution'
+                      ? 'bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border-amber-300'
+                      : 'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 border-blue-300'
+                  }`}
+                >
+                  {postPostingSummary.aiInsight.status === 'positive' && <CheckCircle2 className="h-3 w-3" />}
+                  {postPostingSummary.aiInsight.status === 'warning' && <AlertTriangle className="h-3 w-3" />}
+                  {postPostingSummary.aiInsight.status === 'caution' && <AlertCircle className="h-3 w-3" />}
+                  {postPostingSummary.aiInsight.status === 'neutral' && <Info className="h-3 w-3" />}
+                  {postPostingSummary.aiInsight.statusBadge}
+                </Badge>
+                
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-muted-foreground hover:text-foreground shrink-0"
+                  disabled={isGeneratingAiInsight}
+                  onClick={handleRegenerateInsight}
+                  title="Refresh AI Insights"
+                >
+                  <RefreshCw className={`h-3 w-3 ${isGeneratingAiInsight ? 'animate-spin' : ''}`} />
+                </Button>
+              </div>
+            </div>
+
+            {/* Headline */}
+            <p className="text-sm font-semibold text-foreground leading-snug">
+              {postPostingSummary.aiInsight.headline}
+            </p>
+
+            {/* Structured Impact Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-0.5">
+              {postPostingSummary.aiInsight.budgetInsight && (
+                <div className="p-2.5 rounded-lg bg-background/80 dark:bg-background/40 border border-border/70 text-xs space-y-1">
+                  <div className="flex items-center gap-1.5 text-muted-foreground font-medium text-[11px]">
+                    <PieChart className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
+                    <span>Budget & Burn Rate</span>
+                  </div>
+                  <p className="text-foreground/90 leading-relaxed text-xs">
+                    {postPostingSummary.aiInsight.budgetInsight}
+                  </p>
+                </div>
+              )}
+
+              {postPostingSummary.aiInsight.cashFlowInsight && (
+                <div className="p-2.5 rounded-lg bg-background/80 dark:bg-background/40 border border-border/70 text-xs space-y-1">
+                  <div className="flex items-center gap-1.5 text-muted-foreground font-medium text-[11px]">
+                    <Wallet className="h-3.5 w-3.5 text-purple-500 shrink-0" />
+                    <span>Liquidity & Debt Impact</span>
+                  </div>
+                  <p className="text-foreground/90 leading-relaxed text-xs">
+                    {postPostingSummary.aiInsight.cashFlowInsight}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Actionable Coach Tip */}
+            {postPostingSummary.aiInsight.smartTip && (
+              <div className="p-2.5 rounded-lg bg-indigo-500/10 dark:bg-indigo-500/15 border border-indigo-200/60 dark:border-indigo-800/40 text-xs flex items-start gap-2">
+                <Sparkles className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <span className="font-semibold text-indigo-950 dark:text-indigo-200 text-[11px] block">
+                    Smart Tip
+                  </span>
+                  <p className="text-indigo-900/90 dark:text-indigo-200/90 leading-relaxed text-xs">
+                    {postPostingSummary.aiInsight.smartTip}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Post-Posting Category Budget & Spent Now */}
         {postPostingSummary?.categoryBudgets && postPostingSummary.categoryBudgets.length > 0 && (
           <div>
