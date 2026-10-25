@@ -364,8 +364,8 @@ export default function Transactions() {
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
           <Link to="/voice-transact?intent=transaction" className="flex-1 sm:flex-none">
-            <Button className="w-full bg-primary hover:bg-primary/90 text-white shadow-md transition-all text-xs sm:text-sm">
-              <Sparkles className="mr-2 h-4 w-4 text-white animate-pulse" />
+            <Button className="w-full text-xs sm:text-sm">
+              <Sparkles className="mr-2 h-4 w-4 text-primary" />
               Ask AI Assistant
             </Button>
           </Link>

@@ -13,15 +13,15 @@ import { auth0Config, isAuth0Configured } from './config/auth0';
 
 // Loading fallback component
 const PageLoader = () => (
-  <div className="container mx-auto p-6 space-y-6">
-    <Skeleton className="h-12 w-64 bg-muted" />
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-      <Skeleton className="h-32 bg-muted" />
-      <Skeleton className="h-32 bg-muted" />
-      <Skeleton className="h-32 bg-muted" />
-      <Skeleton className="h-32 bg-muted" />
+  <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+    <Skeleton className="h-9 w-52 rounded-xl bg-muted/60" />
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+      <Skeleton className="h-32 rounded-2xl bg-muted/50" />
+      <Skeleton className="h-32 rounded-2xl bg-muted/50" />
+      <Skeleton className="h-32 rounded-2xl bg-muted/50" />
+      <Skeleton className="h-32 rounded-2xl bg-muted/50" />
     </div>
-    <Skeleton className="h-64 bg-muted" />
+    <Skeleton className="h-64 rounded-2xl bg-muted/40" />
   </div>
 );
 
@@ -31,7 +31,7 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
 
   if (!user) {
     return (
-      <div className="flex flex-col min-h-screen">
+      <div className="flex flex-col min-h-screen bg-background text-foreground">
         <main className="flex-grow">
           {children}
         </main>
@@ -40,14 +40,14 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
   }
 
   return (
-    <div className="flex min-h-screen bg-background text-foreground">
+    <div className="flex min-h-screen bg-background text-foreground antialiased selection:bg-primary/15 selection:text-primary">
       {/* Collapsible Sidebar for screens >= md */}
-      <Sidebar className="hidden md:flex" />
+      <Sidebar className="hidden md:flex flex-shrink-0" />
 
       {/* Main panel holding topbar and page content */}
-      <div className="flex flex-col flex-grow min-h-screen overflow-x-hidden">
+      <div className="flex flex-col flex-grow min-h-screen w-full min-w-0 overflow-x-hidden">
         <Header />
-        <main className="flex-grow">
+        <main className="flex-grow w-full pb-12">
           {children}
         </main>
         <GlobalChatbot />

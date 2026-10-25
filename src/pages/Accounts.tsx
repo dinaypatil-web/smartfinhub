@@ -326,8 +326,8 @@ export default function Accounts() {
         </div>
         <div className="flex items-center gap-3">
           <Link to="/voice-transact?intent=account">
-            <Button className="bg-primary hover:bg-primary/90 text-white shadow-md transition-all">
-              <Sparkles className="mr-2 h-4 w-4 text-white animate-pulse" />
+            <Button>
+              <Sparkles className="mr-2 h-4 w-4 text-primary" />
               Ask AI Account Assistant
             </Button>
           </Link>

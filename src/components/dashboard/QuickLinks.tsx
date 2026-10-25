@@ -218,18 +218,25 @@ export default function QuickLinks({ countryCode, accounts = [] }: QuickLinksPro
       <div className="space-y-4">
         {/* User's Bank Apps */}
         {userBanks.length > 0 && (
-          <Card className="glass-card border-glow animate-slide-up">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Building2 className="h-5 w-5 text-primary" />
-                Your Bank Apps
-              </CardTitle>
+          <Card className="border border-border/70 shadow-card animate-slide-up">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                    <Building2 className="h-4 w-4" />
+                  </div>
+                  <span>Your Bank Apps</span>
+                </CardTitle>
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                  {userBanks.length} Linked
+                </span>
+              </div>
               <CardDescription className="text-muted-foreground text-xs">
-                Quick access to your bank and financial institution apps
+                Quick access to your bank and financial institution portals
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
                 {userBanks.map((bank) => {
                   const hasLink = bank.customLink || (bank.link && (bank.link.webUrl || bank.link.urlScheme));
                   const linkLabel = bank.customLink 
@@ -242,29 +249,31 @@ export default function QuickLinks({ countryCode, accounts = [] }: QuickLinksPro
                     <Button
                       key={bank.name}
                       variant="outline"
-                      className="h-auto flex-col items-start p-4 hover-lift-premium hover-border-glow bg-transparent transition-smooth"
+                      className="h-auto flex-col items-start p-3.5 bg-card hover:bg-muted/50 border border-border/80 hover:border-primary/40 rounded-xl transition-all duration-200 shadow-2xs hover:shadow-card hover:-translate-y-0.5 group text-left"
                       onClick={() => handleOpenBank(bank)}
                     >
-                      <div className="flex items-center gap-2.5 w-full mb-2.5">
+                      <div className="flex items-center gap-2.5 w-full mb-2">
                         {bank.logo ? (
                           <img 
                             src={bank.logo} 
                             alt={`${bank.name} logo`}
-                            className="h-9 w-9 object-contain rounded-lg flex-shrink-0 bg-white/5 p-1 border border-white/10 shadow-sm"
+                            className="h-8 w-8 object-contain rounded-lg flex-shrink-0 bg-muted/40 p-1 border border-border/60 shadow-2xs"
                           />
                         ) : (
-                          <div className="h-9 w-9 rounded-lg flex-shrink-0 bg-primary/10 border border-primary/20 flex items-center justify-center">
-                            <Building2 className="h-5 w-5 text-primary animate-pulse-slow" />
+                          <div className="h-8 w-8 rounded-lg flex-shrink-0 bg-primary/10 border border-primary/20 flex items-center justify-center">
+                            <Building2 className="h-4 w-4 text-primary" />
                           </div>
                         )}
-                        <span className="font-semibold text-sm break-words flex-1 text-left text-white/90">{bank.name}</span>
+                        <span className="font-semibold text-xs sm:text-sm text-foreground break-words flex-1 group-hover:text-primary transition-colors">
+                          {bank.name}
+                        </span>
                         {hasLink ? (
-                          <ExternalLink className="h-3.5 w-3.5 opacity-60 text-primary flex-shrink-0 hover:opacity-100" />
+                          <ExternalLink className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary flex-shrink-0 transition-colors" />
                         ) : (
-                          <span className="text-xs text-muted-foreground flex-shrink-0 animate-bounce">⚙️</span>
+                          <span className="text-xs text-muted-foreground flex-shrink-0">⚙️</span>
                         )}
                       </div>
-                      <p className="text-xs text-muted-foreground/80 text-left w-full break-words whitespace-normal leading-relaxed font-medium">
+                      <p className="text-[11px] text-muted-foreground line-clamp-1 w-full font-medium">
                         {linkLabel}
                       </p>
                     </Button>
@@ -277,41 +286,50 @@ export default function QuickLinks({ countryCode, accounts = [] }: QuickLinksPro
 
         {/* Payment Apps */}
         {paymentApps.length > 0 && (
-          <Card className="glass-card border-glow animate-slide-up animate-stagger-1">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Smartphone className="h-5 w-5 text-primary" />
-                Quick Payment Apps
-              </CardTitle>
+          <Card className="border border-border/70 shadow-card animate-slide-up animate-stagger-1">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <div className="h-7 w-7 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                    <Smartphone className="h-4 w-4" />
+                  </div>
+                  <span>Quick Payment Apps</span>
+                </CardTitle>
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                  Regional Apps
+                </span>
+              </div>
               <CardDescription className="text-muted-foreground text-xs">
-                Access popular payment apps for your region
+                Launch fast payments & UPI apps directly
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
                 {paymentApps.map((app) => (
                   <Button
                     key={app.name}
                     variant="outline"
-                    className="h-auto flex-col items-start p-4 hover-lift-premium hover-border-glow bg-transparent transition-smooth"
+                    className="h-auto flex-col items-start p-3.5 bg-card hover:bg-muted/50 border border-border/80 hover:border-emerald-500/40 rounded-xl transition-all duration-200 shadow-2xs hover:shadow-card hover:-translate-y-0.5 group text-left"
                     onClick={() => handleOpenApp(app)}
                   >
-                    <div className="flex items-center gap-2.5 w-full mb-2.5">
+                    <div className="flex items-center gap-2.5 w-full mb-2">
                       {app.logoUrl ? (
                         <img 
                           src={app.logoUrl} 
                           alt={`${app.name} logo`}
-                          className="h-9 w-9 object-contain rounded-lg flex-shrink-0 bg-white/5 p-1 border border-white/10 shadow-sm"
+                          className="h-8 w-8 object-contain rounded-lg flex-shrink-0 bg-muted/40 p-1 border border-border/60 shadow-2xs"
                         />
                       ) : (
-                        <div className="h-9 w-9 rounded-lg flex-shrink-0 bg-primary/10 border border-primary/20 flex items-center justify-center text-xl">
+                        <div className="h-8 w-8 rounded-lg flex-shrink-0 bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-lg">
                           {app.icon}
                         </div>
                       )}
-                      <span className="font-semibold text-sm break-words flex-1 text-left text-white/90">{app.name}</span>
-                      <ExternalLink className="h-3.5 w-3.5 opacity-60 text-primary flex-shrink-0 hover:opacity-100" />
+                      <span className="font-semibold text-xs sm:text-sm text-foreground break-words flex-1 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                        {app.name}
+                      </span>
+                      <ExternalLink className="h-3.5 w-3.5 text-muted-foreground group-hover:text-emerald-600 dark:group-hover:text-emerald-400 flex-shrink-0 transition-colors" />
                     </div>
-                    <p className="text-xs text-muted-foreground/80 text-left w-full break-words whitespace-normal leading-relaxed font-medium">
+                    <p className="text-[11px] text-muted-foreground line-clamp-1 w-full font-medium">
                       {app.description}
                     </p>
                   </Button>

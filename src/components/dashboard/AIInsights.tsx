@@ -286,55 +286,62 @@ export default function AIInsights() {
   }, [user]);
 
   return (
-    <Card className="glass-card border-glow border-primary/30 hover-lift-premium shadow-glow bg-gradient-to-br from-primary/5 via-transparent to-purple-500/5 animate-slide-up animate-stagger-2">
-      <CardHeader>
+    <Card className="border border-border/70 shadow-card bg-card animate-slide-up animate-stagger-2">
+      <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary animate-pulse-slow" />
-            <CardTitle className="gradient-text">AI Financial Insights</CardTitle>
+          <div className="flex items-center gap-2.5">
+            <div className="h-8 w-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+              <Sparkles className="h-4 w-4" />
+            </div>
+            <div>
+              <CardTitle className="text-base font-semibold text-foreground">AI Financial Insights</CardTitle>
+              <CardDescription className="text-xs text-muted-foreground mt-0.5">
+                Automated intelligence based on cash flows & habits
+              </CardDescription>
+            </div>
           </div>
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
             onClick={() => navigate('/ai-analysis')}
-            className="hover-lift"
+            className="text-xs h-8 px-3 rounded-lg"
           >
-            View Details
+            Full Analysis
           </Button>
         </div>
-        <CardDescription>
-          AI-powered analysis of your financial health
-        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {loadingQuickInsight && (
-          <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+          <div className="flex items-center gap-3 p-3.5 bg-muted/40 border border-border/60 rounded-xl">
             <Skeleton className="h-5 w-5 rounded-full bg-muted" />
             <Skeleton className="h-4 flex-1 bg-muted" />
           </div>
         )}
 
         {!loadingQuickInsight && quickInsight && (
-          <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-            {quickInsight.icon}
-            <p className={`text-sm font-medium ${quickInsight.color}`}>
+          <div className="flex items-center gap-3 p-3.5 bg-muted/40 border border-border/60 rounded-xl">
+            <div className="flex-shrink-0">{quickInsight.icon}</div>
+            <p className={`text-xs sm:text-sm font-medium ${quickInsight.color} leading-relaxed`}>
               {quickInsight.text}
             </p>
           </div>
         )}
 
         {!hasAnalysis && !isLoading && (
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <Sparkles className="h-12 w-12 text-primary/40 mb-3" />
-            <p className="text-sm text-muted-foreground mb-4">
-              Get personalized financial insights and budget recommendations based on your spending patterns
+          <div className="flex flex-col items-center justify-center py-7 px-4 text-center bg-muted/20 border border-border/50 rounded-xl">
+            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary mb-3">
+              <Sparkles className="h-5 w-5" />
+            </div>
+            <p className="text-xs text-muted-foreground max-w-md mb-4 font-medium leading-relaxed">
+              Get personalized AI-powered spending recommendations, savings forecast, and financial health assessment.
             </p>
             <Button
               onClick={generateAnalysis}
               disabled={!user}
               size="sm"
+              className="rounded-xl px-4 font-semibold shadow-xs"
             >
-              <Sparkles className="h-4 w-4 mr-2" />
+              <Sparkles className="h-3.5 w-3.5 mr-2" />
               Generate AI Analysis
             </Button>
           </div>

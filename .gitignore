@@ -32,3 +32,4 @@ package-lock.json
 .sync
 history/*.json
 .vite_cache
+.kilo

@@ -2,14 +2,13 @@ import { useEffect, useState } from 'react';
 import { useHybridAuth as useAuth } from '@/contexts/HybridAuthContext';
 import { accountApi, transactionApi, interestRateApi, emiApi, budgetApi, creditCardStatementApi } from '@/db/api';
 import type { Account, Transaction, FinancialSummary, EMITransaction } from '@/types/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatCurrency, formatAccountNumber } from '@/utils/format';
-import { Plus, Wallet, CreditCard, TrendingUp, TrendingDown, Building2, AlertCircle, Calculator, DollarSign, ExternalLink, Sparkles } from 'lucide-react';
+import { Plus, Wallet, CreditCard, TrendingUp, TrendingDown, Building2, AlertCircle, Calculator, DollarSign, ExternalLink, Sparkles, Calendar } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { calculateEMI, calculateAccruedInterest } from '@/utils/loanCalculations';
@@ -399,159 +398,213 @@ export default function Dashboard() {
     }, [] as { name: string; value: number }[]);
 
   const COLORS = [
-    '#3b82f6', // Blue
-    '#10b981', // Green
+    '#4f46e5', // Indigo
+    '#06b6d4', // Cyan
+    '#10b981', // Emerald
     '#f59e0b', // Amber
-    '#ef4444', // Red
-    '#8b5cf6', // Purple
-    '#ec4899', // Pink
-    '#14b8a6', // Teal
+    '#8b5cf6', // Violet
+    '#ec4899', // Rose
+    '#3b82f6', // Blue
     '#f97316', // Orange
   ];
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  };
 
+  const displayName = user?.user_metadata?.full_name || user?.name || profile?.email?.split('@')[0] || user?.email?.split('@')[0] || 'there';
 
   if (loading) {
     return (
-      <div className="container mx-auto p-6 space-y-6">
-        <Skeleton className="h-12 w-64 bg-muted" />
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div className="space-y-2">
+            <Skeleton className="h-9 w-52 rounded-xl bg-muted/60" />
+            <Skeleton className="h-4 w-72 rounded-lg bg-muted/50" />
+          </div>
+          <div className="flex gap-2.5">
+            <Skeleton className="h-10 w-28 rounded-xl bg-muted/60" />
+            <Skeleton className="h-10 w-32 rounded-xl bg-muted/60" />
+          </div>
+        </div>
+        <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           {[1, 2, 3, 4].map(i => (
-            <Skeleton key={i} className="h-32 bg-muted" />
+            <Skeleton key={i} className="h-32 rounded-2xl bg-muted/50" />
           ))}
         </div>
+        <Skeleton className="h-72 rounded-2xl bg-muted/40" />
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-4 md:p-6 space-y-4 md:space-y-6 max-w-full overflow-x-auto animate-fade-in">
+    <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6 animate-fade-in">
+      {/* Modern Executive Header */}
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 animate-slide-down">
         <div className="space-y-1">
-          <h1 className="text-3xl md:text-4xl font-bold gradient-text">Dashboard</h1>
-          <p className="text-sm md:text-base text-muted-foreground">Welcome back, {profile?.email || 'User'}</p>
-          <p className="text-xs text-muted-foreground">Today: {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
+              {getGreeting()}, <span className="text-primary">{displayName}</span>
+            </h1>
+          </div>
+          <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground font-medium">
+            <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+            <span>{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
+            <span>•</span>
+            <span>Financial Command Center</span>
+          </div>
         </div>
-        <div className="flex gap-2 flex-wrap">
+
+        {/* Action Buttons */}
+        <div className="flex gap-2 sm:gap-2.5 flex-wrap items-center">
           <Link to="/voice-transact">
-            <Button size="sm" className="md:size-default bg-primary hover:bg-primary/90 text-white shadow-md transition-all">
-              <Sparkles className="mr-2 h-4 w-4 text-white animate-pulse" />
-              Ask AI Assistant
+            <Button size="sm" className="h-9 rounded-xl gap-2 font-medium">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <span>Ask AI Copilot</span>
             </Button>
           </Link>
           <Link to="/accounts/new">
-            <Button size="sm" className="md:size-default shadow-elegant hover:shadow-glow transition-smooth">
-              <Plus className="mr-2 h-4 w-4" />
-              Add Account
+            <Button variant="outline" size="sm" className="h-9 rounded-xl shadow-xs gap-1.5 font-medium">
+              <Plus className="h-4 w-4" />
+              <span>Add Account</span>
             </Button>
           </Link>
           <Link to="/transactions/new">
-            <Button variant="outline" size="sm" className="md:size-default hover-lift">
-              <Plus className="mr-2 h-4 w-4" />
-              Add Transaction
+            <Button variant="outline" size="sm" className="h-9 rounded-xl shadow-xs gap-1.5 font-medium">
+              <Plus className="h-4 w-4" />
+              <span>Add Transaction</span>
             </Button>
           </Link>
           {summary?.accounts_by_type.loan && summary.accounts_by_type.loan.length > 0 && (
             <Button
               variant="secondary"
               size="sm"
-              className="md:size-default hover-lift"
+              className="h-9 rounded-xl shadow-xs gap-1.5 font-medium text-xs sm:text-sm"
               onClick={handlePostMonthlyInterest}
               disabled={postingInterest}
             >
-              <Calculator className="mr-2 h-4 w-4" />
-              {postingInterest ? 'Posting...' : 'Post Monthly Interest'}
+              <Calculator className="h-4 w-4" />
+              <span>{postingInterest ? 'Posting...' : 'Post Interest'}</span>
             </Button>
           )}
         </div>
       </div>
 
+      {/* Tabs Navigation */}
       <Tabs defaultValue="overview" className="w-full">
-        <div className="w-full overflow-x-auto pb-2">
-          <TabsList className="inline-flex w-full min-w-max lg:w-auto">
-            <TabsTrigger value="overview" className="flex-1 lg:flex-none whitespace-nowrap">Overview</TabsTrigger>
-            <TabsTrigger value="accounts" className="flex-1 lg:flex-none whitespace-nowrap">Accounts</TabsTrigger>
-            <TabsTrigger value="charts" className="flex-1 lg:flex-none whitespace-nowrap">Charts & Analytics</TabsTrigger>
-            <TabsTrigger value="transactions" className="flex-1 lg:flex-none whitespace-nowrap">Transactions</TabsTrigger>
+        <div className="w-full overflow-x-auto pb-1 scrollbar-none">
+          <TabsList className="inline-flex h-11 p-1 bg-muted/60 dark:bg-muted/40 rounded-xl border border-border/60 gap-1 w-full sm:w-auto">
+            <TabsTrigger value="overview" className="flex-1 sm:flex-none rounded-lg px-4 text-xs sm:text-sm font-semibold whitespace-nowrap data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-2xs transition-all">
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="accounts" className="flex-1 sm:flex-none rounded-lg px-4 text-xs sm:text-sm font-semibold whitespace-nowrap data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-2xs transition-all">
+              Accounts
+            </TabsTrigger>
+            <TabsTrigger value="charts" className="flex-1 sm:flex-none rounded-lg px-4 text-xs sm:text-sm font-semibold whitespace-nowrap data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-2xs transition-all">
+              Charts & Analytics
+            </TabsTrigger>
+            <TabsTrigger value="transactions" className="flex-1 sm:flex-none rounded-lg px-4 text-xs sm:text-sm font-semibold whitespace-nowrap data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-2xs transition-all">
+              Transactions
+            </TabsTrigger>
           </TabsList>
         </div>
 
+        {/* Tab 1: Overview */}
         <TabsContent value="overview" className="space-y-6 mt-6">
-
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 min-w-max md:min-w-0">
-            <Card className="glass-card border-l-4 border-l-emerald-500 hover-lift-premium border-glow animate-slide-up">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-bold text-emerald-600 dark:text-emerald-400 tracking-wide uppercase">Current Assets</CardTitle>
-                <div className="h-10 w-10 rounded-full bg-emerald-500/20 flex items-center justify-center border border-emerald-500/20">
-                  <TrendingUp className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+          {/* Executive Metrics 4-Card Grid */}
+          <div className="grid gap-4 sm:gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+            {/* Current Assets */}
+            <Card className="border border-border/70 rounded-2xl p-5 shadow-card hover:shadow-card-hover transition-all duration-300 hover:-translate-y-1 bg-card animate-slide-up group">
+              <CardHeader className="flex flex-row items-center justify-between p-0 pb-3 space-y-0">
+                <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Current Assets
+                </CardTitle>
+                <div className="h-9 w-9 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform">
+                  <TrendingUp className="h-4 w-4" />
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight">
+              <CardContent className="p-0">
+                <div className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground tabular-nums">
                   {formatCurrency(summary?.total_assets || 0, currency)}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1.5 font-medium">
-                  Cash and bank accounts
-                </p>
+                <div className="flex items-center gap-1.5 mt-2 text-xs text-muted-foreground font-medium">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                  <span>Cash & bank account balances</span>
+                </div>
               </CardContent>
             </Card>
 
-            <Card className="glass-card border-l-4 border-l-red-500 hover-lift-premium border-glow animate-slide-up animate-stagger-1">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-bold text-red-600 dark:text-red-400 tracking-wide uppercase">Current Liabilities</CardTitle>
-                <div className="h-10 w-10 rounded-full bg-red-500/20 flex items-center justify-center border border-red-500/20">
-                  <TrendingDown className="h-5 w-5 text-red-600 dark:text-red-400" />
+            {/* Current Liabilities */}
+            <Card className="border border-border/70 rounded-2xl p-5 shadow-card hover:shadow-card-hover transition-all duration-300 hover:-translate-y-1 bg-card animate-slide-up animate-stagger-1 group">
+              <CardHeader className="flex flex-row items-center justify-between p-0 pb-3 space-y-0">
+                <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Current Liabilities
+                </CardTitle>
+                <div className="h-9 w-9 rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-600 dark:text-rose-400 group-hover:scale-110 transition-transform">
+                  <TrendingDown className="h-4 w-4" />
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-black text-red-600 dark:text-red-400 tracking-tight">
+              <CardContent className="p-0">
+                <div className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground tabular-nums">
                   {formatCurrency(summary?.total_liabilities || 0, currency)}
                 </div>
-                <div className="flex flex-col mt-1.5">
-                  <p className="text-xs text-muted-foreground font-medium">
-                    Credit card balances
-                  </p>
+                <div className="flex flex-col mt-2 gap-1.5">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
+                    <span className="h-1.5 w-1.5 rounded-full bg-rose-500"></span>
+                    <span>Credit cards & obligations</span>
+                  </div>
                   {cashFlow && cashFlow.creditCardDues > 0 && (
-                    <p className="text-xs font-semibold text-purple-600 dark:text-purple-400 mt-1 flex items-center gap-1">
+                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-700 dark:text-purple-300 text-[11px] font-semibold w-fit">
                       <span className="h-1.5 w-1.5 rounded-full bg-purple-500 animate-pulse"></span>
                       Monthly Dues: {formatCurrency(cashFlow.creditCardDues, currency)}
-                    </p>
+                    </div>
                   )}
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="glass-card border-l-4 border-l-blue-500 hover-lift-premium border-glow animate-slide-up animate-stagger-2">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-bold text-blue-600 dark:text-blue-400 tracking-wide uppercase">Liquid Assets</CardTitle>
-                <div className="h-10 w-10 rounded-full bg-blue-500/20 flex items-center justify-center border border-blue-500/20">
-                  <Wallet className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            {/* Liquid Assets */}
+            <Card className="border border-border/70 rounded-2xl p-5 shadow-card hover:shadow-card-hover transition-all duration-300 hover:-translate-y-1 bg-card animate-slide-up animate-stagger-2 group">
+              <CardHeader className="flex flex-row items-center justify-between p-0 pb-3 space-y-0">
+                <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Liquid Assets
+                </CardTitle>
+                <div className="h-9 w-9 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform">
+                  <Wallet className="h-4 w-4" />
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-black text-blue-600 dark:text-blue-400 tracking-tight">
+              <CardContent className="p-0">
+                <div className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground tabular-nums">
                   {formatCurrency(summary?.liquid_assets || 0, currency)}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1.5 font-medium">
-                  Available funds
-                </p>
+                <div className="flex items-center gap-1.5 mt-2 text-xs text-muted-foreground font-medium">
+                  <span className="h-1.5 w-1.5 rounded-full bg-blue-500"></span>
+                  <span>Immediately available capital</span>
+                </div>
               </CardContent>
             </Card>
 
-            <Card className={`glass-card border-l-4 hover-lift-premium border-glow animate-slide-up animate-stagger-3 ${(summary?.working_capital || 0) >= 0 ? 'border-l-purple-500' : 'border-l-amber-500'}`}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className={`text-sm font-bold tracking-wide uppercase ${(summary?.working_capital || 0) >= 0 ? 'text-purple-600 dark:text-purple-400' : 'text-amber-600 dark:text-amber-400'}`}>Working Capital</CardTitle>
-                <div className={`h-10 w-10 rounded-full ${(summary?.working_capital || 0) >= 0 ? 'bg-purple-500/20 border border-purple-500/20' : 'bg-amber-500/20 border border-amber-500/20'} flex items-center justify-center`}>
-                  <TrendingUp className={`h-5 w-5 ${(summary?.working_capital || 0) >= 0 ? 'text-purple-600 dark:text-purple-400' : 'text-amber-600 dark:text-amber-400'}`} />
+            {/* Working Capital */}
+            <Card className="border border-border/70 rounded-2xl p-5 shadow-card hover:shadow-card-hover transition-all duration-300 hover:-translate-y-1 bg-card animate-slide-up animate-stagger-3 group">
+              <CardHeader className="flex flex-row items-center justify-between p-0 pb-3 space-y-0">
+                <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Working Capital
+                </CardTitle>
+                <div className={`h-9 w-9 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform ${(summary?.working_capital || 0) >= 0 ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400' : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'}`}>
+                  <TrendingUp className="h-4 w-4" />
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className={`text-2xl font-black tracking-tight ${(summary?.working_capital || 0) >= 0 ? 'text-purple-600 dark:text-purple-400' : 'text-amber-600 dark:text-amber-400'}`}>
+              <CardContent className="p-0">
+                <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight tabular-nums ${(summary?.working_capital || 0) >= 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-amber-600 dark:text-amber-400'}`}>
                   {formatCurrency(summary?.working_capital || 0, currency)}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1.5 font-medium">
-                  Assets minus liabilities
-                </p>
+                <div className="flex items-center gap-1.5 mt-2 text-xs text-muted-foreground font-medium">
+                  <span className={`h-1.5 w-1.5 rounded-full ${(summary?.working_capital || 0) >= 0 ? 'bg-indigo-500' : 'bg-amber-500'}`}></span>
+                  <span>Total assets minus liabilities</span>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -573,115 +626,157 @@ export default function Dashboard() {
         <TabsContent value="charts" className="space-y-6 mt-6">
           {/* Monthly Cash Flow Summary */}
           {cashFlow && (
-            <Card className="border-l-4 border-l-indigo-500 bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-950/20 dark:to-blue-950/20 shadow-card animate-slide-up">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-lg bg-indigo-500/20 flex items-center justify-center">
-                    <DollarSign className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+            <Card className="border border-border/70 shadow-card rounded-2xl bg-card animate-slide-up">
+              <CardHeader className="pb-4 border-b border-border/50">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-8 w-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                      <DollarSign className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-base font-semibold text-foreground">Monthly Cash Flow Forecast</CardTitle>
+                      <CardDescription className="text-xs text-muted-foreground mt-0.5">
+                        Inflows, expected budgets, and planned dues for the current month
+                      </CardDescription>
+                    </div>
                   </div>
-                  Monthly Cash Flow Summary
-                </CardTitle>
+                  <div className={`px-3 py-1 rounded-full text-xs font-semibold self-start sm:self-auto ${
+                    cashFlow.netAvailable >= 0 
+                      ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' 
+                      : 'bg-rose-500/10 text-rose-700 dark:text-rose-400'
+                  }`}>
+                    Net: {formatCurrency(cashFlow.netAvailable, currency)}
+                  </div>
+                </div>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">Opening Balance (Cash & Bank)</span>
-                        <span className="text-lg font-semibold text-blue-600 dark:text-blue-400">
+              <CardContent className="pt-6 space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {/* Inflows & Opening */}
+                  <div className="p-4 rounded-xl bg-muted/30 border border-border/60 space-y-3">
+                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                      Liquid Inflows
+                    </span>
+                    <div className="space-y-2.5">
+                      <div className="flex justify-between items-center text-xs sm:text-sm">
+                        <span className="text-muted-foreground">Opening Balance</span>
+                        <span className="font-semibold text-foreground tabular-nums">
                           {formatCurrency(cashFlow.openingBalance, currency)}
                         </span>
                       </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">Income Received</span>
-                        <span className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">
+                      <div className="flex justify-between items-center text-xs sm:text-sm">
+                        <span className="text-muted-foreground">Income Received</span>
+                        <span className="font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
                           + {formatCurrency(cashFlow.incomeReceived, currency)}
                         </span>
                       </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">Expenses Incurred (Cash & Bank)</span>
-                        <span className="text-lg font-semibold text-red-600 dark:text-red-400">
-                          - {formatCurrency(cashFlow.expensesIncurred, currency)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">Remaining Budget (Expenses)</span>
-                        <span className="text-lg font-semibold text-amber-600 dark:text-amber-400">
-                          - {formatCurrency(cashFlow.remainingBudget, currency)}
-                        </span>
-                      </div>
                       {cashFlow.remainingIncomeBudget > 0 && (
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-muted-foreground">Remaining Income Budget</span>
-                          <span className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">
+                        <div className="flex justify-between items-center text-xs sm:text-sm">
+                          <span className="text-muted-foreground">Pending Expected Income</span>
+                          <span className="font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
                             + {formatCurrency(cashFlow.remainingIncomeBudget, currency)}
                           </span>
                         </div>
                       )}
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">Credit Card Dues</span>
-                        <span className="text-lg font-semibold text-purple-600 dark:text-purple-400">
+                    </div>
+                  </div>
+
+                  {/* Outflows & Budgets */}
+                  <div className="p-4 rounded-xl bg-muted/30 border border-border/60 space-y-3">
+                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                      Outflows & Commitments
+                    </span>
+                    <div className="space-y-2.5">
+                      <div className="flex justify-between items-center text-xs sm:text-sm">
+                        <span className="text-muted-foreground">Expenses Incurred</span>
+                        <span className="font-semibold text-rose-600 dark:text-rose-400 tabular-nums">
+                          - {formatCurrency(cashFlow.expensesIncurred, currency)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs sm:text-sm">
+                        <span className="text-muted-foreground">Remaining Budget</span>
+                        <span className="font-semibold text-amber-600 dark:text-amber-400 tabular-nums">
+                          - {formatCurrency(cashFlow.remainingBudget, currency)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs sm:text-sm">
+                        <span className="text-muted-foreground">Credit Card Dues</span>
+                        <span className="font-semibold text-purple-600 dark:text-purple-400 tabular-nums">
                           - {formatCurrency(cashFlow.creditCardDues, currency)}
                         </span>
                       </div>
                     </div>
+                  </div>
 
-                    <div className="border-t-2 border-muted pt-2 flex items-center justify-between mt-4">
-                      <span className="text-base font-semibold text-muted-foreground">Net Available</span>
-                      <span className={`text-2xl font-bold ${cashFlow.netAvailable >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                        {formatCurrency(cashFlow.netAvailable, currency)}
+                  {/* Net Available Summary */}
+                  <div className="p-4 rounded-xl bg-muted/40 border border-border/70 flex flex-col justify-between space-y-3">
+                    <div>
+                      <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                        Projected End-of-Month Reserve
                       </span>
+                      <div className="mt-3">
+                        <span className={`text-2xl sm:text-3xl font-extrabold tracking-tight tabular-nums ${
+                          cashFlow.netAvailable >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                        }`}>
+                          {formatCurrency(cashFlow.netAvailable, currency)}
+                        </span>
+                        <p className="text-[11px] text-muted-foreground mt-1">
+                          After all budgeted expenses and pending credit card obligations
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-[11px] text-muted-foreground pt-2 border-t border-border/50">
+                      Formula: Opening + Income − Expenses − Remaining Budget − Dues
                     </div>
                   </div>
+                </div>
 
-                  <div className="pt-2 border-t border-muted">
-                    <p className="text-xs text-muted-foreground">
-                      Formula: Opening Balance + Income Received - Expenses Incurred - Remaining Expense Budget + Remaining Income Budget - Credit Card Dues.
-                    </p>
-                  </div>
-
-                  {/* Credit Card Dues Breakdown */}
-                  {creditCardDuesDetails.length > 0 && (
-                    <div className="pt-3 border-t border-muted space-y-2">
-                      <h4 className="text-sm font-semibold text-muted-foreground">Upcoming Credit Card Dues</h4>
+                {/* Credit Card Dues Breakdown */}
+                {creditCardDuesDetails.length > 0 && (
+                  <div className="pt-4 border-t border-border/50 space-y-2.5">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Upcoming Credit Card Dues Breakdown</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                       {creditCardDuesDetails.map(({ account, dueAmount, nextDueDate }) => (
-                        <div key={account.id} className="flex items-center justify-between text-sm p-2 rounded bg-purple-50 dark:bg-purple-950/20">
-                          <div className="flex items-center gap-2">
+                        <div key={account.id} className="flex items-center justify-between p-3 rounded-xl bg-purple-500/5 border border-purple-500/20">
+                          <div className="flex items-center gap-2.5">
                             <CreditCard className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                             <div>
-                              <p className="font-medium">{account.account_name}</p>
+                              <p className="font-semibold text-xs text-foreground truncate max-w-[130px]">{account.account_name}</p>
                               {nextDueDate && (
-                                <p className="text-xs text-muted-foreground">
-                                  Due: {nextDueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                <p className="text-[11px] text-muted-foreground">
+                                  Due: {nextDueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                 </p>
                               )}
                             </div>
                           </div>
-                          <span className="font-semibold text-purple-600 dark:text-purple-400">
+                          <span className="font-bold text-xs sm:text-sm text-purple-600 dark:text-purple-400 tabular-nums">
                             {formatCurrency(dueAmount, account.currency)}
                           </span>
                         </div>
                       ))}
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
 
-          <div className="grid gap-6 md:grid-cols-2 min-w-max md:min-w-0">
-            <Card className="glass-card hover-lift-premium border-glow animate-scale-in">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <Wallet className="h-4 w-4 text-primary" />
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* Donut Chart 1: Cash & Bank Distribution */}
+            <Card className="border border-border/70 rounded-2xl shadow-card bg-card animate-slide-up">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                    <Wallet className="h-4 w-4" />
                   </div>
-                  Cash & Bank Accounts Distribution
+                  <span>Cash & Bank Distribution</span>
                 </CardTitle>
+                <CardDescription className="text-xs text-muted-foreground">
+                  Proportion across checking, savings, and cash
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 {bankAccountsData.length > 0 ? (
-                  <div className="relative h-[300px] w-full flex items-center justify-center">
+                  <div className="relative h-[280px] w-full flex items-center justify-center">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
@@ -689,9 +784,9 @@ export default function Dashboard() {
                           cx="50%"
                           cy="50%"
                           labelLine={false}
-                          innerRadius={65}
-                          outerRadius={85}
-                          paddingAngle={2}
+                          innerRadius={70}
+                          outerRadius={95}
+                          paddingAngle={3}
                           dataKey="value"
                         >
                           {bankAccountsData.map((_, index) => (
@@ -700,10 +795,12 @@ export default function Dashboard() {
                         </Pie>
                         <Tooltip 
                           contentStyle={{ 
-                            background: 'hsla(var(--popover) / 0.95)', 
-                            border: '1px solid hsl(var(--border) / 0.6)',
-                            borderRadius: 'var(--radius)',
-                            boxShadow: 'var(--shadow-card)'
+                            background: 'hsl(var(--card))', 
+                            border: '1px solid hsl(var(--border))',
+                            borderRadius: '12px',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
+                            fontSize: '12px',
+                            fontWeight: '600'
                           }}
                           formatter={(value: number) => formatCurrency(value, currency)} 
                         />
@@ -711,31 +808,35 @@ export default function Dashboard() {
                     </ResponsiveContainer>
                     <div className="absolute flex flex-col items-center justify-center pointer-events-none text-center">
                       <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Total Liquid</span>
-                      <span className="text-base font-bold text-foreground mt-0.5">
+                      <span className="text-base font-extrabold text-foreground mt-0.5 tabular-nums">
                         {formatCurrency(summary?.liquid_assets || 0, currency)}
                       </span>
                     </div>
                   </div>
                 ) : (
-                  <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                    No bank accounts yet
+                  <div className="h-[280px] flex items-center justify-center text-muted-foreground text-sm">
+                    No bank accounts linked yet
                   </div>
                 )}
               </CardContent>
             </Card>
 
-            <Card className="glass-card hover-lift-premium border-glow animate-scale-in animate-stagger-1">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-lg bg-secondary/10 flex items-center justify-center">
-                    <TrendingDown className="h-4 w-4 text-secondary" />
+            {/* Donut Chart 2: Expenses Breakdown */}
+            <Card className="border border-border/70 rounded-2xl shadow-card bg-card animate-slide-up animate-stagger-1">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <div className="h-7 w-7 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-600 dark:text-rose-400">
+                    <TrendingDown className="h-4 w-4" />
                   </div>
-                  Expenses Breakdown (Current Month)
+                  <span>Expenses Breakdown</span>
                 </CardTitle>
+                <CardDescription className="text-xs text-muted-foreground">
+                  Current month spending categories
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 {expenseData.length > 0 ? (
-                  <div className="relative h-[300px] w-full flex items-center justify-center">
+                  <div className="relative h-[280px] w-full flex items-center justify-center">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
@@ -743,9 +844,9 @@ export default function Dashboard() {
                           cx="50%"
                           cy="50%"
                           labelLine={false}
-                          innerRadius={65}
-                          outerRadius={85}
-                          paddingAngle={2}
+                          innerRadius={70}
+                          outerRadius={95}
+                          paddingAngle={3}
                           dataKey="value"
                         >
                           {expenseData.map((_, index) => (
@@ -754,10 +855,12 @@ export default function Dashboard() {
                         </Pie>
                         <Tooltip 
                           contentStyle={{ 
-                            background: 'hsla(var(--popover) / 0.95)', 
-                            border: '1px solid hsl(var(--border) / 0.6)',
-                            borderRadius: 'var(--radius)',
-                            boxShadow: 'var(--shadow-card)'
+                            background: 'hsl(var(--card))', 
+                            border: '1px solid hsl(var(--border))',
+                            borderRadius: '12px',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
+                            fontSize: '12px',
+                            fontWeight: '600'
                           }}
                           formatter={(value: number) => formatCurrency(value, currency)} 
                         />
@@ -765,14 +868,14 @@ export default function Dashboard() {
                     </ResponsiveContainer>
                     <div className="absolute flex flex-col items-center justify-center pointer-events-none text-center">
                       <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Spent</span>
-                      <span className="text-base font-bold text-danger mt-0.5">
+                      <span className="text-base font-extrabold text-rose-600 dark:text-rose-400 mt-0.5 tabular-nums">
                         {formatCurrency(expenseData.reduce((sum, item) => sum + item.value, 0), currency)}
                       </span>
                     </div>
                   </div>
                 ) : (
-                  <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                    No expenses yet
+                  <div className="h-[280px] flex items-center justify-center text-muted-foreground text-sm">
+                    No expenses recorded this month
                   </div>
                 )}
               </CardContent>
@@ -781,8 +884,8 @@ export default function Dashboard() {
 
           {/* Interest Rate Charts for Floating Rate Loans */}
           {summary?.accounts_by_type?.loan && summary.accounts_by_type.loan.filter(account => account.interest_rate_type === 'floating').length > 0 && (
-            <div className="space-y-6">
-              <h2 className="text-2xl font-bold">Floating Interest Rate Trends</h2>
+            <div className="space-y-4">
+              <h2 className="text-lg font-bold text-foreground">Floating Interest Rate Trends</h2>
               <div className="grid gap-6 xl:grid-cols-1">
                 {summary.accounts_by_type.loan
                   .filter(account => account.interest_rate_type === 'floating')
@@ -799,8 +902,8 @@ export default function Dashboard() {
 
           {/* Interest Rate History Tables for All Loans */}
           {summary?.accounts_by_type?.loan && summary.accounts_by_type.loan.length > 0 && (
-            <div className="space-y-6">
-              <h2 className="text-2xl font-bold">Interest Rate History & Accrued Interest</h2>
+            <div className="space-y-4">
+              <h2 className="text-lg font-bold text-foreground">Interest Rate History & Accrued Interest</h2>
               <div className="grid gap-6 xl:grid-cols-1">
                 {summary.accounts_by_type.loan.map(account => (
                   <InterestRateTable
@@ -818,370 +921,362 @@ export default function Dashboard() {
         </TabsContent>
 
         <TabsContent value="accounts" className="space-y-6 mt-6">
-          <div className="grid gap-6 lg:grid-cols-2 min-w-max lg:min-w-0">
-            <Card className="shadow-card">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <Building2 className="h-4 w-4 text-primary" />
-                  </div>
-                  Your Accounts
-                </CardTitle>
-                <Link to="/accounts">
-                  <Button variant="ghost" size="sm" className="hover-lift">View All</Button>
-                </Link>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {summary?.accounts_by_type.cash.map((account, index) => (
-                    <div
-                      key={account.id}
-                      className={`flex items-center justify-between p-4 border border-border/40 border-l-4 border-l-emerald-500 rounded-lg gradient-cash hover-lift-premium shadow-card cursor-pointer animate-slide-right animate-stagger-${Math.min(index + 1, 4)}`}
-                      onClick={() => handleAccountClick(account)}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-elegant">
-                          <Wallet className="h-5 w-5 text-white" />
-                        </div>
-                        <div>
-                          <p className="font-medium break-words line-clamp-2">{account.account_name}</p>
-                          <p className="text-sm text-muted-foreground break-words">
-                            {getAccountTypeLabel(account.account_type)}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right font-semibold text-emerald-600 dark:text-emerald-400">
-                        {formatCurrency(Number(account.balance), account.currency)}
-                      </div>
-                    </div>
-                  ))}
-                  {summary?.accounts_by_type.bank.map((account, index) => {
-                    return (
-                      <div
-                        key={account.id}
-                        className={`p-4 border border-border/40 border-l-4 border-l-blue-500 rounded-lg gradient-bank hover-lift-premium shadow-card animate-slide-right animate-stagger-${Math.min(index + 1, 4)}`}
-                      >
-                        <div
-                          className="flex items-center justify-between cursor-pointer"
-                          onClick={() => handleAccountClick(account)}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center shadow-elegant border-2 border-blue-200 dark:border-blue-800">
-                              <BankLogo src={account.institution_logo} alt={account.institution_name || 'Bank'} bankName={account.institution_name || undefined} className="h-8 w-8" />
-                            </div>
-                            <div>
-                              <p className="font-medium break-words line-clamp-2">{account.account_name}</p>
-                              <p className="text-sm text-muted-foreground break-words">
-                                {getAccountTypeLabel(account.account_type)} • {formatAccountNumber(account.last_4_digits)}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="text-right font-semibold text-blue-600 dark:text-blue-400">
-                            {formatCurrency(Number(account.balance), account.currency)}
-                          </div>
-                        </div>
-                        {user && (
-                          <div className="mt-3 pt-3 border-t border-muted" onClick={(e) => e.stopPropagation()}>
-                            <BankQuickLinks
-                              bankName={account.institution_name || ''}
-                              country={account.country}
-                              accountId={account.id}
-                              userId={user.id}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                  {summary?.accounts_by_type.credit_card.map((account, index) => {
-                    const emis = accountEMIs[account.id] || [];
-                    const transactions = accountTransactions[account.id] || [];
-                    const bankLink = getBankAppLink(account.institution_name || '');
-
-                    // Calculate statement amount using proper statement period logic
-                    let statementAmount = account.balance;
-                    let dueAmount = 0;
-                    let showDueAmount = false;
-                    let dueDate: Date | null = null;
-
-                    if (account.statement_day) {
-                      const statementCalc = calculateCreditCardStatementAmount(
-                        account.id,
-                        account.statement_day,
-                        transactions,
-                        emis,
-                        new Date(),
-                        Number(account.balance),
-                        account.due_day,
-                        accountAdvanceBalances[account.id] || 0
-                      );
-                      statementAmount = statementCalc.statementAmount;
-
-                      // Only show due amount after statement date
-                      showDueAmount = shouldDisplayDueAmount(account.statement_day);
-                      if (showDueAmount) {
-                        // Use calculated statement amount (only includes transactions up to statement date)
-                        // NOT the entire balance (which includes transactions after statement date)
-                        dueAmount = Math.abs(statementAmount);
-                        if (account.due_day) {
-                          dueDate = getStatementDueDate(account.statement_day, account.due_day);
-                        }
-                      }
-                    } else {
-                      // Fallback to old calculation if no statement day
-                      statementAmount = calculateStatementAmount(account.balance, emis);
-                      dueAmount = Math.abs(account.balance);
-                      showDueAmount = true;
-                    }
-
-                    const utilization = account.credit_limit ? calculateCreditUtilization(account.balance, account.credit_limit) : null;
-                    const warningLevel = account.credit_limit ? getCreditLimitWarningLevel(account.balance, account.credit_limit) : 'safe';
-                    const availableCredit = account.credit_limit ? calculateAvailableCredit(account.balance, account.credit_limit) : null;
-
-                    const billingInfo = (account.statement_day && account.due_day)
-                      ? getBillingCycleInfo(account.statement_day, account.due_day)
-                      : null;
-
-                    return (
-                      <div
-                        key={account.id}
-                        className={`p-4 border border-border/40 border-l-4 border-l-purple-500 rounded-lg gradient-credit-card hover-lift-premium space-y-3 cursor-pointer animate-slide-right animate-stagger-${Math.min(index + 1, 4)}`}
-                        onClick={() => handleAccountClick(account)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center shadow-md border-2 border-purple-200 dark:border-purple-800">
-                              <BankLogo src={account.institution_logo} alt={account.institution_name || 'Credit Card'} bankName={account.institution_name || undefined} className="h-8 w-8" />
-                            </div>
-                            <div>
-                              <p className="font-medium break-words line-clamp-2">{account.account_name}</p>
-                              <p className="text-sm text-muted-foreground break-words">
-                                {getAccountTypeLabel(account.account_type)} • {formatAccountNumber(account.last_4_digits)}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <div className="text-right">
-                              <div className="font-semibold text-purple-600 dark:text-purple-400">
-                                {formatCurrency(Number(account.balance), account.currency)}
-                              </div>
-                              {emis.length > 0 && (
-                                <div className="text-xs text-muted-foreground mt-1">
-                                  + {formatCurrency(emis.reduce((sum: number, emi: any) => sum + emi.monthly_emi, 0), account.currency)} EMI
-                                </div>
-                              )}
-                            </div>
-                            {bankLink && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-8 w-8 p-0"
-                                onClick={(e) => handleOpenBankApp(e, account.institution_name || '', bankLink.webUrl)}
-                                title={`Open ${account.institution_name} app`}
-                              >
-                                <ExternalLink className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Credit Limit Information */}
-                        {account.credit_limit && (
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="text-muted-foreground">Credit Utilization</span>
-                              <div className="flex items-center gap-2">
-                                <span className={`font-semibold ${warningLevel === 'danger' ? 'text-red-600 dark:text-red-400' :
-                                  warningLevel === 'warning' ? 'text-amber-600 dark:text-amber-400' :
-                                    'text-emerald-600 dark:text-emerald-400'
-                                  }`}>
-                                  {utilization?.toFixed(1)}%
-                                </span>
-                                {warningLevel !== 'safe' && (
-                                  <AlertCircle className={`h-3 w-3 ${warningLevel === 'danger' ? 'text-red-600' : 'text-amber-600'
-                                    }`} />
-                                )}
-                              </div>
-                            </div>
-                            <Progress
-                              value={utilization || 0}
-                              className="h-2"
-                            />
-                            <div className="flex items-center justify-between text-xs text-muted-foreground">
-                              <span>Available: {formatCurrency(availableCredit || 0, account.currency)}</span>
-                              <span>Limit: {formatCurrency(account.credit_limit, account.currency)}</span>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* EMI Information */}
-                        {emis.length > 0 && (
-                          <div className="pt-2 border-t border-purple-200 dark:border-purple-800">
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="text-muted-foreground">Active EMIs ({emis.length})</span>
-                              <span className="font-semibold text-purple-600 dark:text-purple-400">
-                                Total Statement: {formatCurrency(statementAmount, account.currency)}
-                              </span>
-                            </div>
-                            <div className="mt-2 space-y-1">
-                              {emis.slice(0, 2).map(emi => (
-                                <div key={emi.id} className="flex items-center justify-between text-xs bg-purple-50 dark:bg-purple-950/30 rounded px-2 py-1">
-                                  <span className="text-muted-foreground truncate max-w-[150px]">
-                                    {emi.description}
-                                  </span>
-                                  <div className="flex items-center gap-2">
-                                    <Badge variant="outline" className="text-xs">
-                                      {emi.remaining_installments}/{emi.emi_months}
-                                    </Badge>
-                                    <span className="font-medium">
-                                      {formatCurrency(emi.monthly_emi, account.currency)}/mo
-                                    </span>
-                                  </div>
-                                </div>
-                              ))}
-                              {emis.length > 2 && (
-                                <div className="text-xs text-center text-muted-foreground">
-                                  +{emis.length - 2} more EMIs
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Due Amount Information - Only show after statement date */}
-                        {showDueAmount && (
-                          <div className="pt-2 border-t border-purple-200 dark:border-purple-800">
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm text-muted-foreground">
-                                {dueAmount > 0
-                                  ? dueDate
-                                    ? `${formatCurrency(dueAmount, account.currency)} due on ${dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
-                                    : billingInfo
-                                      ? `${formatCurrency(dueAmount, account.currency)} due on ${billingInfo.dueDateStr}`
-                                      : `${formatCurrency(dueAmount, account.currency)} outstanding balance`
-                                  : dueDate
-                                    ? `No amount due (Next due: ${dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`
-                                    : billingInfo
-                                      ? `No amount due (Next due: ${billingInfo.dueDateStr})`
-                                      : 'No outstanding balance'
-                                }
-                              </span>
-                            </div>
-                          </div>
-                        )}
-                        {!showDueAmount && account.statement_day && (
-                          <div className="pt-2 border-t border-purple-200 dark:border-purple-800">
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm text-muted-foreground">
-                                Statement will be generated on day {account.statement_day}
-                              </span>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Bank Quick Links */}
-                        {user && (
-                          <div className="pt-3 border-t border-muted" onClick={(e) => e.stopPropagation()}>
-                            <BankQuickLinks
-                              bankName={account.institution_name || ''}
-                              country={account.country}
-                              accountId={account.id}
-                              userId={user.id}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                  {summary?.accounts_by_type.loan.map((account, index) => {
-                    return (
-                      <div
-                        key={account.id}
-                        className={`p-4 border border-border/40 border-l-4 border-l-orange-500 rounded-lg gradient-loan hover-lift-premium animate-slide-right animate-stagger-${Math.min(index + 1, 4)}`}
-                      >
-                        <div
-                          className="flex items-center justify-between cursor-pointer"
-                          onClick={() => handleAccountClick(account)}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center shadow-md border-2 border-orange-200 dark:border-orange-800">
-                              <BankLogo src={account.institution_logo} alt={account.institution_name || 'Loan'} bankName={account.institution_name || undefined} className="h-8 w-8" />
-                            </div>
-                            <div>
-                              <p className="font-medium break-words line-clamp-2">{account.account_name}</p>
-                              <p className="text-sm text-muted-foreground break-words">
-                                {getAccountTypeLabel(account.account_type)} • {account.interest_rate_type}
-                              </p>
-                              {loanCalculations[account.id] && (
-                                <p className="text-xs text-orange-600 dark:text-orange-400 font-medium mt-1">
-                                  EMI: {formatCurrency(loanCalculations[account.id].emi, account.currency)}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="font-semibold text-orange-600 dark:text-orange-400">
-                              {formatCurrency(Number(account.balance), account.currency)}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {account.current_interest_rate}% APR
-                            </div>
-                          </div>
-                        </div>
-                        {user && (
-                          <div className="mt-3 pt-3 border-t border-muted" onClick={(e) => e.stopPropagation()}>
-                            <BankQuickLinks
-                              bankName={account.institution_name || ''}
-                              country={account.country}
-                              accountId={account.id}
-                              userId={user.id}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                  {!summary || (summary.accounts_by_type.bank.length === 0 &&
-                    summary.accounts_by_type.credit_card.length === 0 &&
-                    summary.accounts_by_type.loan.length === 0) && (
-                      <div className="text-center py-8 text-muted-foreground">
-                        No accounts yet. Add your first account to get started!
-                      </div>
-                    )}
+          <Card className="border border-border/70 shadow-card rounded-2xl bg-card">
+            <CardHeader className="flex flex-row items-center justify-between pb-4 border-b border-border/50">
+              <div className="flex items-center gap-2.5">
+                <div className="h-8 w-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                  <Building2 className="h-4 w-4" />
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="transactions" className="space-y-6 mt-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Recent Transactions</CardTitle>
-              <Link to="/transactions">
-                <Button variant="ghost" size="sm">View All</Button>
+                <div>
+                  <CardTitle className="text-base font-semibold text-foreground">Your Financial Accounts</CardTitle>
+                  <CardDescription className="text-xs text-muted-foreground mt-0.5">
+                    Manage checking, credit cards, loans, and cash balances
+                  </CardDescription>
+                </div>
+              </div>
+              <Link to="/accounts">
+                <Button variant="outline" size="sm" className="text-xs h-8 px-3 rounded-lg">
+                  Manage All
+                </Button>
               </Link>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-6">
               <div className="space-y-4">
-                {recentTransactions.map(transaction => (
-                  <div key={transaction.id} className="flex items-center justify-between p-4 border rounded-lg gap-4">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium break-words line-clamp-2">{transaction.description || transaction.transaction_type}</p>
-                      <p className="text-sm text-muted-foreground break-words">
-                        {transaction.category} • {new Date(transaction.transaction_date).toLocaleDateString()}
-                      </p>
+                {/* Cash Accounts */}
+                {summary?.accounts_by_type.cash.map((account, index) => (
+                  <div
+                    key={account.id}
+                    className={`flex items-center justify-between p-4 border border-border/70 rounded-xl bg-card hover:bg-muted/30 hover:border-emerald-500/40 transition-all duration-200 shadow-2xs hover:shadow-card hover:-translate-y-0.5 cursor-pointer animate-slide-up animate-stagger-${Math.min(index + 1, 4)}`}
+                    onClick={() => handleAccountClick(account)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                        <Wallet className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-sm text-foreground break-words">{account.account_name}</p>
+                        <p className="text-xs text-muted-foreground font-medium">
+                          {getAccountTypeLabel(account.account_type)}
+                        </p>
+                      </div>
                     </div>
-                    <div className={`font-semibold flex-shrink-0 ${transaction.transaction_type === 'income' ? 'text-success' : 'text-danger'
-                      }`}>
-                      {transaction.transaction_type === 'income' ? '+' : '-'}
-                      {formatCurrency(Number(transaction.amount), transaction.currency)}
+                    <div className="text-right font-extrabold text-sm sm:text-base text-emerald-600 dark:text-emerald-400 tabular-nums">
+                      {formatCurrency(Number(account.balance), account.currency)}
                     </div>
                   </div>
                 ))}
+
+                {/* Bank Accounts */}
+                {summary?.accounts_by_type.bank.map((account, index) => {
+                  return (
+                    <div
+                      key={account.id}
+                      className={`p-4 border border-border/70 rounded-xl bg-card hover:bg-muted/30 hover:border-blue-500/40 transition-all duration-200 shadow-2xs hover:shadow-card hover:-translate-y-0.5 animate-slide-up animate-stagger-${Math.min(index + 1, 4)}`}
+                    >
+                      <div
+                        className="flex items-center justify-between cursor-pointer"
+                        onClick={() => handleAccountClick(account)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-xl bg-muted/40 p-1 border border-border/60 flex items-center justify-center">
+                            <BankLogo src={account.institution_logo} alt={account.institution_name || 'Bank'} bankName={account.institution_name || undefined} className="h-7 w-7" />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-sm text-foreground break-words">{account.account_name}</p>
+                            <p className="text-xs text-muted-foreground font-medium">
+                              {getAccountTypeLabel(account.account_type)} • {formatAccountNumber(account.last_4_digits)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right font-extrabold text-sm sm:text-base text-blue-600 dark:text-blue-400 tabular-nums">
+                          {formatCurrency(Number(account.balance), account.currency)}
+                        </div>
+                      </div>
+                      {user && (
+                        <div className="mt-3 pt-3 border-t border-border/50" onClick={(e) => e.stopPropagation()}>
+                          <BankQuickLinks
+                            bankName={account.institution_name || ''}
+                            country={account.country}
+                            accountId={account.id}
+                            userId={user.id}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Credit Card Accounts */}
+                {summary?.accounts_by_type.credit_card.map((account, index) => {
+                  const emis = accountEMIs[account.id] || [];
+                  const transactions = accountTransactions[account.id] || [];
+                  const bankLink = getBankAppLink(account.institution_name || '');
+
+                  let statementAmount = account.balance;
+                  let dueAmount = 0;
+                  let showDueAmount = false;
+                  let dueDate: Date | null = null;
+
+                  if (account.statement_day) {
+                    const statementCalc = calculateCreditCardStatementAmount(
+                      account.id,
+                      account.statement_day,
+                      transactions,
+                      emis,
+                      new Date(),
+                      Number(account.balance),
+                      account.due_day,
+                      accountAdvanceBalances[account.id] || 0
+                    );
+                    statementAmount = statementCalc.statementAmount;
+
+                    showDueAmount = shouldDisplayDueAmount(account.statement_day);
+                    if (showDueAmount) {
+                      dueAmount = Math.abs(statementAmount);
+                      if (account.due_day) {
+                        dueDate = getStatementDueDate(account.statement_day, account.due_day);
+                      }
+                    }
+                  } else {
+                    statementAmount = calculateStatementAmount(account.balance, emis);
+                    dueAmount = Math.abs(account.balance);
+                    showDueAmount = true;
+                  }
+
+                  const utilization = account.credit_limit ? calculateCreditUtilization(account.balance, account.credit_limit) : null;
+                  const warningLevel = account.credit_limit ? getCreditLimitWarningLevel(account.balance, account.credit_limit) : 'safe';
+                  const availableCredit = account.credit_limit ? calculateAvailableCredit(account.balance, account.credit_limit) : null;
+
+                  const billingInfo = (account.statement_day && account.due_day)
+                    ? getBillingCycleInfo(account.statement_day, account.due_day)
+                    : null;
+
+                  return (
+                    <div
+                      key={account.id}
+                      className={`p-4 border border-border/70 rounded-xl bg-card hover:bg-muted/30 hover:border-purple-500/40 transition-all duration-200 shadow-2xs hover:shadow-card hover:-translate-y-0.5 space-y-3 cursor-pointer animate-slide-up animate-stagger-${Math.min(index + 1, 4)}`}
+                      onClick={() => handleAccountClick(account)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-xl bg-muted/40 p-1 border border-border/60 flex items-center justify-center">
+                            <BankLogo src={account.institution_logo} alt={account.institution_name || 'Credit Card'} bankName={account.institution_name || undefined} className="h-7 w-7" />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-sm text-foreground break-words">{account.account_name}</p>
+                            <p className="text-xs text-muted-foreground font-medium">
+                              {getAccountTypeLabel(account.account_type)} • {formatAccountNumber(account.last_4_digits)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <div className="font-extrabold text-sm sm:text-base text-purple-600 dark:text-purple-400 tabular-nums">
+                              {formatCurrency(Number(account.balance), account.currency)}
+                            </div>
+                            {emis.length > 0 && (
+                              <div className="text-[11px] text-muted-foreground mt-0.5">
+                                + {formatCurrency(emis.reduce((sum: number, emi: any) => sum + emi.monthly_emi, 0), account.currency)} EMI
+                              </div>
+                            )}
+                          </div>
+                          {bankLink && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 w-8 p-0 rounded-lg"
+                              onClick={(e) => handleOpenBankApp(e, account.institution_name || '', bankLink.webUrl)}
+                              title={`Open ${account.institution_name} app`}
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Credit Limit Information */}
+                      {account.credit_limit && (
+                        <div className="space-y-1.5 pt-2 border-t border-border/40">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-muted-foreground font-medium">Credit Utilization</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className={`font-bold tabular-nums ${
+                                warningLevel === 'danger' ? 'text-rose-600 dark:text-rose-400' :
+                                warningLevel === 'warning' ? 'text-amber-600 dark:text-amber-400' :
+                                'text-emerald-600 dark:text-emerald-400'
+                              }`}>
+                                {utilization?.toFixed(1)}%
+                              </span>
+                              {warningLevel !== 'safe' && (
+                                <AlertCircle className={`h-3 w-3 ${warningLevel === 'danger' ? 'text-rose-600' : 'text-amber-600'}`} />
+                              )}
+                            </div>
+                          </div>
+                          <Progress
+                            value={utilization || 0}
+                            className="h-1.5 rounded-full"
+                          />
+                          <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                            <span>Available: {formatCurrency(availableCredit || 0, account.currency)}</span>
+                            <span>Limit: {formatCurrency(account.credit_limit, account.currency)}</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Due Amount Information */}
+                      {showDueAmount && (
+                        <div className="pt-2 border-t border-border/40">
+                          <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
+                            <span>
+                              {dueAmount > 0
+                                ? dueDate
+                                  ? `${formatCurrency(dueAmount, account.currency)} due on ${dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                                  : billingInfo
+                                    ? `${formatCurrency(dueAmount, account.currency)} due on ${billingInfo.dueDateStr}`
+                                    : `${formatCurrency(dueAmount, account.currency)} outstanding balance`
+                                : 'No outstanding amount due'
+                              }
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Bank Quick Links */}
+                      {user && (
+                        <div className="pt-2.5 border-t border-border/40" onClick={(e) => e.stopPropagation()}>
+                          <BankQuickLinks
+                            bankName={account.institution_name || ''}
+                            country={account.country}
+                            accountId={account.id}
+                            userId={user.id}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Loan Accounts */}
+                {summary?.accounts_by_type.loan.map((account, index) => {
+                  return (
+                    <div
+                      key={account.id}
+                      className={`p-4 border border-border/70 rounded-xl bg-card hover:bg-muted/30 hover:border-orange-500/40 transition-all duration-200 shadow-2xs hover:shadow-card hover:-translate-y-0.5 animate-slide-up animate-stagger-${Math.min(index + 1, 4)}`}
+                    >
+                      <div
+                        className="flex items-center justify-between cursor-pointer"
+                        onClick={() => handleAccountClick(account)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-xl bg-muted/40 p-1 border border-border/60 flex items-center justify-center">
+                            <BankLogo src={account.institution_logo} alt={account.institution_name || 'Loan'} bankName={account.institution_name || undefined} className="h-7 w-7" />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-sm text-foreground break-words">{account.account_name}</p>
+                            <p className="text-xs text-muted-foreground font-medium">
+                              {getAccountTypeLabel(account.account_type)} • {account.interest_rate_type}
+                            </p>
+                            {loanCalculations[account.id] && (
+                              <p className="text-xs text-orange-600 dark:text-orange-400 font-semibold mt-0.5">
+                                EMI: {formatCurrency(loanCalculations[account.id].emi, account.currency)}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-extrabold text-sm sm:text-base text-orange-600 dark:text-orange-400 tabular-nums">
+                            {formatCurrency(Number(account.balance), account.currency)}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {account.current_interest_rate}% APR
+                          </div>
+                        </div>
+                      </div>
+                      {user && (
+                        <div className="mt-3 pt-3 border-t border-border/50" onClick={(e) => e.stopPropagation()}>
+                          <BankQuickLinks
+                            bankName={account.institution_name || ''}
+                            country={account.country}
+                            accountId={account.id}
+                            userId={user.id}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {!summary || (summary.accounts_by_type.bank.length === 0 &&
+                  summary.accounts_by_type.credit_card.length === 0 &&
+                  summary.accounts_by_type.loan.length === 0 &&
+                  summary.accounts_by_type.cash.length === 0) && (
+                    <div className="text-center py-10 text-muted-foreground">
+                      <p className="text-sm">No accounts found.</p>
+                      <Link to="/accounts/new" className="mt-2 inline-block">
+                        <Button size="sm" variant="outline" className="text-xs mt-2">Add Your First Account</Button>
+                      </Link>
+                    </div>
+                  )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Tab 4: Transactions */}
+        <TabsContent value="transactions" className="space-y-6 mt-6">
+          <Card className="border border-border/70 shadow-card rounded-2xl bg-card">
+            <CardHeader className="flex flex-row items-center justify-between pb-4 border-b border-border/50">
+              <div>
+                <CardTitle className="text-base font-semibold text-foreground">Recent Transactions</CardTitle>
+                <CardDescription className="text-xs text-muted-foreground mt-0.5">
+                  Latest inflows, expenses, and account transfers
+                </CardDescription>
+              </div>
+              <Link to="/transactions">
+                <Button variant="outline" size="sm" className="text-xs h-8 px-3 rounded-lg">View All</Button>
+              </Link>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <div className="space-y-2.5">
+                {recentTransactions.map(transaction => {
+                  const isIncome = transaction.transaction_type === 'income';
+                  return (
+                    <div
+                      key={transaction.id}
+                      className="flex items-center justify-between p-3.5 border border-border/60 rounded-xl hover:bg-muted/30 transition-all duration-200 gap-3 group"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`h-9 w-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                          isIncome
+                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                            : 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
+                        }`}>
+                          {isIncome ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-xs sm:text-sm text-foreground truncate">
+                            {transaction.description || transaction.transaction_type}
+                          </p>
+                          <p className="text-[11px] sm:text-xs text-muted-foreground truncate">
+                            {transaction.category || 'General'} • {new Date(transaction.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </p>
+                        </div>
+                      </div>
+                      <div className={`text-xs sm:text-sm font-extrabold flex-shrink-0 tabular-nums ${
+                        isIncome ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                      }`}>
+                        {isIncome ? '+' : '-'}
+                        {formatCurrency(Number(transaction.amount), transaction.currency)}
+                      </div>
+                    </div>
+                  );
+                })}
                 {recentTransactions.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    No transactions yet. Add your first transaction!
+                  <div className="text-center py-10 text-muted-foreground">
+                    <p className="text-sm">No transactions yet.</p>
+                    <Link to="/transactions/new" className="mt-2 inline-block">
+                      <Button size="sm" variant="outline" className="text-xs mt-2">Add First Transaction</Button>
+                    </Link>
                   </div>
                 )}
               </div>
