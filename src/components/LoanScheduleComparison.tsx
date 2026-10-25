@@ -181,9 +181,6 @@ export default function LoanScheduleComparison({
     const totalProjectedInterestPaid = paidRows.reduce((sum, r) => sum + r.projectedInterest, 0);
     const totalActualInterestPaid = paidRows.reduce((sum, r) => sum + (r.actualInterest || 0), 0);
     const interestSavings = totalProjectedInterestPaid - totalActualInterestPaid;
-    
-    // Total projected for entire loan (for reference)
-    const totalProjectedInterest = comparison.reduce((sum, r) => sum + r.projectedInterest, 0);
 
     const getStatusBadge = (status: 'paid' | 'pending' | 'overdue') => {
         switch (status) {

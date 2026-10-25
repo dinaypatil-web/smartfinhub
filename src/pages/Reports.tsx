@@ -1193,7 +1193,12 @@ export default function Reports() {
                       <CardTitle className="text-lg">Transactions</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      {creditCardStatement.transactions.length === 0 ? (
+                      {generatingStatements ? (
+                        <div className="flex items-center justify-center py-8 text-muted-foreground gap-2">
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                          <span>Generating statement lines...</span>
+                        </div>
+                      ) : creditCardStatement.transactions.length === 0 ? (
                         <div className="text-center py-8 text-muted-foreground">
                           No transactions in this billing cycle
                         </div>
@@ -1244,15 +1249,15 @@ export default function Reports() {
                                   </span>
                                 </TableCell>
                                 <TableCell className="text-right font-medium">
-                                  {transaction.status ? (
+                                  {(transaction as any).status ? (
                                     <Badge className={
-                                      transaction.status === 'paid'
+                                      (transaction as any).status === 'paid'
                                         ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                                        : transaction.status === 'partial'
+                                        : (transaction as any).status === 'partial'
                                           ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
                                           : 'bg-slate-100 text-slate-800 dark:bg-slate-900/30 dark:text-slate-400'
                                     }>
-                                      {transaction.status.toUpperCase()}
+                                      {String((transaction as any).status).toUpperCase()}
                                     </Badge>
                                   ) : (
                                     <Badge variant="secondary">PENDING</Badge>

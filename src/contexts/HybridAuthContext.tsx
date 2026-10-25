@@ -59,7 +59,6 @@ export function HybridAuthProvider({ children }: { children: ReactNode }) {
     isLoading: isAuth0Loading,
     loginWithRedirect,
     logout: auth0Logout,
-    getAccessTokenSilently,
   } = auth0Context;
 
   const [user, setUser] = useState<any | null>(null);

@@ -68,6 +68,12 @@ interface DraftBudget {
   category_budgets: Record<string, number> | null;
 }
 
+interface DraftEMI {
+  principal: number | null;
+  annual_rate: number | null;
+  tenure_months: number | null;
+}
+
 // Inline helper for bank logos if needed
 const getBankLogo = (bankName: string) => {
   const normalized = bankName.toLowerCase();
@@ -159,6 +165,8 @@ export default function GlobalChatbot() {
     budgeted_expenses: null,
     category_budgets: null
   });
+
+  const [missingFields, setMissingFields] = useState<string[]>([]);
 
   // Exclude rendering on auth pages
   const isAuthPage = ['/login', '/register', '/reset-password', '/auth/callback', '/confirm-email'].includes(location.pathname);
@@ -1296,6 +1304,12 @@ export default function GlobalChatbot() {
                           </Badge>
                         )}
                       </div>
+
+                      {missingFields.length > 0 && (
+                        <div className="text-[10px] text-amber-400 bg-amber-500/10 px-2.5 py-1.5 rounded-lg border border-amber-500/20">
+                          Missing required details: {missingFields.map(f => f.replace(/_/g, ' ')).join(', ')}
+                        </div>
+                      )}
 
                       {batchDrafts.length > 0 && (
                         <div className="max-h-48 overflow-y-auto space-y-1.5 my-1 pr-1">

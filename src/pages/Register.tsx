@@ -255,7 +255,7 @@ export default function Register() {
         </CardHeader>
         <CardContent>
           {mojoAuthEnabled ? (
-            <Tabs defaultValue="email" className="w-full">
+            <Tabs value={registrationType} onValueChange={(v) => setRegistrationType(v as 'email' | 'phone')} className="w-full">
               <TabsList className="grid w-full grid-cols-2 mb-6">
                 <TabsTrigger value="email" className="flex items-center gap-2">
                   <Mail className="h-4 w-4" />

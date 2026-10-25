@@ -124,7 +124,7 @@ export default function AIInsights() {
         .filter(t => t.transaction_type === 'expense')
         .forEach(t => {
           if (t.transaction_splits && t.transaction_splits.length > 0) {
-            t.transaction_splits.forEach(s => {
+            t.transaction_splits.forEach((s: any) => {
               if (!categoryTrends[s.category]) {
                 categoryTrends[s.category] = [];
               }

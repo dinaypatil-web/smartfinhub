@@ -60,7 +60,7 @@ const Footer: React.FC = () => {
         {/* ================= Copyright Section ================= */}
         <div className="mt-8 pt-8 border-t border-amber-200 text-center text-gray-600">
           <p>
-            {/* © {currentYear} Your Company or Organization Name */}
+            © {currentYear} SmartFinHub. All rights reserved.
           </p>
         </div>
       </div>

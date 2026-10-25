@@ -3,7 +3,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Search, ExternalLink, Smartphone, Plus } from 'lucide-react';
 import { bankingApps, type BankingApp } from '@/data/bankingApps';
 import { customBankLinkApi } from '@/db/api';
@@ -30,7 +29,6 @@ export function SelectBankAppDialog({
   onSuccess
 }: SelectBankAppDialogProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedApp, setSelectedApp] = useState<BankingApp | null>(null);
   const [loading, setLoading] = useState(false);
   const [platform, setPlatform] = useState<'android' | 'ios' | 'unknown'>('unknown');
   const [showCustomForm, setShowCustomForm] = useState(false);
@@ -62,7 +60,6 @@ export function SelectBankAppDialog({
   };
 
   const handleSelectApp = async (app: BankingApp) => {
-    setSelectedApp(app);
     setLoading(true);
 
     try {
@@ -90,7 +87,6 @@ export function SelectBankAppDialog({
       });
     } finally {
       setLoading(false);
-      setSelectedApp(null);
     }
   };
 

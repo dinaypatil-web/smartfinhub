@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { formatCurrency, formatDate, formatAccountNumber } from '@/utils/format';
+import { formatCurrency, formatDate } from '@/utils/format';
 import { TrendingUp, TrendingDown, ArrowRightLeft, CreditCard, Building2 } from 'lucide-react';
 import BankLogo from './BankLogo';
 

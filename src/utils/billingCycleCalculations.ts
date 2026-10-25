@@ -84,7 +84,7 @@ export function getCurrentBillingCycle(statementDay: number): {
  * @param dueDay - Day of month when payment is due
  * @returns Next due date (current month if not passed, next month if passed)
  */
-export function getNextDueDate(statementDay: number, dueDay: number): Date {
+export function getNextDueDate(_statementDay: number, dueDay: number): Date {
   const today = new Date();
   const currentYear = today.getFullYear();
   const currentMonth = today.getMonth();

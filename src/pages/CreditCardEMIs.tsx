@@ -3,13 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { useHybridAuth as useAuth } from '@/contexts/HybridAuthContext';
 import { accountApi, emiApi, creditCardStatementApi } from '@/db/api';
 import type { Account, EMITransaction } from '@/types/types';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Calendar, CreditCard, TrendingUp, AlertCircle, RefreshCw, CheckCircle2, PlusCircle, ArrowLeft, Clock } from 'lucide-react';
+import { Loader2, CreditCard, TrendingUp, AlertCircle, RefreshCw, CheckCircle2, PlusCircle, Clock } from 'lucide-react';
 import { formatCurrency } from '@/utils/format';
 import { calculateFirstEMIDueDate } from '@/utils/emiCalculations';
 import { Badge } from '@/components/ui/badge';
@@ -259,7 +259,7 @@ export default function CreditCardEMIs() {
             id: existingLine.id,
             emiId: emi.id,
             description: emi.description || 'Credit Card EMI',
-            cardName: card.name,
+            cardName: card.account_name,
             cardId: card.id,
             installmentNum: instNum,
             totalInstallments: emi.emi_months,
@@ -281,7 +281,7 @@ export default function CreditCardEMIs() {
             id: `virtual-${emi.id}-${expectedStmtMonth}`,
             emiId: emi.id,
             description: emi.description || 'Credit Card EMI',
-            cardName: card.name,
+            cardName: card.account_name,
             cardId: card.id,
             installmentNum: instNum,
             totalInstallments: emi.emi_months,
@@ -446,7 +446,7 @@ export default function CreditCardEMIs() {
                   <SelectContent>
                     <SelectItem value="all">All Cards</SelectItem>
                     {creditCards.map(card => (
-                      <SelectItem key={card.id} value={card.id}>{card.name}</SelectItem>
+                      <SelectItem key={card.id} value={card.id}>{card.account_name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -606,7 +606,7 @@ export default function CreditCardEMIs() {
                           <h3 className="font-bold text-lg leading-tight text-foreground">{emi.description || 'EMI Purchase'}</h3>
                           <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
                             <CreditCard className="h-3.5 w-3.5" />
-                            {card?.name || 'Credit Card'}
+                            {card?.account_name || 'Credit Card'}
                           </p>
                         </div>
                         <Badge className={

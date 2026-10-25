@@ -77,7 +77,7 @@ export default function Login() {
     }
   };
 
-  const handlePhoneAuthSuccess = async (phoneNumber: string, accessToken: string) => {
+  const handlePhoneAuthSuccess = async (phoneNumber: string, _accessToken: string) => {
     setLoading(true);
 
     try {
@@ -93,7 +93,7 @@ export default function Login() {
       const tempPassword = `phone_${profile.id}`;
       
       // Try to sign in
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { error } = await supabase.auth.signInWithPassword({
         email: phoneEmail,
         password: tempPassword,
       });

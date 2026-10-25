@@ -367,7 +367,7 @@ export const transactionApi = {
 
     // Insert splits if present
     if (transaction_splits && transaction_splits.length > 0) {
-      const splitsToInsert = transaction_splits.map(s => ({
+      const splitsToInsert = transaction_splits.map((s: any) => ({
         transaction_id: data.id,
         user_id: data.user_id,
         category: s.category,
@@ -504,7 +504,7 @@ export const transactionApi = {
 
     // Insert new splits if present
     if (transaction_splits && transaction_splits.length > 0) {
-      const splitsToInsert = transaction_splits.map(s => ({
+      const splitsToInsert = transaction_splits.map((s: any) => ({
         transaction_id: transactionId,
         user_id: data.user_id,
         category: s.category,
