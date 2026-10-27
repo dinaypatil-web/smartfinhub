@@ -25,11 +25,22 @@ const PageLoader = () => (
   </div>
 );
 
+import { useLocation } from 'react-router-dom';
+
 // Layout wrapper component that adjusts UI depending on authentication state
 const MainLayout = ({ children }: { children: React.ReactNode }) => {
   const { user } = useHybridAuth();
+  const location = useLocation();
 
-  if (!user) {
+  const isAuthRoute = [
+    '/login',
+    '/register',
+    '/reset-password',
+    '/auth/callback',
+    '/confirm-email',
+  ].includes(location.pathname);
+
+  if (!user || isAuthRoute) {
     return (
       <div className="flex flex-col min-h-screen bg-background text-foreground">
         <main className="flex-grow">
