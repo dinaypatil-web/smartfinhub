@@ -703,15 +703,46 @@ export default function VoiceTransactPage() {
 
               const sanitizedBatch: DraftTransaction[] = parsedResult.batchTransactions.map(bt => {
                 const isInc = bt.transaction_type === 'income';
+                let accId: string | null = null;
+                const rawAcc = isInc ? bt.to_account_id : bt.from_account_id;
+                if (rawAcc && accounts.some(a => a.id === rawAcc)) {
+                  accId = rawAcc;
+                } else {
+                  const searchStr = (bt.account_name || rawAcc || '').toLowerCase();
+                  if (searchStr) {
+                    const matched = accounts.find(a =>
+                      a.account_name.toLowerCase().includes(searchStr) ||
+                      searchStr.includes(a.account_name.toLowerCase())
+                    );
+                    if (matched) accId = matched.id;
+                  }
+                }
+                if (!accId) {
+                  accId = isInc ? defaultToAcc : defaultFromAcc;
+                }
+
+                // Resolve category
+                let finalCat: string | null = bt.category || null;
+                if (!isInc && finalCat) {
+                  const targetCat = finalCat;
+                  const matchedCat = categories.find(c =>
+                    c.name.toLowerCase() === targetCat.toLowerCase() ||
+                    c.name.toLowerCase().includes(targetCat.toLowerCase()) ||
+                    targetCat.toLowerCase().includes(c.name.toLowerCase())
+                  );
+                  finalCat = matchedCat ? matchedCat.name : targetCat;
+                } else if (!isInc && !finalCat) {
+                  finalCat = categories[0]?.name || 'Others';
+                }
+
                 return {
                   transaction_type: isInc ? 'income' : 'expense',
                   amount: Number(bt.amount) || 0,
-                  from_account_id: isInc ? null : (bt.from_account_id || defaultFromAcc),
-                  to_account_id: isInc ? (bt.to_account_id || defaultToAcc) : null,
-                  // Ensure category is NEVER blank
-                  category: isInc ? null : (bt.category || categories[0]?.name || 'Others'),
+                  from_account_id: isInc ? null : accId,
+                  to_account_id: isInc ? accId : null,
+                  category: isInc ? null : (finalCat || 'Others'),
                   income_category: isInc ? (bt.income_category || 'others') : null,
-                  description: bt.description || (isInc ? 'Income' : 'Expense'),
+                  description: bt.description || (isInc ? getIncomeCategoryName((bt.income_category || 'others') as any) : (finalCat || 'Expense')),
                   transaction_date: bt.transaction_date || today,
                   is_emi: false,
                   emi_months: null,
@@ -726,9 +757,10 @@ export default function VoiceTransactPage() {
               const botMessage: ChatMessage = {
                 id: botMsgId,
                 role: 'model',
+                isInteractive: true,
                 content: `📋 I have prepared a batch of **${sanitizedBatch.length} transactions** (${sanitizedBatch.filter(b => b.transaction_type === 'expense').length} expenses, ${sanitizedBatch.filter(b => b.transaction_type === 'income').length} income).\n\n` +
-                  `Categories are assigned and will not remain blank. Please verify the accounts in the review card on the right.\n\n` +
-                  `⚠️ **Note**: Transactions will only be accepted and posted to the database once you click **Submit & Post All (${sanitizedBatch.length}) Transactions**.`
+                  `Categories and accounts are assigned. Please review them below or in the review card on the right.\n\n` +
+                  `Click **Submit & Post All (${sanitizedBatch.length}) Transactions** when you are ready to post them!`
               };
               setChatMessages(prev => [...prev, botMessage]);
             } else {
@@ -1159,16 +1191,17 @@ export default function VoiceTransactPage() {
     try {
       for (let i = 0; i < total; i++) {
         const item = batchDrafts[i];
+        const isInc = item.transaction_type === 'income';
         const transactionPayload = {
           user_id: user.id,
           transaction_type: item.transaction_type!,
-          from_account_id: item.from_account_id,
-          to_account_id: item.to_account_id,
+          from_account_id: isInc ? null : item.from_account_id,
+          to_account_id: isInc ? item.to_account_id : null,
           amount: Number(item.amount),
           currency: 'INR',
-          category: item.category || 'Others',
-          income_category: item.income_category || 'others',
-          description: item.description || item.category || (item.income_category ? getIncomeCategoryName(item.income_category) : 'Transaction'),
+          category: isInc ? null : (item.category || 'Others'),
+          income_category: isInc ? (item.income_category || 'others') : null,
+          description: item.description?.trim() || (isInc ? getIncomeCategoryName((item.income_category || 'others') as any) : (item.category || 'Expense')),
           transaction_date: item.transaction_date || today
         };
 

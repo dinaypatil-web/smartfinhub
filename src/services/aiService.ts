@@ -466,6 +466,110 @@ export interface SmartChatbotResult {
   extraContext?: any;
 }
 
+// Helper to resolve an account from natural language text, ID, or keywords
+function resolveAccountFromText(
+  text: string | null | undefined,
+  accounts: any[],
+  defaultAccId: string | null = null
+): string | null {
+  if (!text || !accounts || accounts.length === 0) return defaultAccId;
+  const t = text.trim().toLowerCase();
+
+  // 1. Direct match with account ID
+  const directId = accounts.find(a => a.id === text.trim());
+  if (directId) return directId.id;
+
+  // 2. Direct match with account name (case-insensitive)
+  for (const acc of accounts) {
+    const name = acc.account_name.toLowerCase();
+    if (t.includes(name) || name.includes(t)) return acc.id;
+  }
+
+  // 3. Keyword / bank brand matching
+  const bankKeywords = [
+    { keys: ['hdfc'], type: 'hdfc' },
+    { keys: ['sbi', 'state bank'], type: 'sbi' },
+    { keys: ['icici'], type: 'icici' },
+    { keys: ['axis'], type: 'axis' },
+    { keys: ['kotak'], type: 'kotak' },
+    { keys: ['pnb', 'punjab'], type: 'pnb' },
+    { keys: ['bob', 'baroda'], type: 'baroda' },
+    { keys: ['idbi'], type: 'idbi' },
+    { keys: ['yes bank', 'yesbank'], type: 'yes' },
+    { keys: ['indusind'], type: 'indus' },
+    { keys: ['canara'], type: 'canara' },
+    { keys: ['cash', 'wallet', 'pocket', 'petty'], type: 'cash' },
+    { keys: ['credit card', 'creditcard', 'cc'], type: 'credit_card' },
+  ];
+
+  for (const bk of bankKeywords) {
+    if (bk.keys.some(k => t.includes(k))) {
+      if (bk.type === 'cash') {
+        const cashAcc = accounts.find(a => a.account_type === 'cash');
+        if (cashAcc) return cashAcc.id;
+      } else if (bk.type === 'credit_card') {
+        const matchedCC = accounts.find(a => a.account_type === 'credit_card' && bk.keys.some(k => a.account_name.toLowerCase().includes(k)));
+        if (matchedCC) return matchedCC.id;
+        const anyCC = accounts.find(a => a.account_type === 'credit_card');
+        if (anyCC) return anyCC.id;
+      } else {
+        const matched = accounts.find(a => a.account_name.toLowerCase().includes(bk.type));
+        if (matched) return matched.id;
+      }
+    }
+  }
+
+  return defaultAccId;
+}
+
+// Helper to resolve an expense category from natural language text or keywords
+function resolveCategoryFromText(text: string | null | undefined, categories: any[]): string {
+  if (!text) return categories[0]?.name || 'Others';
+  const t = text.trim().toLowerCase();
+
+  // 1. Direct match with existing category name
+  for (const c of categories) {
+    if (t.includes(c.name.toLowerCase())) return c.name;
+  }
+
+  // 2. Keyword dictionary
+  const mappings = [
+    { cat: 'Groceries', keywords: ['grocer', 'supermarket', 'dmart', 'milk', 'vegetable', 'fruit', 'veggie', 'bigbasket', 'blinkit', 'zepto', 'instamart', 'kirana', 'ration', 'provisions'] },
+    { cat: 'Food & Dining', keywords: ['food', 'dining', 'restaurant', 'cafe', 'coffee', 'lunch', 'dinner', 'breakfast', 'snack', 'zomato', 'swiggy', 'starbucks', 'mcdonald', 'burger', 'pizza', 'tea', 'chai', 'meal', 'dessert', 'bistro'] },
+    { cat: 'Transportation', keywords: ['petrol', 'fuel', 'diesel', 'auto', 'uber', 'ola', 'metro', 'bus', 'cab', 'taxi', 'train', 'flight', 'parking', 'toll', 'fare', 'commute', 'rapido'] },
+    { cat: 'Utilities', keywords: ['electricity', 'water', 'gas', 'cylinder', 'wifi', 'broadband', 'internet', 'recharge', 'mobile bill', 'dth', 'power bill', 'phone bill', 'utility'] },
+    { cat: 'Housing', keywords: ['rent', 'lease', 'flat', 'maintenance', 'pg', 'hostel', 'property', 'society'] },
+    { cat: 'Shopping', keywords: ['amazon', 'flipkart', 'clothes', 'myntra', 'shoes', 'dress', 'shopping', 'mall', 'electronics', 'gadget', 'clothing'] },
+    { cat: 'Health & Medical', keywords: ['pharmacy', 'medicine', 'doctor', 'hospital', 'clinic', 'medical', 'test', 'lab', 'chemist', 'tablet', 'apollo', 'medicines'] },
+    { cat: 'Entertainment', keywords: ['movie', 'cinema', 'theatre', 'netflix', 'prime video', 'hotstar', 'concert', 'game', 'subscription', 'spotify', 'bookmyshow'] }
+  ];
+
+  for (const map of mappings) {
+    if (map.keywords.some(k => t.includes(k))) {
+      const match = categories.find(c => c.name.toLowerCase() === map.cat.toLowerCase() || c.name.toLowerCase().includes(map.cat.toLowerCase()) || map.cat.toLowerCase().includes(c.name.toLowerCase()));
+      if (match) return match.name;
+    }
+  }
+
+  // 3. Match individual words of category names (e.g. "Food" in "Food & Dining")
+  for (const c of categories) {
+    const words = c.name.toLowerCase().split(/[\s&,/]+/).filter((w: string) => w.length > 3);
+    if (words.some((w: string) => t.includes(w))) return c.name;
+  }
+
+  return categories[0]?.name || 'Others';
+}
+
+// Helper to resolve an income category from text
+function resolveIncomeCategoryFromText(text: string | null | undefined): 'salaries' | 'allowances' | 'family_income' | 'others' {
+  if (!text) return 'others';
+  const t = text.trim().toLowerCase();
+  if (t.includes('salary') || t.includes('salaries') || t.includes('payroll') || t.includes('stipend')) return 'salaries';
+  if (t.includes('allowance') || t.includes('bonus') || t.includes('incentive') || t.includes('perk') || t.includes('cashback') || t.includes('refund') || t.includes('dividend')) return 'allowances';
+  if (t.includes('family') || t.includes('father') || t.includes('mother') || t.includes('parents') || t.includes('dad') || t.includes('mom') || t.includes('husband') || t.includes('wife')) return 'family_income';
+  return 'others';
+}
+
 // Local heuristic fallback for common queries or when API is unreachable
 function tryLocalHeuristicFallback(
   command: string,
@@ -510,22 +614,67 @@ function tryLocalHeuristicFallback(
   }
 
   // 3. Quick transaction extraction fallback (supporting both single and multi-transaction)
-  // Check if multiple transactions are present (separated by 'and', commas, or newlines)
-  const segments = command.split(/\r?\n|(?:\s+and\s+)|(?:\s*,\s*(?=(?:spent|paid|received|got|salary|income|\d+)))/i).map(s => s.trim()).filter(Boolean);
-  
-  const extractedBatch: any[] = [];
-  
-  for (const seg of segments) {
+  const defaultBankAcc = accounts.find(a => a.account_type === 'bank' || a.account_type === 'cash')?.id || accounts[0]?.id || null;
+  const defaultIncomeAcc = accounts.find(a => a.account_type === 'bank')?.id || accounts[0]?.id || null;
+
+  // Check if the overall command mentions a common account for the whole batch
+  const overallAccId = resolveAccountFromText(command, accounts, null);
+
+  // Split command into candidate transaction segments
+  const lines = command.trim().split(/\r?\n|;/).map(l => l.trim()).filter(Boolean);
+  const segments: string[] = [];
+
+  for (const line of lines) {
+    const subSegments = line.split(/(?:\s+(?:and|&|\+)\s+)|(?:\s*,\s*(?=(?:spent|paid|received|got|salary|income|debited|credited|for|\d+|[a-zA-Z]+\s+\d+)))/i)
+      .map(s => s.trim())
+      .filter(Boolean);
+    segments.push(...subSegments);
+  }
+
+  const extractedBatch: BatchTransactionItem[] = [];
+
+  for (const rawSeg of segments) {
+    // Strip leading list numbering like "1.", "1)", "2 -", "#1", "*", "-"
+    const seg = rawSeg.replace(/^\s*(?:\d+[\.\)\-:]+|[#*•\-])\s*/, '').trim();
+    if (!seg) continue;
+
     const segText = seg.toLowerCase();
-    const segAmtMatch = seg.match(/(?:₹|rs\.?|inr)?\s*(\d+(?:,\d+)*(?:\.\d{1,2})?)/i);
-    if (!segAmtMatch) continue;
 
-    const segAmt = parseFloat(segAmtMatch[1].replace(/,/g, ''));
-    if (isNaN(segAmt) || segAmt <= 0) continue;
+    // Extract amounts using robust boundary regex
+    const amountMatches = [...seg.matchAll(/(?:(?:₹|rs\.?|inr)\s*)?(\b\d+(?:,\d+)*(?:\.\d{1,2})?\b)/gi)];
+    if (!amountMatches || amountMatches.length === 0) continue;
 
-    const isInc = segText.includes('salary') || segText.includes('income') || segText.includes('credit') || segText.includes('received') || segText.includes('deposit');
-    const matchedAcc = accounts.find(a => segText.includes(a.account_name.toLowerCase()));
-    const matchedCat = categories.find(c => segText.includes(c.name.toLowerCase()));
+    let matchedAmount: number | null = null;
+    for (const match of amountMatches) {
+      const valStr = match[1].replace(/,/g, '');
+      const num = parseFloat(valStr);
+      // Skip year like 2024..2035 unless currency or payment keyword is explicitly attached
+      if (num >= 2020 && num <= 2035 && !match[0].match(/₹|rs|inr/i) && !segText.match(/salary|rent|fees|amount|spent|paid/i)) {
+        continue;
+      }
+      if (num > 0) {
+        matchedAmount = num;
+        break;
+      }
+    }
+
+    if (!matchedAmount || isNaN(matchedAmount) || matchedAmount <= 0) continue;
+
+    // Detect income vs expense
+    // WARNING: "credit card" does NOT mean income
+    const cleanedForIncome = segText.replace(/credit\s*card|creditcard|\bcc\b/g, '');
+    const isIncome = cleanedForIncome.includes('salary') ||
+                     cleanedForIncome.includes('income') ||
+                     cleanedForIncome.includes('received') ||
+                     cleanedForIncome.includes('got paid') ||
+                     cleanedForIncome.includes('credited') ||
+                     cleanedForIncome.includes('deposit') ||
+                     cleanedForIncome.includes('earned') ||
+                     cleanedForIncome.includes('refund') ||
+                     cleanedForIncome.includes('cashback');
+
+    // Account for this segment
+    const segAccId = resolveAccountFromText(seg, accounts, null) || overallAccId;
 
     // Date check
     let segDate = currentDate;
@@ -535,31 +684,37 @@ function tryLocalHeuristicFallback(
       segDate = d.toISOString().slice(0, 10);
     }
 
-    if (isInc) {
+    if (isIncome) {
+      const incCat = resolveIncomeCategoryFromText(seg);
       extractedBatch.push({
         transaction_type: 'income',
-        amount: segAmt,
-        to_account_id: matchedAcc?.id || null,
-        income_category: 'others',
-        category: 'Others',
-        description: seg.trim(),
+        amount: matchedAmount,
+        from_account_id: null,
+        to_account_id: segAccId || defaultIncomeAcc,
+        category: null,
+        income_category: incCat,
+        description: seg,
         transaction_date: segDate
       });
     } else {
-      // Expense - category must NEVER remain blank
+      const expCat = resolveCategoryFromText(seg, categories);
       extractedBatch.push({
         transaction_type: 'expense',
-        amount: segAmt,
-        from_account_id: matchedAcc?.id || null,
-        category: matchedCat ? matchedCat.name : (segText.includes('grocer') ? 'Groceries' : (segText.includes('petrol') || segText.includes('fuel') ? 'Transportation' : (categories[0]?.name || 'Others'))),
-        description: seg.trim(),
+        amount: matchedAmount,
+        from_account_id: segAccId || defaultBankAcc,
+        to_account_id: null,
+        category: expCat,
+        income_category: null,
+        description: seg,
         transaction_date: segDate
       });
     }
   }
 
   if (extractedBatch.length > 1) {
-    const reply = `I've prepared a batch of **${extractedBatch.length} transactions** (${extractedBatch.filter(b => b.transaction_type === 'expense').length} expenses, ${extractedBatch.filter(b => b.transaction_type === 'income').length} income). All categories are assigned and ready for review!`;
+    const expCount = extractedBatch.filter(b => b.transaction_type === 'expense').length;
+    const incCount = extractedBatch.filter(b => b.transaction_type === 'income').length;
+    const reply = `I've prepared a batch of **${extractedBatch.length} transactions** (${expCount} expense${expCount !== 1 ? 's' : ''}, ${incCount} income). All categories and accounts are assigned. Please review and submit to post them!`;
     return {
       intent: 'transaction',
       extractedInfo: extractedBatch[0],
@@ -571,66 +726,19 @@ function tryLocalHeuristicFallback(
     };
   }
 
-  // Single transaction extraction
-  const amountMatch = command.match(/(?:₹|rs\.?|inr)?\s*(\d+(?:,\d+)*(?:\.\d{1,2})?)/i);
-  if (amountMatch) {
-    const amountVal = parseFloat(amountMatch[1].replace(/,/g, ''));
-    if (!isNaN(amountVal) && amountVal > 0) {
-      // Check for salary / income
-      const isIncome = text.includes('salary') || text.includes('income') || text.includes('credit') || text.includes('received');
-      const isCCRepay = text.includes('repay') || text.includes('bill') || text.includes('credit card');
-
-      // Date check
-      let dateVal = currentDate;
-      if (text.includes('yesterday')) {
-        const d = new Date(currentDate);
-        d.setDate(d.getDate() - 1);
-        dateVal = d.toISOString().slice(0, 10);
-      }
-
-      // Matched account
-      const matchedAcc = accounts.find(a => text.includes(a.account_name.toLowerCase()));
-      // Matched category
-      const matchedCat = categories.find(c => text.includes(c.name.toLowerCase()));
-
-      const extractedInfo: any = {
-        amount: amountVal,
-        transaction_date: dateVal,
-        description: command.trim()
-      };
-
-      if (isCCRepay) {
-        extractedInfo.transaction_type = 'credit_card_repayment';
-        extractedInfo.to_account_id = accounts.find(a => a.account_type === 'credit_card')?.id || null;
-        extractedInfo.from_account_id = matchedAcc?.id || null;
-      } else if (isIncome) {
-        extractedInfo.transaction_type = 'income';
-        extractedInfo.income_category = text.includes('salary') ? 'salaries' : 'others';
-        extractedInfo.to_account_id = matchedAcc?.id || null;
-      } else {
-        extractedInfo.transaction_type = 'expense';
-        // Category must NEVER remain blank
-        extractedInfo.category = matchedCat ? matchedCat.name : (text.includes('grocer') ? 'Groceries' : (text.includes('petrol') || text.includes('fuel') ? 'Transportation' : (categories[0]?.name || 'Others')));
-        extractedInfo.from_account_id = matchedAcc?.id || null;
-      }
-
-      const missing: string[] = [];
-      if (!extractedInfo.from_account_id && extractedInfo.transaction_type === 'expense') {
-        missing.push('from_account_id');
-      }
-
-      const reply = `I've prepared a ${extractedInfo.transaction_type} of ₹${amountVal.toLocaleString('en-IN')}${extractedInfo.category ? ` for ${extractedInfo.category}` : ''} on ${dateVal}.${missing.length > 0 ? ' Which account did you pay from?' : ' Form is auto-filled and ready!'}`;
-
-      return {
-        intent: 'transaction',
-        extractedInfo,
-        batchTransactions: [extractedInfo],
-        isComplete: missing.length === 0,
-        missingFields: missing,
-        reply,
-        clarificationQuestion: reply
-      };
-    }
+  if (extractedBatch.length === 1) {
+    const single = extractedBatch[0];
+    const catName = single.transaction_type === 'expense' ? single.category : single.income_category;
+    const reply = `I've prepared a ${single.transaction_type} of ₹${single.amount.toLocaleString('en-IN')}${catName ? ` for ${catName}` : ''} on ${single.transaction_date}. Form is auto-filled and ready!`;
+    return {
+      intent: 'transaction',
+      extractedInfo: single,
+      batchTransactions: [single],
+      isComplete: true,
+      missingFields: [],
+      reply,
+      clarificationQuestion: reply
+    };
   }
 
   return null;
@@ -931,23 +1039,28 @@ export async function parseSmartChatbotCommand(
       
       const parsedResult: SmartChatbotResult = JSON.parse(cleanedText);
 
-      // Sanitize & enforce non-blank categories for batch transactions
+      // Sanitize & enforce non-blank categories and valid accounts for batch transactions
       if (parsedResult.batchTransactions && Array.isArray(parsedResult.batchTransactions)) {
+        const defaultBankAcc = accounts.find(a => a.account_type === 'bank' || a.account_type === 'cash')?.id || accounts[0]?.id || null;
+        const defaultIncomeAcc = accounts.find(a => a.account_type === 'bank')?.id || accounts[0]?.id || null;
+
         parsedResult.batchTransactions = parsedResult.batchTransactions
           .filter(t => t && Number(t.amount) > 0)
           .map(t => {
             const isInc = t.transaction_type === 'income';
-            const matchedCat = categories.find(c => c.name.toLowerCase() === (t.category || '').toLowerCase());
+            const rawAcc = isInc ? t.to_account_id : t.from_account_id;
+            const resolvedAccId = resolveAccountFromText(t.account_name || rawAcc, accounts, isInc ? defaultIncomeAcc : defaultBankAcc);
+            const resolvedCategory = isInc ? null : resolveCategoryFromText(t.category, categories);
+            const resolvedIncCategory = isInc ? resolveIncomeCategoryFromText(t.income_category) : null;
+
             return {
               transaction_type: isInc ? 'income' : 'expense',
               amount: Number(t.amount),
-              from_account_id: isInc ? null : (t.from_account_id || null),
-              to_account_id: isInc ? (t.to_account_id || null) : null,
-              // Expense category must NEVER remain blank
-              category: isInc ? null : (matchedCat ? matchedCat.name : (t.category && t.category.trim() ? t.category.trim() : (categories[0]?.name || 'Others'))),
-              // Income category must NEVER remain blank
-              income_category: isInc ? (['salaries', 'allowances', 'family_income', 'others'].includes(t.income_category as any) ? t.income_category : 'others') : null,
-              description: t.description || (isInc ? 'Income' : 'Expense'),
+              from_account_id: isInc ? null : resolvedAccId,
+              to_account_id: isInc ? resolvedAccId : null,
+              category: resolvedCategory,
+              income_category: resolvedIncCategory,
+              description: t.description?.trim() || (isInc ? 'Income' : 'Expense'),
               transaction_date: t.transaction_date || currentDate
             };
           });

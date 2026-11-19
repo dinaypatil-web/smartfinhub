@@ -188,6 +188,7 @@ export default function TransactionForm() {
     description: string;
     transaction_date: string;
     account_name?: string;
+    isPosted?: boolean;
   }
 
   const [batchDrafts, setBatchDrafts] = useState<BatchDraftItem[]>([]);
@@ -828,13 +829,24 @@ export default function TransactionForm() {
                 .filter((bt: any) => bt.transaction_type === 'income' || bt.transaction_type === 'expense')
                 .map((bt: any) => {
                   const isInc = bt.transaction_type === 'income';
-                  let accId = isInc ? (bt.to_account_id || defaultToAcc) : (bt.from_account_id || defaultFromAcc);
-                  if (bt.account_name) {
-                    const matchedAcc = accounts.find(a =>
-                      a.account_name.toLowerCase().includes(bt.account_name.toLowerCase()) ||
-                      bt.account_name.toLowerCase().includes(a.account_name.toLowerCase())
-                    );
-                    if (matchedAcc) accId = matchedAcc.id;
+                  
+                  // Resolve Account strictly to a valid account ID in accounts
+                  let accId: string | null = null;
+                  const rawAcc = isInc ? bt.to_account_id : bt.from_account_id;
+                  if (rawAcc && accounts.some(a => a.id === rawAcc)) {
+                    accId = rawAcc;
+                  } else {
+                    const searchStr = (bt.account_name || rawAcc || '').toLowerCase();
+                    if (searchStr) {
+                      const matched = accounts.find(a =>
+                        a.account_name.toLowerCase().includes(searchStr) ||
+                        searchStr.includes(a.account_name.toLowerCase())
+                      );
+                      if (matched) accId = matched.id;
+                    }
+                  }
+                  if (!accId) {
+                    accId = isInc ? defaultToAcc : defaultFromAcc;
                   }
 
                   // Resolve Expense Category
@@ -842,7 +854,8 @@ export default function TransactionForm() {
                   if (!isInc && finalCat) {
                     const matchedCat = categories.find(c =>
                       c.name.toLowerCase() === finalCat.toLowerCase() ||
-                      c.name.toLowerCase().includes(finalCat.toLowerCase())
+                      c.name.toLowerCase().includes(finalCat.toLowerCase()) ||
+                      finalCat.toLowerCase().includes(c.name.toLowerCase())
                     );
                     finalCat = matchedCat ? matchedCat.name : finalCat;
                   } else if (!isInc && !finalCat) {
@@ -870,6 +883,7 @@ export default function TransactionForm() {
                     income_category: isInc ? (finalIncCat as IncomeCategoryKey) : null,
                     description: bt.description?.trim() || (isInc ? getIncomeCategoryName((finalIncCat || 'others') as any) : (finalCat || 'Expense')),
                     transaction_date: bt.transaction_date || today,
+                    isPosted: false,
                   };
                 });
 
@@ -1019,13 +1033,50 @@ export default function TransactionForm() {
   const handleSaveAllBatchTransactions = async () => {
     if (!user || batchDrafts.length === 0) return;
 
-    // Validate all items: ensure amount, accounts, and non-blank categories
-    for (let i = 0; i < batchDrafts.length; i++) {
-      const item = batchDrafts[i];
+    // 1. Sync currently active form state into current batch item
+    const currentBatch = [...batchDrafts];
+    if (currentBatch[batchCurrentIndex] && !currentBatch[batchCurrentIndex].isPosted) {
+      currentBatch[batchCurrentIndex] = {
+        ...currentBatch[batchCurrentIndex],
+        transaction_type: formData.transaction_type === 'income' ? 'income' : 'expense',
+        amount: Number(formData.amount) || 0,
+        from_account_id: formData.from_account_id || null,
+        to_account_id: formData.to_account_id || null,
+        category: formData.category || null,
+        income_category: (formData.income_category as IncomeCategoryKey) || null,
+        description: formData.description || '',
+        transaction_date: formData.transaction_date,
+      };
+      setBatchDrafts(currentBatch);
+    }
+
+    const defaultFromAcc = accounts.find(a => a.account_type === 'bank' || a.account_type === 'cash')?.id || accounts[0]?.id || null;
+    const defaultToAcc = accounts.find(a => a.account_type === 'bank')?.id || accounts[0]?.id || null;
+
+    // 2. Identify unposted items
+    const unpostedIndices: number[] = [];
+    currentBatch.forEach((item, idx) => {
+      if (!item.isPosted) unpostedIndices.push(idx);
+    });
+
+    if (unpostedIndices.length === 0) {
+      toast({
+        title: 'All Transactions Posted',
+        description: 'All transactions in this batch have already been saved.',
+      });
+      setBatchDrafts([]);
+      setBatchCurrentIndex(0);
+      navigate('/transactions');
+      return;
+    }
+
+    // 3. Validate unposted items
+    for (const idx of unpostedIndices) {
+      const item = currentBatch[idx];
       if (!item.amount || item.amount <= 0) {
         toast({
           title: 'Validation Error',
-          description: `Transaction #${i + 1} has an invalid or missing amount.`,
+          description: `Transaction #${idx + 1} has an invalid or missing amount.`,
           variant: 'destructive',
         });
         return;
@@ -1033,57 +1084,53 @@ export default function TransactionForm() {
       if (item.transaction_type !== 'income' && item.transaction_type !== 'expense') {
         toast({
           title: 'Invalid Transaction Type',
-          description: `Transaction #${i + 1} is '${item.transaction_type}'. Batch posting supports only Income or Expense.`,
+          description: `Transaction #${idx + 1} is '${item.transaction_type}'. Batch posting supports only Income or Expense.`,
           variant: 'destructive',
         });
         return;
       }
       if (item.transaction_type === 'expense') {
+        if (!item.from_account_id || !accounts.some(a => a.id === item.from_account_id)) {
+          item.from_account_id = defaultFromAcc;
+        }
         if (!item.from_account_id) {
           toast({
             title: 'Missing Account',
-            description: `Transaction #${i + 1} is missing a source account (Paid From).`,
+            description: `Transaction #${idx + 1} is missing a source account (Paid From).`,
             variant: 'destructive',
           });
           return;
         }
         if (!item.category || !item.category.trim()) {
-          toast({
-            title: 'Missing Category',
-            description: `Transaction #${i + 1}: Expense category cannot remain blank.`,
-            variant: 'destructive',
-          });
-          return;
+          item.category = categories[0]?.name || 'Others';
         }
       }
       if (item.transaction_type === 'income') {
+        if (!item.to_account_id || !accounts.some(a => a.id === item.to_account_id)) {
+          item.to_account_id = defaultToAcc;
+        }
         if (!item.to_account_id) {
           toast({
             title: 'Missing Account',
-            description: `Transaction #${i + 1} is missing a destination account (Received In).`,
+            description: `Transaction #${idx + 1} is missing a destination account (Received In).`,
             variant: 'destructive',
           });
           return;
         }
         if (!item.income_category || !item.income_category.trim()) {
-          toast({
-            title: 'Missing Category',
-            description: `Transaction #${i + 1}: Income category cannot remain blank.`,
-            variant: 'destructive',
-          });
-          return;
+          item.income_category = 'others';
         }
       }
     }
 
     setIsBatchSaving(true);
     setLoading(true);
-    const total = batchDrafts.length;
+    const total = currentBatch.length;
     const today = new Date().toISOString().slice(0, 10);
 
     try {
-      for (let i = 0; i < total; i++) {
-        const item = batchDrafts[i];
+      for (const idx of unpostedIndices) {
+        const item = currentBatch[idx];
         const isInc = item.transaction_type === 'income';
         const payload: any = {
           user_id: user.id,
@@ -1099,6 +1146,8 @@ export default function TransactionForm() {
         };
 
         await transactionApi.createTransaction(payload);
+        item.isPosted = true;
+        setBatchDrafts([...currentBatch]);
 
         // Fetch updated account balance for all associated accounts
         const associatedIds = [item.from_account_id, item.to_account_id].filter(Boolean) as string[];
@@ -1123,7 +1172,7 @@ export default function TransactionForm() {
           ? (item.income_category ? getIncomeCategoryName(item.income_category as any) : 'Income')
           : (item.category || 'Expense');
 
-        const successMsg = `✅ **Transaction ${i + 1} of ${total} posted successfully!**\n- Amount: ₹${Number(item.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })} (${item.transaction_type === 'income' ? 'Income' : 'Expense'} - ${catDisplay})\n- **Post-Posting Account Balances:**\n${balanceReportLines || '  • N/A'}`;
+        const successMsg = `✅ **Transaction ${idx + 1} of ${total} posted successfully!**\n- Amount: ₹${Number(item.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })} (${item.transaction_type === 'income' ? 'Income' : 'Expense'} - ${catDisplay})\n- **Post-Posting Account Balances:**\n${balanceReportLines || '  • N/A'}`;
 
         setChatMessages(prev => [
           ...prev,
@@ -2269,6 +2318,13 @@ export default function TransactionForm() {
           ]);
 
           const nextIdx = batchCurrentIndex + 1;
+          setBatchDrafts(prev => {
+            const next = [...prev];
+            if (next[batchCurrentIndex]) {
+              next[batchCurrentIndex] = { ...next[batchCurrentIndex], isPosted: true };
+            }
+            return next;
+          });
           setBatchCurrentIndex(nextIdx);
           loadBatchItemIntoForm(batchDrafts[nextIdx]);
 
@@ -2443,7 +2499,7 @@ export default function TransactionForm() {
                         className={`text-xs px-2.5 py-1 rounded-lg border transition-all flex items-center gap-1.5 ${
                           idx === batchCurrentIndex
                             ? 'bg-teal-500 text-slate-950 font-bold border-teal-400 shadow-sm'
-                            : idx < batchCurrentIndex
+                            : (item.isPosted || idx < batchCurrentIndex)
                               ? 'bg-emerald-950/30 text-emerald-300 border-emerald-500/30'
                               : 'bg-muted/40 text-muted-foreground border-border hover:bg-muted'
                         }`}
@@ -2451,7 +2507,7 @@ export default function TransactionForm() {
                         <span>#{idx + 1}</span>
                         <span className="font-semibold">₹{Number(item.amount || 0).toLocaleString('en-IN')}</span>
                         <span className="text-[10px] opacity-80 capitalize">({item.category || item.income_category || item.transaction_type})</span>
-                        {idx < batchCurrentIndex && <Check className="h-3 w-3 text-emerald-400" />}
+                        {(item.isPosted || idx < batchCurrentIndex) && <Check className="h-3 w-3 text-emerald-400" />}
                       </button>
                     ))}
                   </div>

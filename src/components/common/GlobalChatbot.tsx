@@ -422,21 +422,46 @@ export default function GlobalChatbot() {
           
           if (parsedResult.intent === 'transaction') {
             if (parsedResult.batchTransactions && parsedResult.batchTransactions.length > 0) {
-              const defaultAcc = accounts.find(a => a.account_type === 'bank' || a.account_type === 'cash') || accounts[0];
-              const defaultAccId = defaultAcc ? defaultAcc.id : null;
+              const defaultBankAcc = accounts.find(a => a.account_type === 'bank' || a.account_type === 'cash') || accounts[0];
+              const defaultBankAccId = defaultBankAcc ? defaultBankAcc.id : null;
+              const defaultIncomeAcc = accounts.find(a => a.account_type === 'bank') || accounts[0];
+              const defaultIncomeAccId = defaultIncomeAcc ? defaultIncomeAcc.id : null;
               const defaultExpenseCategory = categories[0]?.name || 'Others';
 
               const stagedBatch: DraftTransaction[] = parsedResult.batchTransactions
                 .filter(item => item.transaction_type === 'income' || item.transaction_type === 'expense')
                 .map(item => {
                   const isIncome = item.transaction_type === 'income';
-                  let accId = item.from_account_id || defaultAccId;
-                  if (item.account_name) {
-                    const matchedAcc = accounts.find(a => a.account_name.toLowerCase().includes(item.account_name!.toLowerCase()));
-                    if (matchedAcc) accId = matchedAcc.id;
+                  let accId: string | null = null;
+                  const rawAcc = isIncome ? item.to_account_id : item.from_account_id;
+                  if (rawAcc && accounts.some(a => a.id === rawAcc)) {
+                    accId = rawAcc;
+                  } else {
+                    const searchStr = (item.account_name || rawAcc || '').toLowerCase();
+                    if (searchStr) {
+                      const matched = accounts.find(a =>
+                        a.account_name.toLowerCase().includes(searchStr) ||
+                        searchStr.includes(a.account_name.toLowerCase())
+                      );
+                      if (matched) accId = matched.id;
+                    }
+                  }
+                  if (!accId) {
+                    accId = isIncome ? defaultIncomeAccId : defaultBankAccId;
                   }
 
-                  const finalCategory = !isIncome ? (item.category?.trim() || defaultExpenseCategory) : null;
+                  let finalCategory = !isIncome ? item.category?.trim() : null;
+                  if (!isIncome && finalCategory) {
+                    const matchedCat = categories.find(c =>
+                      c.name.toLowerCase() === finalCategory!.toLowerCase() ||
+                      c.name.toLowerCase().includes(finalCategory!.toLowerCase()) ||
+                      finalCategory!.toLowerCase().includes(c.name.toLowerCase())
+                    );
+                    finalCategory = matchedCat ? matchedCat.name : finalCategory;
+                  } else if (!isIncome && !finalCategory) {
+                    finalCategory = defaultExpenseCategory;
+                  }
+
                   const finalIncomeCategory = isIncome ? ((item.income_category as any) || 'others') : null;
 
                   return {
@@ -444,7 +469,7 @@ export default function GlobalChatbot() {
                     amount: item.amount > 0 ? item.amount : null,
                     from_account_id: !isIncome ? accId : null,
                     to_account_id: isIncome ? accId : null,
-                    category: finalCategory,
+                    category: finalCategory || null,
                     income_category: finalIncomeCategory,
                     description: item.description?.trim() || (isIncome ? getIncomeCategoryName(finalIncomeCategory || 'others') : (finalCategory || 'Expense')),
                     transaction_date: item.transaction_date || today,
