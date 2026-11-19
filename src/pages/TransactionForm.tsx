@@ -992,7 +992,9 @@ export default function TransactionForm() {
             }
 
             // Resolve Expense Category: case-insensitive match
-            if (ext.category) {
+            if (ext.transaction_type === 'withdrawal' || ext.transaction_type === 'transfer' || ext.transaction_type === 'income') {
+              updates.category = '';
+            } else if (ext.category) {
               const matchedCat = categories.find(c => 
                 c.name.toLowerCase() === ext.category.toLowerCase() ||
                 c.name.toLowerCase().includes(ext.category.toLowerCase()) ||

@@ -816,8 +816,10 @@ export default function VoiceTransactPage() {
                 amount: ext.amount || draft.amount,
                 from_account_id: ext.from_account_id || draft.from_account_id,
                 to_account_id: ext.to_account_id || draft.to_account_id,
-                // Ensure category is NEVER blank
-                category: ext.transaction_type === 'income' ? null : (ext.category || draft.category || categories[0]?.name || 'Others'),
+                // Ensure category is NEVER blank for expense, and null for income/withdrawal/transfer
+                category: (ext.transaction_type === 'income' || ext.transaction_type === 'withdrawal' || ext.transaction_type === 'transfer')
+                  ? null
+                  : (ext.category || draft.category || categories[0]?.name || 'Others'),
                 income_category: ext.transaction_type === 'income' ? (ext.income_category || draft.income_category || 'others') : null,
                 description: ext.description || draft.description,
                 transaction_date: ext.transaction_date || draft.transaction_date || today,

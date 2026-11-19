@@ -522,36 +522,270 @@ function resolveAccountFromText(
   return defaultAccId;
 }
 
-// Helper to resolve an expense category from natural language text or keywords
-function resolveCategoryFromText(text: string | null | undefined, categories: any[]): string {
+const NLP_MONTHS: Record<string, number> = {
+  jan: 0, january: 0,
+  feb: 1, february: 1,
+  mar: 2, march: 2,
+  apr: 3, april: 3,
+  may: 4,
+  jun: 5, june: 5,
+  jul: 6, july: 6,
+  aug: 7, august: 7,
+  sep: 8, sept: 8, september: 8,
+  oct: 9, october: 9,
+  nov: 10, november: 10,
+  dec: 11, december: 11
+};
+
+const nlpMonthNamesPattern = Object.keys(NLP_MONTHS).join('|');
+
+// Helper to parse dates from natural language text
+export function parseDateFromText(text: string | null | undefined, currentDate: string): string {
+  if (!text) return currentDate;
+  const t = text.toLowerCase();
+  const curr = new Date(currentDate);
+  const currYear = curr.getFullYear();
+  const currMonth = curr.getMonth(); // 0-indexed
+
+  // 1. Relative: today
+  if (/\btoday\b/i.test(t)) {
+    return currentDate;
+  }
+
+  // 2. Relative: yesterday / day before yesterday
+  if (/\bday before yesterday\b/i.test(t)) {
+    const d = new Date(currentDate);
+    d.setDate(d.getDate() - 2);
+    return d.toISOString().slice(0, 10);
+  }
+  if (/\byesterday\b/i.test(t)) {
+    const d = new Date(currentDate);
+    d.setDate(d.getDate() - 1);
+    return d.toISOString().slice(0, 10);
+  }
+
+  // 3. Relative: X days ago
+  const daysAgoMatch = t.match(/\b(\d+)\s+days?\s+ago\b/i);
+  if (daysAgoMatch) {
+    const days = parseInt(daysAgoMatch[1], 10);
+    const d = new Date(currentDate);
+    d.setDate(d.getDate() - days);
+    return d.toISOString().slice(0, 10);
+  }
+
+  // 4. ISO Date: YYYY-MM-DD
+  const isoMatch = t.match(/\b(\d{4})-(\d{1,2})-(\d{1,2})\b/);
+  if (isoMatch) {
+    const y = parseInt(isoMatch[1], 10);
+    const m = String(parseInt(isoMatch[2], 10)).padStart(2, '0');
+    const d = String(parseInt(isoMatch[3], 10)).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  // 5. Numeric: DD/MM/YYYY or DD-MM-YYYY
+  const dmyMatch = t.match(/\b(\d{1,2})[/-](\d{1,2})[/-](\d{4})\b/);
+  if (dmyMatch) {
+    const d = String(parseInt(dmyMatch[1], 10)).padStart(2, '0');
+    const m = String(parseInt(dmyMatch[2], 10)).padStart(2, '0');
+    const y = parseInt(dmyMatch[3], 10);
+    return `${y}-${m}-${d}`;
+  }
+
+  // 6. Numeric: DD/MM or DD-MM (assumes current year)
+  const dmMatch = t.match(/\b(\d{1,2})[/-](\d{1,2})\b/);
+  if (dmMatch) {
+    const d = String(parseInt(dmMatch[1], 10)).padStart(2, '0');
+    const m = String(parseInt(dmMatch[2], 10)).padStart(2, '0');
+    return `${currYear}-${m}-${d}`;
+  }
+
+  // 7. Pattern A: Day Month (e.g. 15th Nov, 15 November 2026, 15 Nov)
+  const dayMonthRegex = new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(${nlpMonthNamesPattern})(?:\\s+(\\d{4}))?\\b`, 'i');
+  const dmWordMatch = t.match(dayMonthRegex);
+  if (dmWordMatch) {
+    const day = String(parseInt(dmWordMatch[1], 10)).padStart(2, '0');
+    const mStr = dmWordMatch[2].toLowerCase();
+    const monthNum = String(NLP_MONTHS[mStr] + 1).padStart(2, '0');
+    const year = dmWordMatch[3] ? parseInt(dmWordMatch[3], 10) : currYear;
+    return `${year}-${monthNum}-${day}`;
+  }
+
+  // Pattern B: Month Day (e.g. Nov 15, November 15th, Nov 15 2026)
+  const monthDayRegex = new RegExp(`\\b(${nlpMonthNamesPattern})\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:\\s+(\\d{4}))?\\b`, 'i');
+  const mdWordMatch = t.match(monthDayRegex);
+  if (mdWordMatch) {
+    const mStr = mdWordMatch[1].toLowerCase();
+    const monthNum = String(NLP_MONTHS[mStr] + 1).padStart(2, '0');
+    const day = String(parseInt(mdWordMatch[2], 10)).padStart(2, '0');
+    const year = mdWordMatch[3] ? parseInt(mdWordMatch[3], 10) : currYear;
+    return `${year}-${monthNum}-${day}`;
+  }
+
+  // 8. Day of current month: e.g. "on 15th", "on 5th", "on the 10th"
+  const onDayMatch = t.match(/\b(?:on\s+(?:the\s+)?)(\d{1,2})(?:st|nd|rd|th)\b/i);
+  if (onDayMatch) {
+    const day = String(parseInt(onDayMatch[1], 10)).padStart(2, '0');
+    const monthNum = String(currMonth + 1).padStart(2, '0');
+    return `${currYear}-${monthNum}-${day}`;
+  }
+
+  return currentDate;
+}
+
+function toTitleCase(str: string): string {
+  return str.replace(/\b[a-zA-Z]/g, match => match.toUpperCase());
+}
+
+// Clean and extract a professional description from a natural language segment
+export function cleanDescriptionFromText(seg: string, category: string | null, transactionType: string): string {
+  let d = seg;
+
+  // 1. Remove date expressions first so they don't get partially stripped by number regexes
+  d = d.replace(/\b(?:on\s+)?(?:day before yesterday|yesterday|today|\d+\s+days?\s+ago)\b/gi, ' ');
+  d = d.replace(new RegExp(`\\b(?:on\\s+)?\\d{1,2}(?:st|nd|rd|th)?\\s+(?:${nlpMonthNamesPattern})(?:\\s+\\d{2,4})?\\b`, 'gi'), ' ');
+  d = d.replace(new RegExp(`\\b(?:on\\s+)?(?:${nlpMonthNamesPattern})\\s+\\d{1,2}(?:st|nd|rd|th)?(?:\\s+\\d{2,4})?\\b`, 'gi'), ' ');
+  d = d.replace(/\b(?:on\s+)?\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?\b/gi, ' ');
+  d = d.replace(/\b(?:on\s+(?:the\s+)?)?\d{1,2}(?:st|nd|rd|th)\b/gi, ' ');
+
+  // 2. Remove bank / account references
+  d = d.replace(/\b(?:from|via|through|using|by|with|in)\s+(?:(?:my|the)\s+)?(?:(?:hdfc|sbi|icici|axis|kotak|pnb|bob|canara|union|idfc|yes|indusind|rbl|citi|hsbc|standard chartered)\s*(?:bank|card|credit\s*card|debit\s*card|savings|account)?|cash\s*(?:wallet|pocket|account)?|credit\s*card|debit\s*card|upi|paytm|gpay|google\s*pay|phonepe)\b/gi, ' ');
+  d = d.replace(/\b(?:from|at|via)\s+(?:sbi|hdfc|icici|axis|kotak|pnb|bob)?\s*atm\b/gi, ' ');
+  d = d.replace(/\b(?:in|into|to|from)\s+(?:hdfc|sbi|icici|axis|kotak|pnb|bob)\s*(?:bank|account)?\b/gi, ' ');
+
+  // 3. Remove amounts (₹500, Rs. 500, 500 rs, 500)
+  d = d.replace(/(?:(?:₹|rs\.?|inr)\s*)?\b\d+(?:,\d+)*(?:\.\d{1,2})?\s*(?:rs|inr|bucks|rupees)?/gi, ' ');
+
+  // 4. Remove common action verbs
+  d = d.replace(/\b(?:spent|paid\s+to|paid|bought|ordered|purchased|received|got|credited|debited|withdrew|withdrawn|withdraw|transferred|transfer|sent\s+to|moved\s+to|recharged)\b/gi, ' ');
+
+  // 5. Clean up extra prepositions and punctuation
+  d = d.replace(/[,\-_;:~|/]+/g, ' ');
+  d = d.replace(/^\s*(?:for|at|on|to|in|via|with|by|of|from|using|a|an|the)\s+/gi, ' ');
+  d = d.replace(/\s+(?:for|at|on|to|in|via|with|by|of|from|using|a|an|the)\s*$/gi, ' ');
+  d = d.replace(/\s+/g, ' ').trim();
+
+  // 6. Handle withdrawal / transfer defaults
+  if (transactionType === 'withdrawal') {
+    return d && d.length > 2 && !d.toLowerCase().includes('atm') ? toTitleCase(d) : 'ATM Cash Withdrawal';
+  }
+  if (transactionType === 'transfer') {
+    return d && d.length > 2 ? toTitleCase(d) : 'Account Transfer';
+  }
+
+  // 7. If clean text is empty or meaningless, use category
+  if (!d || d.length < 2) {
+    return category || (transactionType === 'income' ? 'Income' : 'Expense');
+  }
+
+  return toTitleCase(d);
+}
+
+const CATEGORY_TAXONOMY = [
+  {
+    target: ['Shopping', 'Clothing', 'Personal'],
+    keywords: [
+      'marks & spencer', 'marks and spencer', 'zara', 'h&m', 'myntra', 'ajio', 'meesho', 'nykaa',
+      'shirt', 'pants', 'pant', 'jeans', 'tshirt', 't-shirt', 'shoes', 'dress', 'clothing', 'clothes',
+      'footwear', 'sneakers', 'saree', 'kurta', 'electronics', 'gadget', 'laptop', 'shopping', 'mall'
+    ]
+  },
+  {
+    target: ['Groceries', 'Grocery', 'Household'],
+    keywords: [
+      'grocer', 'supermarket', 'dmart', 'milk', 'curd', 'paneer', 'egg', 'eggs', 'bread', 'butter',
+      'cheese', 'vegetable', 'vegetables', 'fruit', 'fruits', 'veggie', 'veggies', 'bigbasket', 'blinkit',
+      'zepto', 'instamart', 'kirana', 'ration', 'provisions', 'reliance fresh', 'spencers', "spencer's"
+    ]
+  },
+  {
+    target: ['Food & Dining', 'Food', 'Dining', 'Restaurant', 'Food and Drinks'],
+    keywords: [
+      'food', 'dining', 'restaurant', 'cafe', 'coffee', 'tea', 'chai', 'lunch', 'dinner', 'breakfast',
+      'snack', 'snacks', 'zomato', 'swiggy', 'starbucks', 'mcdonald', 'burger', 'pizza', 'dominos',
+      'kfc', 'subway', 'haldiram', 'meal', 'dessert', 'bistro', 'bar', 'pub', 'dhaba', 'bakery', 'cake'
+    ]
+  },
+  {
+    target: ['Transportation', 'Travel', 'Fuel', 'Commute', 'Vehicle'],
+    keywords: [
+      'petrol', 'fuel', 'diesel', 'cng', 'auto', 'uber', 'ola', 'rapido', 'metro', 'bus', 'cab', 'taxi',
+      'train', 'irctc', 'railway', 'flight', 'indigo', 'airline', 'parking', 'toll', 'fastag', 'fare',
+      'commute', 'travel', 'mechanic'
+    ]
+  },
+  {
+    target: ['Utilities', 'Bills & Utilities', 'Bills', 'Recharge'],
+    keywords: [
+      'electricity', 'water bill', 'cylinder', 'gas bill', 'wifi', 'broadband', 'internet', 'fiber',
+      'recharge', 'mobile bill', 'phone bill', 'dth', 'power bill', 'utility', 'bills', 'airtel', 'jio',
+      'vi', 'vodafone', 'bescom', 'mseb'
+    ]
+  },
+  {
+    target: ['Health & Medical', 'Medical', 'Healthcare', 'Health'],
+    keywords: [
+      'pharmacy', 'medicine', 'medicines', 'doctor', 'hospital', 'clinic', 'medical', 'test', 'lab',
+      'chemist', 'tablet', 'apollo', '1mg', 'pharmeasy', 'dentist', 'health'
+    ]
+  },
+  {
+    target: ['Entertainment', 'Leisure', 'Subscriptions'],
+    keywords: [
+      'movie', 'movies', 'cinema', 'theatre', 'theater', 'pvr', 'inox', 'netflix', 'prime', 'hotstar',
+      'spotify', 'youtube', 'bookmyshow', 'concert', 'game', 'gaming', 'subscription'
+    ]
+  },
+  {
+    target: ['Housing', 'Rent', 'Home'],
+    keywords: [
+      'rent', 'house rent', 'flat rent', 'maintenance', 'society', 'pg', 'hostel', 'property', 'maid', 'cook'
+    ]
+  }
+];
+
+// Helper to resolve an expense category from natural language text, keywords, and history
+export function resolveCategoryFromText(text: string | null | undefined, categories: any[], transactions: any[] = []): string {
   if (!text) return categories[0]?.name || 'Others';
   const t = text.trim().toLowerCase();
 
   // 1. Direct match with existing category name
   for (const c of categories) {
-    if (t.includes(c.name.toLowerCase())) return c.name;
+    if (new RegExp(`\\b${c.name.toLowerCase()}\\b`, 'i').test(t)) return c.name;
   }
 
-  // 2. Keyword dictionary
-  const mappings = [
-    { cat: 'Groceries', keywords: ['grocer', 'supermarket', 'dmart', 'milk', 'vegetable', 'fruit', 'veggie', 'bigbasket', 'blinkit', 'zepto', 'instamart', 'kirana', 'ration', 'provisions'] },
-    { cat: 'Food & Dining', keywords: ['food', 'dining', 'restaurant', 'cafe', 'coffee', 'lunch', 'dinner', 'breakfast', 'snack', 'zomato', 'swiggy', 'starbucks', 'mcdonald', 'burger', 'pizza', 'tea', 'chai', 'meal', 'dessert', 'bistro'] },
-    { cat: 'Transportation', keywords: ['petrol', 'fuel', 'diesel', 'auto', 'uber', 'ola', 'metro', 'bus', 'cab', 'taxi', 'train', 'flight', 'parking', 'toll', 'fare', 'commute', 'rapido'] },
-    { cat: 'Utilities', keywords: ['electricity', 'water', 'gas', 'cylinder', 'wifi', 'broadband', 'internet', 'recharge', 'mobile bill', 'dth', 'power bill', 'phone bill', 'utility'] },
-    { cat: 'Housing', keywords: ['rent', 'lease', 'flat', 'maintenance', 'pg', 'hostel', 'property', 'society'] },
-    { cat: 'Shopping', keywords: ['amazon', 'flipkart', 'clothes', 'myntra', 'shoes', 'dress', 'shopping', 'mall', 'electronics', 'gadget', 'clothing'] },
-    { cat: 'Health & Medical', keywords: ['pharmacy', 'medicine', 'doctor', 'hospital', 'clinic', 'medical', 'test', 'lab', 'chemist', 'tablet', 'apollo', 'medicines'] },
-    { cat: 'Entertainment', keywords: ['movie', 'cinema', 'theatre', 'netflix', 'prime video', 'hotstar', 'concert', 'game', 'subscription', 'spotify', 'bookmyshow'] }
-  ];
-
-  for (const map of mappings) {
-    if (map.keywords.some(k => t.includes(k))) {
-      const match = categories.find(c => c.name.toLowerCase() === map.cat.toLowerCase() || c.name.toLowerCase().includes(map.cat.toLowerCase()) || map.cat.toLowerCase().includes(c.name.toLowerCase()));
-      if (match) return match.name;
+  // 2. Learn from previous transactions matching descriptions/keywords
+  if (Array.isArray(transactions) && transactions.length > 0) {
+    for (const tx of transactions) {
+      if (tx.description && tx.category) {
+        const descWords = tx.description.toLowerCase().split(/\s+/).filter((w: string) => w.length >= 3);
+        const matchCount = descWords.filter((w: string) => t.includes(w)).length;
+        if (matchCount >= 2 || (descWords.length === 1 && matchCount === 1)) {
+          const matchedCat = categories.find(c => c.name.toLowerCase() === tx.category.toLowerCase());
+          if (matchedCat) return matchedCat.name;
+        }
+      }
     }
   }
 
-  // 3. Match individual words of category names (e.g. "Food" in "Food & Dining")
+  // 3. Keyword dictionary taxonomy
+  for (const group of CATEGORY_TAXONOMY) {
+    const hasMatch = group.keywords.some(k => {
+      const escaped = k.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      return new RegExp(`\\b${escaped}\\b`, 'i').test(t) || t.includes(k);
+    });
+    if (hasMatch) {
+      for (const targetName of group.target) {
+        const found = categories.find(c =>
+          c.name.toLowerCase() === targetName.toLowerCase() ||
+          c.name.toLowerCase().includes(targetName.toLowerCase()) ||
+          targetName.toLowerCase().includes(c.name.toLowerCase())
+        );
+        if (found) return found.name;
+      }
+    }
+  }
+
+  // 4. Match individual words of category names (e.g. "Food" in "Food & Dining")
   for (const c of categories) {
     const words = c.name.toLowerCase().split(/[\s&,/]+/).filter((w: string) => w.length > 3);
     if (words.some((w: string) => t.includes(w))) return c.name;
@@ -561,7 +795,7 @@ function resolveCategoryFromText(text: string | null | undefined, categories: an
 }
 
 // Helper to resolve an income category from text
-function resolveIncomeCategoryFromText(text: string | null | undefined): 'salaries' | 'allowances' | 'family_income' | 'others' {
+export function resolveIncomeCategoryFromText(text: string | null | undefined): 'salaries' | 'allowances' | 'family_income' | 'others' {
   if (!text) return 'others';
   const t = text.trim().toLowerCase();
   if (t.includes('salary') || t.includes('salaries') || t.includes('payroll') || t.includes('stipend')) return 'salaries';
@@ -571,11 +805,12 @@ function resolveIncomeCategoryFromText(text: string | null | undefined): 'salari
 }
 
 // Local heuristic fallback for common queries or when API is unreachable
-function tryLocalHeuristicFallback(
+export function tryLocalHeuristicFallback(
   command: string,
   accounts: any[],
   categories: any[],
-  currentDate: string
+  currentDate: string,
+  transactions: any[] = []
 ): SmartChatbotResult | null {
   const text = command.trim().toLowerCase();
 
@@ -618,19 +853,20 @@ function tryLocalHeuristicFallback(
   const defaultCashAcc = accounts.find(a => a.account_type === 'cash')?.id || accounts.find(a => a.account_type === 'bank')?.id || accounts[0]?.id || null;
   const defaultIncomeAcc = accounts.find(a => a.account_type === 'bank')?.id || accounts[0]?.id || null;
 
-  // Check if the overall command mentions a common account for the whole batch
+  // Check if the overall command mentions a common account or date for the whole batch
   const overallAccId = resolveAccountFromText(command, accounts, null);
+  const overallDate = parseDateFromText(command, currentDate);
 
   // Split command into candidate transaction segments.
   // CRITICAL: NEVER split on '&' (e.g. "Food & Dining", "Marks & Spencer", "tea & snacks").
-  // Only split on 'and' or commas when followed by a transaction action or amount.
+  // Split on 'and' or commas when followed by transaction actions, merchant/category + amount, or currency amounts.
   const lines = command.trim().split(/\r?\n|;/).map(l => l.trim()).filter(Boolean);
   const segments: string[] = [];
 
   for (const line of lines) {
     const subSegments = line
-      .split(/(?:\s+and\s+(?=(?:spent|paid|withdrew|withdraw|withdrawal|withdrawn|atm|received|got|salary|income|debited|credited|bought|ordered|transferred|transfer|\b(?:₹|rs\.?|inr)?\s*\d+)))|(?:\s*,\s*(?=(?:spent|paid|withdrew|withdraw|withdrawal|withdrawn|atm|received|got|salary|income|debited|credited|bought|ordered|transferred|transfer|\b(?:₹|rs\.?|inr)?\s*\d+)))/i)
-      .map(s => s.trim())
+      .split(/(?:\s+and\s+(?=(?:spent|paid|withdrew|withdraw|withdrawal|withdrawn|atm|received|got|salary|income|debited|credited|bought|ordered|recharged|transferred|transfer|[a-zA-Z&'\s]+\s+\d+|\b(?:₹|rs\.?|inr)?\s*\d+)))|(?:\s*,\s*(?=(?:spent|paid|withdrew|withdraw|withdrawal|withdrawn|atm|received|got|salary|income|debited|credited|bought|ordered|recharged|transferred|transfer|[a-zA-Z&'\s]+\s+\d+|\b(?:₹|rs\.?|inr)?\s*\d+)))/i)
+      .map(s => s.trim().replace(/^\s*(?:\d+[\.\)\-:]+|[#*•\-]|and\b)\s*/i, ''))
       .filter(Boolean);
     segments.push(...subSegments);
   }
@@ -638,8 +874,8 @@ function tryLocalHeuristicFallback(
   const extractedBatch: BatchTransactionItem[] = [];
 
   for (const rawSeg of segments) {
-    // Strip leading list numbering like "1.", "1)", "2 -", "#1", "*", "-"
-    const seg = rawSeg.replace(/^\s*(?:\d+[\.\)\-:]+|[#*•\-])\s*/, '').trim();
+    // Strip leading list numbering like "1.", "1)", "2 -", "#1", "*", "-" or leading "and "
+    const seg = rawSeg.replace(/^\s*(?:\d+[\.\)\-:]+|[#*•\-]|and\b)\s*/i, '').trim();
     if (!seg) continue;
 
     const segText = seg.toLowerCase();
@@ -699,15 +935,11 @@ function tryLocalHeuristicFallback(
     // Account for this segment
     const segAccId = resolveAccountFromText(seg, accounts, null) || overallAccId;
 
-    // Date check
-    let segDate = currentDate;
-    if (segText.includes('yesterday')) {
-      const d = new Date(currentDate);
-      d.setDate(d.getDate() - 1);
-      segDate = d.toISOString().slice(0, 10);
-    }
+    // Date extraction: check segment first, then overall command date
+    const segDate = parseDateFromText(seg, overallDate);
 
     if (isWithdrawal) {
+      const cleanDesc = cleanDescriptionFromText(seg, null, 'withdrawal');
       extractedBatch.push({
         transaction_type: 'withdrawal',
         amount: matchedAmount,
@@ -715,10 +947,11 @@ function tryLocalHeuristicFallback(
         to_account_id: defaultCashAcc,
         category: null,
         income_category: null,
-        description: seg,
+        description: cleanDesc,
         transaction_date: segDate
       });
     } else if (isTransfer) {
+      const cleanDesc = cleanDescriptionFromText(seg, null, 'transfer');
       extractedBatch.push({
         transaction_type: 'transfer',
         amount: matchedAmount,
@@ -726,11 +959,12 @@ function tryLocalHeuristicFallback(
         to_account_id: defaultCashAcc,
         category: null,
         income_category: null,
-        description: seg,
+        description: cleanDesc,
         transaction_date: segDate
       });
     } else if (isIncome) {
       const incCat = resolveIncomeCategoryFromText(seg);
+      const cleanDesc = cleanDescriptionFromText(seg, 'Salary', 'income');
       extractedBatch.push({
         transaction_type: 'income',
         amount: matchedAmount,
@@ -738,11 +972,12 @@ function tryLocalHeuristicFallback(
         to_account_id: segAccId || defaultIncomeAcc,
         category: null,
         income_category: incCat,
-        description: seg,
+        description: cleanDesc,
         transaction_date: segDate
       });
     } else {
-      const expCat = resolveCategoryFromText(seg, categories);
+      const expCat = resolveCategoryFromText(seg, categories, transactions);
+      const cleanDesc = cleanDescriptionFromText(seg, expCat, 'expense');
       extractedBatch.push({
         transaction_type: 'expense',
         amount: matchedAmount,
@@ -750,7 +985,7 @@ function tryLocalHeuristicFallback(
         to_account_id: null,
         category: expCat,
         income_category: null,
-        description: seg,
+        description: cleanDesc,
         transaction_date: segDate
       });
     }
@@ -768,7 +1003,7 @@ function tryLocalHeuristicFallback(
     if (wthCount > 0) countParts.push(`${wthCount} withdrawal${wthCount !== 1 ? 's' : ''}`);
     if (trfCount > 0) countParts.push(`${trfCount} transfer${trfCount !== 1 ? 's' : ''}`);
 
-    const reply = `I've prepared a batch of **${extractedBatch.length} transactions** (${countParts.join(', ')}). All categories and accounts are assigned. Please review and submit to post them!`;
+    const reply = `I've prepared a batch of **${extractedBatch.length} transactions** (${countParts.join(', ')}). All categories, accounts, and dates are assigned. Please review and submit to post them!`;
     return {
       intent: 'transaction',
       extractedInfo: extractedBatch[0],
@@ -783,7 +1018,7 @@ function tryLocalHeuristicFallback(
   if (extractedBatch.length === 1) {
     const single = extractedBatch[0];
     const catName = single.transaction_type === 'expense' ? single.category : single.transaction_type === 'income' ? single.income_category : null;
-    const reply = `I've prepared a ${single.transaction_type} of ₹${single.amount.toLocaleString('en-IN')}${catName ? ` for ${catName}` : ''} on ${single.transaction_date}. Form is auto-filled and ready!`;
+    const reply = `I've prepared a ${single.transaction_type} of ₹${single.amount.toLocaleString('en-IN')}${catName ? ` for ${catName}` : ''}${single.description ? ` (${single.description})` : ''} on ${single.transaction_date}. Form is auto-filled and ready!`;
     return {
       intent: 'transaction',
       extractedInfo: single,
@@ -1225,7 +1460,7 @@ export async function parseSmartChatbotCommand(
             }
           }
         } else if (parsedResult.intent === 'financial_inquiry') {
-          const fallbackInquiry = tryLocalHeuristicFallback(command, accounts, categories, currentDate);
+          const fallbackInquiry = tryLocalHeuristicFallback(command, accounts, categories, currentDate, transactions);
           finalReply = fallbackInquiry?.reply || "Here are your financial inquiry results based on your accounts and records.";
         } else {
           finalReply = "I've processed your request. Let me know if you need to adjust any transaction or account details!";
@@ -1239,7 +1474,7 @@ export async function parseSmartChatbotCommand(
       console.error('Failed to parse final AI output as JSON:', e, fullResponseText);
       
       // Check if heuristic fallback can handle it
-      const fallback = tryLocalHeuristicFallback(command, accounts, categories, currentDate);
+      const fallback = tryLocalHeuristicFallback(command, accounts, categories, currentDate, transactions);
       if (fallback) {
         onComplete(fallback);
         return;
@@ -1259,7 +1494,7 @@ export async function parseSmartChatbotCommand(
     console.error('AI Service Error:', error);
 
     // If API failed (network error, app ID, rate limit), attempt heuristic fallback first
-    const fallback = tryLocalHeuristicFallback(command, accounts, categories, currentDate);
+    const fallback = tryLocalHeuristicFallback(command, accounts, categories, currentDate, transactions);
     if (fallback) {
       onComplete(fallback);
       return;

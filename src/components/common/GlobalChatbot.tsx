@@ -538,7 +538,9 @@ export default function GlobalChatbot() {
                 amount: ext.amount || draft.amount,
                 from_account_id: ext.from_account_id || draft.from_account_id,
                 to_account_id: ext.to_account_id || draft.to_account_id,
-                category: ext.category || draft.category,
+                category: (ext.transaction_type === 'income' || ext.transaction_type === 'withdrawal' || ext.transaction_type === 'transfer')
+                  ? null
+                  : (ext.category || draft.category || categories[0]?.name || 'Others'),
                 income_category: ext.income_category || draft.income_category,
                 description: ext.description || draft.description,
                 transaction_date: ext.transaction_date || draft.transaction_date || today,
