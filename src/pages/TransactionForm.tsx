@@ -179,7 +179,7 @@ export default function TransactionForm() {
 
   // Multi-Transaction Batch Posting State
   interface BatchDraftItem {
-    transaction_type: 'expense' | 'income';
+    transaction_type: 'expense' | 'income' | 'withdrawal' | 'transfer';
     amount: number;
     category: string | null;
     income_category: IncomeCategoryKey | null;
@@ -822,66 +822,96 @@ export default function TransactionForm() {
           if (result.intent === 'transaction') {
             // Check for multi-transaction batch processing
             if (result.batchTransactions && result.batchTransactions.length > 1) {
-              const defaultFromAcc = accounts.find(a => a.account_type === 'bank' || a.account_type === 'cash')?.id || accounts[0]?.id || null;
+              const defaultBankAcc = accounts.find(a => a.account_type === 'bank')?.id || accounts.find(a => a.account_type === 'cash')?.id || accounts[0]?.id || null;
+              const defaultCashAcc = accounts.find(a => a.account_type === 'cash')?.id || accounts.find(a => a.account_type === 'bank')?.id || accounts[0]?.id || null;
               const defaultToAcc = accounts.find(a => a.account_type === 'bank')?.id || accounts[0]?.id || null;
 
               const sanitizedBatch: BatchDraftItem[] = result.batchTransactions
-                .filter((bt: any) => bt.transaction_type === 'income' || bt.transaction_type === 'expense')
+                .filter((bt: any) => ['income', 'expense', 'withdrawal', 'transfer'].includes(bt.transaction_type))
                 .map((bt: any) => {
-                  const isInc = bt.transaction_type === 'income';
+                  const type = bt.transaction_type as 'income' | 'expense' | 'withdrawal' | 'transfer';
+                  const isInc = type === 'income';
+                  const isExp = type === 'expense';
+                  const isWth = type === 'withdrawal';
+                  const isTrf = type === 'transfer';
                   
-                  // Resolve Account strictly to a valid account ID in accounts
-                  let accId: string | null = null;
-                  const rawAcc = isInc ? bt.to_account_id : bt.from_account_id;
-                  if (rawAcc && accounts.some(a => a.id === rawAcc)) {
-                    accId = rawAcc;
-                  } else {
-                    const searchStr = (bt.account_name || rawAcc || '').toLowerCase();
-                    if (searchStr) {
+                  // Resolve from_account_id
+                  let fromId: string | null = null;
+                  if (!isInc) {
+                    const rawFrom = bt.from_account_id || bt.account_name;
+                    if (rawFrom && accounts.some(a => a.id === rawFrom)) {
+                      fromId = rawFrom;
+                    } else if (rawFrom) {
+                      const searchStr = rawFrom.toLowerCase();
                       const matched = accounts.find(a =>
                         a.account_name.toLowerCase().includes(searchStr) ||
                         searchStr.includes(a.account_name.toLowerCase())
                       );
-                      if (matched) accId = matched.id;
+                      if (matched) fromId = matched.id;
                     }
+                    if (!fromId) fromId = defaultBankAcc;
                   }
-                  if (!accId) {
-                    accId = isInc ? defaultToAcc : defaultFromAcc;
+
+                  // Resolve to_account_id
+                  let toId: string | null = null;
+                  if (!isExp) {
+                    const rawTo = bt.to_account_id || (isInc ? bt.account_name : null);
+                    if (rawTo && accounts.some(a => a.id === rawTo)) {
+                      toId = rawTo;
+                    } else if (rawTo) {
+                      const searchStr = rawTo.toLowerCase();
+                      const matched = accounts.find(a =>
+                        a.account_name.toLowerCase().includes(searchStr) ||
+                        searchStr.includes(a.account_name.toLowerCase())
+                      );
+                      if (matched) toId = matched.id;
+                    }
+                    if (!toId) toId = isWth ? defaultCashAcc : defaultToAcc;
                   }
 
                   // Resolve Expense Category
                   let finalCat = bt.category;
-                  if (!isInc && finalCat) {
+                  if (isExp && finalCat) {
                     const matchedCat = categories.find(c =>
                       c.name.toLowerCase() === finalCat.toLowerCase() ||
                       c.name.toLowerCase().includes(finalCat.toLowerCase()) ||
                       finalCat.toLowerCase().includes(c.name.toLowerCase())
                     );
                     finalCat = matchedCat ? matchedCat.name : finalCat;
-                  } else if (!isInc && !finalCat) {
+                  } else if (isExp && !finalCat) {
                     finalCat = categories[0]?.name || 'Others';
+                  } else if (!isExp) {
+                    finalCat = null;
                   }
 
                   // Resolve Income Category
                   let finalIncCat = bt.income_category;
                   if (isInc && finalIncCat) {
+                    const targetInc = finalIncCat;
                     const matchedInc = INCOME_CATEGORIES.find(ic =>
-                      ic.key.toLowerCase() === finalIncCat.toLowerCase() ||
-                      ic.name.toLowerCase() === finalIncCat.toLowerCase()
+                      ic.key.toLowerCase() === targetInc.toLowerCase() ||
+                      ic.name.toLowerCase() === targetInc.toLowerCase()
                     );
-                    finalIncCat = matchedInc ? matchedInc.key : finalIncCat;
+                    finalIncCat = matchedInc ? matchedInc.key : targetInc;
                   } else if (isInc && !finalIncCat) {
                     finalIncCat = 'others';
+                  } else if (!isInc) {
+                    finalIncCat = null;
                   }
 
                   return {
-                    transaction_type: isInc ? 'income' : 'expense',
+                    transaction_type: type,
                     amount: Number(bt.amount) || 0,
-                    from_account_id: isInc ? null : accId,
-                    to_account_id: isInc ? accId : null,
-                    category: isInc ? null : finalCat,
+                    from_account_id: isInc ? null : fromId,
+                    to_account_id: isExp ? null : toId,
+                    category: isExp ? finalCat : null,
                     income_category: isInc ? (finalIncCat as IncomeCategoryKey) : null,
-                    description: bt.description?.trim() || (isInc ? getIncomeCategoryName((finalIncCat || 'others') as any) : (finalCat || 'Expense')),
+                    description: bt.description?.trim() || (
+                      isWth ? 'Cash Withdrawal' :
+                      isTrf ? 'Account Transfer' :
+                      isInc ? getIncomeCategoryName((finalIncCat || 'others') as any) :
+                      (finalCat || 'Expense')
+                    ),
                     transaction_date: bt.transaction_date || today,
                     isPosted: false,
                   };
@@ -894,8 +924,15 @@ export default function TransactionForm() {
 
                 const expCount = sanitizedBatch.filter(b => b.transaction_type === 'expense').length;
                 const incCount = sanitizedBatch.filter(b => b.transaction_type === 'income').length;
+                const wthCount = sanitizedBatch.filter(b => b.transaction_type === 'withdrawal').length;
+                const trfCount = sanitizedBatch.filter(b => b.transaction_type === 'transfer').length;
+                const countParts: string[] = [];
+                if (expCount > 0) countParts.push(`${expCount} expense${expCount !== 1 ? 's' : ''}`);
+                if (incCount > 0) countParts.push(`${incCount} income`);
+                if (wthCount > 0) countParts.push(`${wthCount} withdrawal${wthCount !== 1 ? 's' : ''}`);
+                if (trfCount > 0) countParts.push(`${trfCount} transfer${trfCount !== 1 ? 's' : ''}`);
                 
-                const batchNotice = `📋 I have prepared a batch of **${sanitizedBatch.length} transactions** (${expCount} expense${expCount !== 1 ? 's' : ''}, ${incCount} income).\n\n` +
+                const batchNotice = `📋 I have prepared a batch of **${sanitizedBatch.length} transactions** (${countParts.join(', ')}).\n\n` +
                   `• **Transaction 1 of ${sanitizedBatch.length}** is currently loaded in the form for your review.\n` +
                   `• You can edit & save transactions one-by-one with **Save & Next**, or click **Submit & Post All (${sanitizedBatch.length}) Transactions** to post all at once!`;
 
@@ -1038,7 +1075,7 @@ export default function TransactionForm() {
     if (currentBatch[batchCurrentIndex] && !currentBatch[batchCurrentIndex].isPosted) {
       currentBatch[batchCurrentIndex] = {
         ...currentBatch[batchCurrentIndex],
-        transaction_type: formData.transaction_type === 'income' ? 'income' : 'expense',
+        transaction_type: formData.transaction_type as any,
         amount: Number(formData.amount) || 0,
         from_account_id: formData.from_account_id || null,
         to_account_id: formData.to_account_id || null,
@@ -1051,6 +1088,7 @@ export default function TransactionForm() {
     }
 
     const defaultFromAcc = accounts.find(a => a.account_type === 'bank' || a.account_type === 'cash')?.id || accounts[0]?.id || null;
+    const defaultCashAcc = accounts.find(a => a.account_type === 'cash')?.id || accounts.find(a => a.account_type === 'bank')?.id || accounts[0]?.id || null;
     const defaultToAcc = accounts.find(a => a.account_type === 'bank')?.id || accounts[0]?.id || null;
 
     // 2. Identify unposted items
@@ -1081,14 +1119,6 @@ export default function TransactionForm() {
         });
         return;
       }
-      if (item.transaction_type !== 'income' && item.transaction_type !== 'expense') {
-        toast({
-          title: 'Invalid Transaction Type',
-          description: `Transaction #${idx + 1} is '${item.transaction_type}'. Batch posting supports only Income or Expense.`,
-          variant: 'destructive',
-        });
-        return;
-      }
       if (item.transaction_type === 'expense') {
         if (!item.from_account_id || !accounts.some(a => a.id === item.from_account_id)) {
           item.from_account_id = defaultFromAcc;
@@ -1104,8 +1134,7 @@ export default function TransactionForm() {
         if (!item.category || !item.category.trim()) {
           item.category = categories[0]?.name || 'Others';
         }
-      }
-      if (item.transaction_type === 'income') {
+      } else if (item.transaction_type === 'income') {
         if (!item.to_account_id || !accounts.some(a => a.id === item.to_account_id)) {
           item.to_account_id = defaultToAcc;
         }
@@ -1120,6 +1149,37 @@ export default function TransactionForm() {
         if (!item.income_category || !item.income_category.trim()) {
           item.income_category = 'others';
         }
+      } else if (item.transaction_type === 'withdrawal') {
+        if (!item.from_account_id || !accounts.some(a => a.id === item.from_account_id)) {
+          item.from_account_id = defaultFromAcc;
+        }
+        if (!item.to_account_id || !accounts.some(a => a.id === item.to_account_id)) {
+          item.to_account_id = defaultCashAcc;
+        }
+        if (!item.from_account_id || !item.to_account_id) {
+          toast({
+            title: 'Missing Account',
+            description: `Transaction #${idx + 1} (Withdrawal) requires both source (Bank) and destination (Cash) accounts.`,
+            variant: 'destructive',
+          });
+          return;
+        }
+      } else if (item.transaction_type === 'transfer') {
+        if (!item.from_account_id || !item.to_account_id) {
+          toast({
+            title: 'Missing Account',
+            description: `Transaction #${idx + 1} (Transfer) requires both source and destination accounts.`,
+            variant: 'destructive',
+          });
+          return;
+        }
+      } else {
+        toast({
+          title: 'Invalid Transaction Type',
+          description: `Transaction #${idx + 1} has unsupported type '${item.transaction_type}'.`,
+          variant: 'destructive',
+        });
+        return;
       }
     }
 
@@ -1131,17 +1191,26 @@ export default function TransactionForm() {
     try {
       for (const idx of unpostedIndices) {
         const item = currentBatch[idx];
+        const isExp = item.transaction_type === 'expense';
         const isInc = item.transaction_type === 'income';
+        const isWth = item.transaction_type === 'withdrawal';
+        const isTrf = item.transaction_type === 'transfer';
+
         const payload: any = {
           user_id: user.id,
           transaction_type: item.transaction_type,
           from_account_id: isInc ? null : item.from_account_id,
-          to_account_id: isInc ? item.to_account_id : null,
+          to_account_id: isExp ? null : item.to_account_id,
           amount: Number(item.amount),
           currency: 'INR',
-          category: isInc ? null : (item.category || 'Others'),
+          category: isExp ? (item.category || 'Others') : null,
           income_category: isInc ? (item.income_category || 'others') : null,
-          description: item.description?.trim() || (isInc ? getIncomeCategoryName((item.income_category || 'others') as any) : (item.category || 'Expense')),
+          description: item.description?.trim() || (
+            isWth ? 'Cash Withdrawal' :
+            isTrf ? 'Account Transfer' :
+            isInc ? getIncomeCategoryName((item.income_category || 'others') as any) :
+            (item.category || 'Expense')
+          ),
           transaction_date: item.transaction_date || today,
         };
 

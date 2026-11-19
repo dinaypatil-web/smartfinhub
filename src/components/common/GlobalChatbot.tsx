@@ -422,56 +422,86 @@ export default function GlobalChatbot() {
           
           if (parsedResult.intent === 'transaction') {
             if (parsedResult.batchTransactions && parsedResult.batchTransactions.length > 0) {
-              const defaultBankAcc = accounts.find(a => a.account_type === 'bank' || a.account_type === 'cash') || accounts[0];
+              const defaultBankAcc = accounts.find(a => a.account_type === 'bank') || accounts.find(a => a.account_type === 'cash') || accounts[0];
               const defaultBankAccId = defaultBankAcc ? defaultBankAcc.id : null;
+              const defaultCashAcc = accounts.find(a => a.account_type === 'cash') || accounts.find(a => a.account_type === 'bank') || accounts[0];
+              const defaultCashAccId = defaultCashAcc ? defaultCashAcc.id : null;
               const defaultIncomeAcc = accounts.find(a => a.account_type === 'bank') || accounts[0];
               const defaultIncomeAccId = defaultIncomeAcc ? defaultIncomeAcc.id : null;
               const defaultExpenseCategory = categories[0]?.name || 'Others';
 
               const stagedBatch: DraftTransaction[] = parsedResult.batchTransactions
-                .filter(item => item.transaction_type === 'income' || item.transaction_type === 'expense')
+                .filter(item => ['income', 'expense', 'withdrawal', 'transfer'].includes(item.transaction_type))
                 .map(item => {
-                  const isIncome = item.transaction_type === 'income';
-                  let accId: string | null = null;
-                  const rawAcc = isIncome ? item.to_account_id : item.from_account_id;
-                  if (rawAcc && accounts.some(a => a.id === rawAcc)) {
-                    accId = rawAcc;
-                  } else {
-                    const searchStr = (item.account_name || rawAcc || '').toLowerCase();
-                    if (searchStr) {
+                  const type = item.transaction_type as 'income' | 'expense' | 'withdrawal' | 'transfer';
+                  const isIncome = type === 'income';
+                  const isExpense = type === 'expense';
+                  const isWithdrawal = type === 'withdrawal';
+                  const isTransfer = type === 'transfer';
+
+                  // Resolve from_account_id
+                  let fromId: string | null = null;
+                  if (!isIncome) {
+                    const rawFrom = item.from_account_id || item.account_name;
+                    if (rawFrom && accounts.some(a => a.id === rawFrom)) {
+                      fromId = rawFrom;
+                    } else if (rawFrom) {
+                      const searchStr = rawFrom.toLowerCase();
                       const matched = accounts.find(a =>
                         a.account_name.toLowerCase().includes(searchStr) ||
                         searchStr.includes(a.account_name.toLowerCase())
                       );
-                      if (matched) accId = matched.id;
+                      if (matched) fromId = matched.id;
                     }
-                  }
-                  if (!accId) {
-                    accId = isIncome ? defaultIncomeAccId : defaultBankAccId;
+                    if (!fromId) fromId = defaultBankAccId;
                   }
 
-                  let finalCategory = !isIncome ? item.category?.trim() : null;
-                  if (!isIncome && finalCategory) {
+                  // Resolve to_account_id
+                  let toId: string | null = null;
+                  if (!isExpense) {
+                    const rawTo = item.to_account_id || (isIncome ? item.account_name : null);
+                    if (rawTo && accounts.some(a => a.id === rawTo)) {
+                      toId = rawTo;
+                    } else if (rawTo) {
+                      const searchStr = rawTo.toLowerCase();
+                      const matched = accounts.find(a =>
+                        a.account_name.toLowerCase().includes(searchStr) ||
+                        searchStr.includes(a.account_name.toLowerCase())
+                      );
+                      if (matched) toId = matched.id;
+                    }
+                    if (!toId) toId = isWithdrawal ? defaultCashAccId : defaultIncomeAccId;
+                  }
+
+                  let finalCategory = isExpense ? item.category?.trim() : null;
+                  if (isExpense && finalCategory) {
                     const matchedCat = categories.find(c =>
                       c.name.toLowerCase() === finalCategory!.toLowerCase() ||
                       c.name.toLowerCase().includes(finalCategory!.toLowerCase()) ||
                       finalCategory!.toLowerCase().includes(c.name.toLowerCase())
                     );
                     finalCategory = matchedCat ? matchedCat.name : finalCategory;
-                  } else if (!isIncome && !finalCategory) {
+                  } else if (isExpense && !finalCategory) {
                     finalCategory = defaultExpenseCategory;
+                  } else if (!isExpense) {
+                    finalCategory = null;
                   }
 
                   const finalIncomeCategory = isIncome ? ((item.income_category as any) || 'others') : null;
 
                   return {
-                    transaction_type: isIncome ? 'income' : 'expense',
+                    transaction_type: type,
                     amount: item.amount > 0 ? item.amount : null,
-                    from_account_id: !isIncome ? accId : null,
-                    to_account_id: isIncome ? accId : null,
-                    category: finalCategory || null,
-                    income_category: finalIncomeCategory,
-                    description: item.description?.trim() || (isIncome ? getIncomeCategoryName(finalIncomeCategory || 'others') : (finalCategory || 'Expense')),
+                    from_account_id: isIncome ? null : fromId,
+                    to_account_id: isExpense ? null : toId,
+                    category: isExpense ? (finalCategory || 'Others') : null,
+                    income_category: isIncome ? (finalIncomeCategory || 'others') : null,
+                    description: item.description?.trim() || (
+                      isWithdrawal ? 'Cash Withdrawal' :
+                      isTransfer ? 'Account Transfer' :
+                      isIncome ? getIncomeCategoryName(finalIncomeCategory || 'others') :
+                      (finalCategory || 'Expense')
+                    ),
                     transaction_date: item.transaction_date || today,
                     is_emi: false,
                     emi_months: null,
@@ -803,7 +833,7 @@ export default function GlobalChatbot() {
   const handleSaveBatchTransactions = async () => {
     if (!user || batchDrafts.length === 0) return;
 
-    // Validate that only income/expense are present and required fields are set
+    // Validate batch items: types and required accounts & categories
     for (let i = 0; i < batchDrafts.length; i++) {
       const item = batchDrafts[i];
       if (!item.amount || item.amount <= 0) {
@@ -814,35 +844,53 @@ export default function GlobalChatbot() {
         });
         return;
       }
-      if (item.transaction_type !== 'income' && item.transaction_type !== 'expense') {
+      if (item.transaction_type === 'income') {
+        if (!item.to_account_id) {
+          toast({
+            title: `Account missing in #${i + 1}`,
+            description: `Please select an account for transaction #${i + 1}.`,
+            variant: 'destructive'
+          });
+          return;
+        }
+        if (!item.income_category) {
+          toast({
+            title: `Category missing in #${i + 1}`,
+            description: `Income category cannot remain blank for transaction #${i + 1}.`,
+            variant: 'destructive'
+          });
+          return;
+        }
+      } else if (item.transaction_type === 'expense') {
+        if (!item.from_account_id) {
+          toast({
+            title: `Account missing in #${i + 1}`,
+            description: `Please select an account for transaction #${i + 1}.`,
+            variant: 'destructive'
+          });
+          return;
+        }
+        if (!item.category?.trim()) {
+          toast({
+            title: `Category missing in #${i + 1}`,
+            description: `Expense category cannot remain blank for transaction #${i + 1}.`,
+            variant: 'destructive'
+          });
+          return;
+        }
+      } else if (item.transaction_type === 'withdrawal' || item.transaction_type === 'transfer') {
+        if (!item.from_account_id || !item.to_account_id) {
+          toast({
+            title: `Account missing in #${i + 1}`,
+            description: `Transaction #${i + 1} (${item.transaction_type}) requires both source and destination accounts.`,
+            variant: 'destructive'
+          });
+          return;
+        }
+      } else {
         toast({
           title: `Batch Error in #${i + 1}`,
-          description: `Only Income and Expense transactions are supported in multi-transaction batches.`,
-          variant: 'destructive'
-        });
-        return;
-      }
-      const accId = item.transaction_type === 'income' ? item.to_account_id : item.from_account_id;
-      if (!accId) {
-        toast({
-          title: `Account missing in #${i + 1}`,
-          description: `Please select an account for transaction #${i + 1}.`,
-          variant: 'destructive'
-        });
-        return;
-      }
-      if (item.transaction_type === 'income' && !item.income_category) {
-        toast({
-          title: `Category missing in #${i + 1}`,
-          description: `Income category cannot remain blank for transaction #${i + 1}.`,
-          variant: 'destructive'
-        });
-        return;
-      }
-      if (item.transaction_type === 'expense' && !item.category?.trim()) {
-        toast({
-          title: `Category missing in #${i + 1}`,
-          description: `Expense category cannot remain blank for transaction #${i + 1}.`,
+          description: `Unsupported transaction type '${item.transaction_type}' in batch.`,
           variant: 'destructive'
         });
         return;
@@ -860,18 +908,25 @@ export default function GlobalChatbot() {
       for (let idx = 0; idx < total; idx++) {
         const item = batchDrafts[idx];
         const isIncome = item.transaction_type === 'income';
-        const accId = isIncome ? item.to_account_id : item.from_account_id;
+        const isExpense = item.transaction_type === 'expense';
+        const isWth = item.transaction_type === 'withdrawal';
+        const isTrf = item.transaction_type === 'transfer';
 
         const payload = {
           user_id: user.id,
           transaction_type: item.transaction_type!,
-          from_account_id: isIncome ? null : accId,
-          to_account_id: isIncome ? accId : null,
+          from_account_id: isIncome ? null : item.from_account_id,
+          to_account_id: isExpense ? null : item.to_account_id,
           amount: Number(item.amount),
           currency: 'INR',
-          category: !isIncome ? (item.category || 'Others') : null,
+          category: isExpense ? (item.category || 'Others') : null,
           income_category: isIncome ? (item.income_category || 'others') : null,
-          description: item.description?.trim() || (!isIncome ? (item.category || 'Expense') : getIncomeCategoryName(item.income_category || 'others')),
+          description: item.description?.trim() || (
+            isWth ? 'Cash Withdrawal' :
+            isTrf ? 'Account Transfer' :
+            isIncome ? getIncomeCategoryName(item.income_category || 'others') :
+            (item.category || 'Expense')
+          ),
           transaction_date: item.transaction_date || new Date().toISOString().slice(0, 10),
         };
 
@@ -1338,23 +1393,54 @@ export default function GlobalChatbot() {
 
                       {batchDrafts.length > 0 && (
                         <div className="max-h-48 overflow-y-auto space-y-1.5 my-1 pr-1">
-                          {batchDrafts.map((item, idx) => (
-                            <div key={idx} className="bg-slate-900/80 border border-white/5 rounded-lg p-2 text-[10px] space-y-1">
-                              <div className="flex justify-between items-center font-bold">
-                                <span className="text-teal-400">#{idx + 1} of {batchDrafts.length}</span>
-                                <Badge className={item.transaction_type === 'income' ? 'bg-emerald-500/20 text-emerald-300 text-[9px] py-0 px-1.5' : 'bg-red-500/20 text-red-300 text-[9px] py-0 px-1.5'}>
-                                  {item.transaction_type?.toUpperCase()} • ₹{Number(item.amount || 0).toLocaleString('en-IN')}
-                                </Badge>
+                          {batchDrafts.map((item, idx) => {
+                            const isExpense = item.transaction_type === 'expense';
+                            const isIncome = item.transaction_type === 'income';
+                            const isWithdrawal = item.transaction_type === 'withdrawal';
+                            const isTransfer = item.transaction_type === 'transfer';
+
+                            return (
+                              <div key={idx} className="bg-slate-900/80 border border-white/5 rounded-lg p-2 text-[10px] space-y-1">
+                                <div className="flex justify-between items-center font-bold">
+                                  <span className="text-teal-400">#{idx + 1} of {batchDrafts.length}</span>
+                                  <Badge className={
+                                    isExpense ? 'bg-red-500/20 text-red-300 text-[9px] py-0 px-1.5' :
+                                    isIncome ? 'bg-emerald-500/20 text-emerald-300 text-[9px] py-0 px-1.5' :
+                                    isWithdrawal ? 'bg-amber-500/20 text-amber-300 text-[9px] py-0 px-1.5' :
+                                    'bg-sky-500/20 text-sky-300 text-[9px] py-0 px-1.5'
+                                  }>
+                                    {item.transaction_type?.toUpperCase()} • ₹{Number(item.amount || 0).toLocaleString('en-IN')}
+                                  </Badge>
+                                </div>
+                                <div className="flex justify-between text-slate-300">
+                                  {isWithdrawal ? (
+                                    <>
+                                      <span>From: <strong className="text-white">{getAccountName(item.from_account_id) || 'Bank'}</strong></span>
+                                      <span>To Cash: <strong className="text-white">{getAccountName(item.to_account_id) || 'Cash Wallet'}</strong></span>
+                                    </>
+                                  ) : isTransfer ? (
+                                    <>
+                                      <span>From: <strong className="text-white">{getAccountName(item.from_account_id) || 'Account'}</strong></span>
+                                      <span>To: <strong className="text-white">{getAccountName(item.to_account_id) || 'Account'}</strong></span>
+                                    </>
+                                  ) : isIncome ? (
+                                    <>
+                                      <span>Category: <strong className="text-white">{getIncomeCategoryName(item.income_category || 'others')}</strong></span>
+                                      <span>Account: <strong className="text-white">{getAccountName(item.to_account_id) || 'Default'}</strong></span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span>Category: <strong className="text-white">{item.category || 'Others'}</strong></span>
+                                      <span>Account: <strong className="text-white">{getAccountName(item.from_account_id) || 'Default'}</strong></span>
+                                    </>
+                                  )}
+                                </div>
+                                {item.description && (
+                                  <p className="text-slate-400 italic truncate">"{item.description}"</p>
+                                )}
                               </div>
-                              <div className="flex justify-between text-slate-300">
-                                <span>Category: <strong className="text-white">{item.transaction_type === 'income' ? getIncomeCategoryName(item.income_category || 'others') : (item.category || 'Others')}</strong></span>
-                                <span>Account: <strong className="text-white">{getAccountName(item.transaction_type === 'income' ? item.to_account_id : item.from_account_id) || 'Default'}</strong></span>
-                              </div>
-                              {item.description && (
-                                <p className="text-slate-400 italic truncate">"{item.description}"</p>
-                              )}
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
 

@@ -698,57 +698,103 @@ export default function VoiceTransactPage() {
           
           if (parsedResult.intent === 'transaction') {
             if (parsedResult.batchTransactions && parsedResult.batchTransactions.length > 1) {
-              const defaultFromAcc = accounts.find(a => a.account_type === 'bank' || a.account_type === 'cash')?.id || accounts[0]?.id || null;
+              const defaultBankAcc = accounts.find(a => a.account_type === 'bank')?.id || accounts.find(a => a.account_type === 'cash')?.id || accounts[0]?.id || null;
+              const defaultCashAcc = accounts.find(a => a.account_type === 'cash')?.id || accounts.find(a => a.account_type === 'bank')?.id || accounts[0]?.id || null;
               const defaultToAcc = accounts.find(a => a.account_type === 'bank')?.id || accounts[0]?.id || null;
 
-              const sanitizedBatch: DraftTransaction[] = parsedResult.batchTransactions.map(bt => {
-                const isInc = bt.transaction_type === 'income';
-                let accId: string | null = null;
-                const rawAcc = isInc ? bt.to_account_id : bt.from_account_id;
-                if (rawAcc && accounts.some(a => a.id === rawAcc)) {
-                  accId = rawAcc;
-                } else {
-                  const searchStr = (bt.account_name || rawAcc || '').toLowerCase();
-                  if (searchStr) {
-                    const matched = accounts.find(a =>
-                      a.account_name.toLowerCase().includes(searchStr) ||
-                      searchStr.includes(a.account_name.toLowerCase())
-                    );
-                    if (matched) accId = matched.id;
+              const sanitizedBatch: DraftTransaction[] = parsedResult.batchTransactions
+                .filter(bt => ['income', 'expense', 'withdrawal', 'transfer'].includes(bt.transaction_type))
+                .map(bt => {
+                  const type = bt.transaction_type as 'income' | 'expense' | 'withdrawal' | 'transfer';
+                  const isInc = type === 'income';
+                  const isExp = type === 'expense';
+                  const isWth = type === 'withdrawal';
+                  const isTrf = type === 'transfer';
+
+                  // Resolve from_account_id
+                  let fromId: string | null = null;
+                  if (!isInc) {
+                    const rawFrom = bt.from_account_id || bt.account_name;
+                    if (rawFrom && accounts.some(a => a.id === rawFrom)) {
+                      fromId = rawFrom;
+                    } else if (rawFrom) {
+                      const searchStr = rawFrom.toLowerCase();
+                      const matched = accounts.find(a =>
+                        a.account_name.toLowerCase().includes(searchStr) ||
+                        searchStr.includes(a.account_name.toLowerCase())
+                      );
+                      if (matched) fromId = matched.id;
+                    }
+                    if (!fromId) fromId = defaultBankAcc;
                   }
-                }
-                if (!accId) {
-                  accId = isInc ? defaultToAcc : defaultFromAcc;
-                }
 
-                // Resolve category
-                let finalCat: string | null = bt.category || null;
-                if (!isInc && finalCat) {
-                  const targetCat = finalCat;
-                  const matchedCat = categories.find(c =>
-                    c.name.toLowerCase() === targetCat.toLowerCase() ||
-                    c.name.toLowerCase().includes(targetCat.toLowerCase()) ||
-                    targetCat.toLowerCase().includes(c.name.toLowerCase())
-                  );
-                  finalCat = matchedCat ? matchedCat.name : targetCat;
-                } else if (!isInc && !finalCat) {
-                  finalCat = categories[0]?.name || 'Others';
-                }
+                  // Resolve to_account_id
+                  let toId: string | null = null;
+                  if (!isExp) {
+                    const rawTo = bt.to_account_id || (isInc ? bt.account_name : null);
+                    if (rawTo && accounts.some(a => a.id === rawTo)) {
+                      toId = rawTo;
+                    } else if (rawTo) {
+                      const searchStr = rawTo.toLowerCase();
+                      const matched = accounts.find(a =>
+                        a.account_name.toLowerCase().includes(searchStr) ||
+                        searchStr.includes(a.account_name.toLowerCase())
+                      );
+                      if (matched) toId = matched.id;
+                    }
+                    if (!toId) toId = isWth ? defaultCashAcc : defaultToAcc;
+                  }
 
-                return {
-                  transaction_type: isInc ? 'income' : 'expense',
-                  amount: Number(bt.amount) || 0,
-                  from_account_id: isInc ? null : accId,
-                  to_account_id: isInc ? accId : null,
-                  category: isInc ? null : (finalCat || 'Others'),
-                  income_category: isInc ? (bt.income_category || 'others') : null,
-                  description: bt.description || (isInc ? getIncomeCategoryName((bt.income_category || 'others') as any) : (finalCat || 'Expense')),
-                  transaction_date: bt.transaction_date || today,
-                  is_emi: false,
-                  emi_months: null,
-                  bank_charges: null
-                };
-              });
+                  // Resolve category
+                  let finalCat: string | null = bt.category || null;
+                  if (isExp && finalCat) {
+                    const targetCat = finalCat;
+                    const matchedCat = categories.find(c =>
+                      c.name.toLowerCase() === targetCat.toLowerCase() ||
+                      c.name.toLowerCase().includes(targetCat.toLowerCase()) ||
+                      targetCat.toLowerCase().includes(c.name.toLowerCase())
+                    );
+                    finalCat = matchedCat ? matchedCat.name : targetCat;
+                  } else if (isExp && !finalCat) {
+                    finalCat = categories[0]?.name || 'Others';
+                  } else if (!isExp) {
+                    finalCat = null;
+                  }
+
+                  // Resolve Income Category
+                  let finalIncCat = bt.income_category;
+                  if (isInc && finalIncCat) {
+                    const targetInc = finalIncCat;
+                    const matchedInc = INCOME_CATEGORIES.find(ic =>
+                      ic.key.toLowerCase() === targetInc.toLowerCase() ||
+                      ic.name.toLowerCase() === targetInc.toLowerCase()
+                    );
+                    finalIncCat = matchedInc ? (matchedInc.key as any) : targetInc;
+                  } else if (isInc && !finalIncCat) {
+                    finalIncCat = 'others';
+                  } else if (!isInc) {
+                    finalIncCat = null;
+                  }
+
+                  return {
+                    transaction_type: type,
+                    amount: Number(bt.amount) || 0,
+                    from_account_id: isInc ? null : fromId,
+                    to_account_id: isExp ? null : toId,
+                    category: isExp ? (finalCat || 'Others') : null,
+                    income_category: isInc ? (finalIncCat || 'others') : null,
+                    description: bt.description || (
+                      isWth ? 'Cash Withdrawal' :
+                      isTrf ? 'Account Transfer' :
+                      isInc ? getIncomeCategoryName((finalIncCat || 'others') as any) :
+                      (finalCat || 'Expense')
+                    ),
+                    transaction_date: bt.transaction_date || today,
+                    is_emi: false,
+                    emi_months: null,
+                    bank_charges: null
+                  };
+                });
 
               setBatchDrafts(sanitizedBatch);
               setDraft(sanitizedBatch[0]);
@@ -1127,21 +1173,13 @@ export default function VoiceTransactPage() {
   const handleSaveBatchTransactions = async () => {
     if (!user || batchDrafts.length === 0) return;
     
-    // Validate each item: only income or expense, account required, category required (must not be blank!)
+    // Validate each item: supported types, accounts required, category required (must not be blank!)
     for (let i = 0; i < batchDrafts.length; i++) {
       const item = batchDrafts[i];
       if (!item.amount || item.amount <= 0) {
         toast({
           title: 'Validation Error',
           description: `Transaction #${i + 1} has an invalid amount.`,
-          variant: 'destructive'
-        });
-        return;
-      }
-      if (item.transaction_type !== 'income' && item.transaction_type !== 'expense') {
-        toast({
-          title: 'Invalid Transaction Type',
-          description: `Transaction #${i + 1} is '${item.transaction_type}'. Batch posting allows only Income or Expense transactions.`,
           variant: 'destructive'
         });
         return;
@@ -1163,8 +1201,7 @@ export default function VoiceTransactPage() {
           });
           return;
         }
-      }
-      if (item.transaction_type === 'income') {
+      } else if (item.transaction_type === 'income') {
         if (!item.to_account_id) {
           toast({
             title: 'Missing Account',
@@ -1181,6 +1218,31 @@ export default function VoiceTransactPage() {
           });
           return;
         }
+      } else if (item.transaction_type === 'withdrawal') {
+        if (!item.from_account_id || !item.to_account_id) {
+          toast({
+            title: 'Missing Account',
+            description: `Transaction #${i + 1} (Withdrawal) requires both source (Bank) and destination (Cash) accounts.`,
+            variant: 'destructive'
+          });
+          return;
+        }
+      } else if (item.transaction_type === 'transfer') {
+        if (!item.from_account_id || !item.to_account_id) {
+          toast({
+            title: 'Missing Account',
+            description: `Transaction #${i + 1} (Transfer) requires both source and destination accounts.`,
+            variant: 'destructive'
+          });
+          return;
+        }
+      } else {
+        toast({
+          title: 'Invalid Transaction Type',
+          description: `Transaction #${i + 1} has unsupported type '${item.transaction_type}'.`,
+          variant: 'destructive'
+        });
+        return;
       }
     }
 
@@ -1191,17 +1253,26 @@ export default function VoiceTransactPage() {
     try {
       for (let i = 0; i < total; i++) {
         const item = batchDrafts[i];
+        const isExp = item.transaction_type === 'expense';
         const isInc = item.transaction_type === 'income';
+        const isWth = item.transaction_type === 'withdrawal';
+        const isTrf = item.transaction_type === 'transfer';
+
         const transactionPayload = {
           user_id: user.id,
           transaction_type: item.transaction_type!,
           from_account_id: isInc ? null : item.from_account_id,
-          to_account_id: isInc ? item.to_account_id : null,
+          to_account_id: isExp ? null : item.to_account_id,
           amount: Number(item.amount),
           currency: 'INR',
-          category: isInc ? null : (item.category || 'Others'),
+          category: isExp ? (item.category || 'Others') : null,
           income_category: isInc ? (item.income_category || 'others') : null,
-          description: item.description?.trim() || (isInc ? getIncomeCategoryName((item.income_category || 'others') as any) : (item.category || 'Expense')),
+          description: item.description?.trim() || (
+            isWth ? 'Cash Withdrawal' :
+            isTrf ? 'Account Transfer' :
+            isInc ? getIncomeCategoryName((item.income_category || 'others') as any) :
+            (item.category || 'Expense')
+          ),
           transaction_date: item.transaction_date || today
         };
 
@@ -3133,6 +3204,10 @@ export default function VoiceTransactPage() {
                         <div className="space-y-3">
                           {batchDrafts.map((item, idx) => {
                             const isExpense = item.transaction_type === 'expense';
+                            const isIncome = item.transaction_type === 'income';
+                            const isWithdrawal = item.transaction_type === 'withdrawal';
+                            const isTransfer = item.transaction_type === 'transfer';
+
                             return (
                               <div
                                 key={idx}
@@ -3143,8 +3218,13 @@ export default function VoiceTransactPage() {
                                     <span className="font-bold text-slate-300 font-mono text-[11px]">
                                       #{idx + 1} of {batchDrafts.length}
                                     </span>
-                                    <Badge className={isExpense ? "bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[10px]" : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px]"}>
-                                      {isExpense ? 'Expense' : 'Income'}
+                                    <Badge className={
+                                      isExpense ? "bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[10px]" :
+                                      isIncome ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px]" :
+                                      isWithdrawal ? "bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px]" :
+                                      "bg-sky-500/20 text-sky-300 border border-sky-500/30 text-[10px]"
+                                    }>
+                                      {isExpense ? 'Expense' : isIncome ? 'Income' : isWithdrawal ? 'Withdrawal' : 'Transfer'}
                                     </Badge>
                                   </div>
                                   <div className="flex items-center gap-2">
@@ -3164,66 +3244,156 @@ export default function VoiceTransactPage() {
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-2 pt-1">
-                                  <div>
-                                    <label className="text-[10px] text-slate-400 block mb-0.5 font-medium">
-                                      Category (Required) *
-                                    </label>
-                                    {isExpense ? (
-                                      <Select
-                                        value={item.category || ''}
-                                        onValueChange={(val) => handleUpdateBatchDraftItem(idx, { category: val })}
-                                      >
-                                        <SelectTrigger className="h-7 text-[11px] bg-slate-950/60 border-slate-700">
-                                          <SelectValue placeholder="Select Category" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {categories.map(c => (
-                                            <SelectItem key={c.id || c.name} value={c.name} className="text-xs">
-                                              {c.name}
-                                            </SelectItem>
-                                          ))}
-                                          <SelectItem value="Others" className="text-xs">Others</SelectItem>
-                                        </SelectContent>
-                                      </Select>
-                                    ) : (
-                                      <Select
-                                        value={item.income_category || 'others'}
-                                        onValueChange={(val: any) => handleUpdateBatchDraftItem(idx, { income_category: val })}
-                                      >
-                                        <SelectTrigger className="h-7 text-[11px] bg-slate-950/60 border-slate-700">
-                                          <SelectValue placeholder="Select Income Category" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {INCOME_CATEGORIES.map(c => (
-                                            <SelectItem key={c.key} value={c.key} className="text-xs">
-                                              {c.icon} {c.name}
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                    )}
-                                  </div>
+                                  {isWithdrawal ? (
+                                    <>
+                                      <div>
+                                        <label className="text-[10px] text-slate-400 block mb-0.5 font-medium">
+                                          Withdrawn From (Bank) *
+                                        </label>
+                                        <Select
+                                          value={item.from_account_id || ''}
+                                          onValueChange={(val) => handleUpdateBatchDraftItem(idx, { from_account_id: val })}
+                                        >
+                                          <SelectTrigger className="h-7 text-[11px] bg-slate-950/60 border-slate-700">
+                                            <SelectValue placeholder="Select Bank" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {accounts.filter(a => a.account_type === 'bank' || a.account_type === 'credit_card').map(acc => (
+                                              <SelectItem key={acc.id} value={acc.id} className="text-xs">
+                                                {acc.account_name} ({acc.account_type})
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                      <div>
+                                        <label className="text-[10px] text-slate-400 block mb-0.5 font-medium">
+                                          Deposited In (Cash Wallet) *
+                                        </label>
+                                        <Select
+                                          value={item.to_account_id || ''}
+                                          onValueChange={(val) => handleUpdateBatchDraftItem(idx, { to_account_id: val })}
+                                        >
+                                          <SelectTrigger className="h-7 text-[11px] bg-slate-950/60 border-slate-700">
+                                            <SelectValue placeholder="Select Cash Account" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {accounts.filter(a => a.account_type === 'cash' || a.account_type === 'bank').map(acc => (
+                                              <SelectItem key={acc.id} value={acc.id} className="text-xs">
+                                                {acc.account_name} ({acc.account_type})
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                    </>
+                                  ) : isTransfer ? (
+                                    <>
+                                      <div>
+                                        <label className="text-[10px] text-slate-400 block mb-0.5 font-medium">
+                                          Transfer From *
+                                        </label>
+                                        <Select
+                                          value={item.from_account_id || ''}
+                                          onValueChange={(val) => handleUpdateBatchDraftItem(idx, { from_account_id: val })}
+                                        >
+                                          <SelectTrigger className="h-7 text-[11px] bg-slate-950/60 border-slate-700">
+                                            <SelectValue placeholder="Select Source Account" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {accounts.map(acc => (
+                                              <SelectItem key={acc.id} value={acc.id} className="text-xs">
+                                                {acc.account_name} ({acc.account_type})
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                      <div>
+                                        <label className="text-[10px] text-slate-400 block mb-0.5 font-medium">
+                                          Transfer To *
+                                        </label>
+                                        <Select
+                                          value={item.to_account_id || ''}
+                                          onValueChange={(val) => handleUpdateBatchDraftItem(idx, { to_account_id: val })}
+                                        >
+                                          <SelectTrigger className="h-7 text-[11px] bg-slate-950/60 border-slate-700">
+                                            <SelectValue placeholder="Select Dest Account" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {accounts.map(acc => (
+                                              <SelectItem key={acc.id} value={acc.id} className="text-xs">
+                                                {acc.account_name} ({acc.account_type})
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <div>
+                                        <label className="text-[10px] text-slate-400 block mb-0.5 font-medium">
+                                          Category (Required) *
+                                        </label>
+                                        {isExpense ? (
+                                          <Select
+                                            value={item.category || ''}
+                                            onValueChange={(val) => handleUpdateBatchDraftItem(idx, { category: val })}
+                                          >
+                                            <SelectTrigger className="h-7 text-[11px] bg-slate-950/60 border-slate-700">
+                                              <SelectValue placeholder="Select Category" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              {categories.map(c => (
+                                                <SelectItem key={c.id || c.name} value={c.name} className="text-xs">
+                                                  {c.name}
+                                                </SelectItem>
+                                              ))}
+                                              <SelectItem value="Others" className="text-xs">Others</SelectItem>
+                                            </SelectContent>
+                                          </Select>
+                                        ) : (
+                                          <Select
+                                            value={item.income_category || 'others'}
+                                            onValueChange={(val: any) => handleUpdateBatchDraftItem(idx, { income_category: val })}
+                                          >
+                                            <SelectTrigger className="h-7 text-[11px] bg-slate-950/60 border-slate-700">
+                                              <SelectValue placeholder="Select Income Category" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              {INCOME_CATEGORIES.map(c => (
+                                                <SelectItem key={c.key} value={c.key} className="text-xs">
+                                                  {c.icon} {c.name}
+                                                </SelectItem>
+                                              ))}
+                                            </SelectContent>
+                                          </Select>
+                                        )}
+                                      </div>
 
-                                  <div>
-                                    <label className="text-[10px] text-slate-400 block mb-0.5 font-medium">
-                                      {isExpense ? 'Paid From Account *' : 'Received In Account *'}
-                                    </label>
-                                    <Select
-                                      value={isExpense ? (item.from_account_id || '') : (item.to_account_id || '')}
-                                      onValueChange={(val) => handleUpdateBatchDraftItem(idx, isExpense ? { from_account_id: val } : { to_account_id: val })}
-                                    >
-                                      <SelectTrigger className="h-7 text-[11px] bg-slate-950/60 border-slate-700">
-                                        <SelectValue placeholder="Select Account" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {accounts.map(acc => (
-                                          <SelectItem key={acc.id} value={acc.id} className="text-xs">
-                                            {acc.account_name} ({acc.account_type})
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
+                                      <div>
+                                        <label className="text-[10px] text-slate-400 block mb-0.5 font-medium">
+                                          {isExpense ? 'Paid From Account *' : 'Received In Account *'}
+                                        </label>
+                                        <Select
+                                          value={isExpense ? (item.from_account_id || '') : (item.to_account_id || '')}
+                                          onValueChange={(val) => handleUpdateBatchDraftItem(idx, isExpense ? { from_account_id: val } : { to_account_id: val })}
+                                        >
+                                          <SelectTrigger className="h-7 text-[11px] bg-slate-950/60 border-slate-700">
+                                            <SelectValue placeholder="Select Account" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {accounts.map(acc => (
+                                              <SelectItem key={acc.id} value={acc.id} className="text-xs">
+                                                {acc.account_name} ({acc.account_type})
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                    </>
+                                  )}
                                 </div>
 
                                 <div className="text-[11px] text-slate-400 truncate pt-0.5">

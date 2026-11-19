@@ -398,7 +398,7 @@ Be realistic and practical. Focus on sustainable changes.`;
 }
 
 export interface BatchTransactionItem {
-  transaction_type: 'income' | 'expense';
+  transaction_type: 'income' | 'expense' | 'withdrawal' | 'transfer';
   amount: number;
   from_account_id?: string | null;
   to_account_id?: string | null;
@@ -614,18 +614,22 @@ function tryLocalHeuristicFallback(
   }
 
   // 3. Quick transaction extraction fallback (supporting both single and multi-transaction)
-  const defaultBankAcc = accounts.find(a => a.account_type === 'bank' || a.account_type === 'cash')?.id || accounts[0]?.id || null;
+  const defaultBankAcc = accounts.find(a => a.account_type === 'bank')?.id || accounts.find(a => a.account_type === 'cash')?.id || accounts[0]?.id || null;
+  const defaultCashAcc = accounts.find(a => a.account_type === 'cash')?.id || accounts.find(a => a.account_type === 'bank')?.id || accounts[0]?.id || null;
   const defaultIncomeAcc = accounts.find(a => a.account_type === 'bank')?.id || accounts[0]?.id || null;
 
   // Check if the overall command mentions a common account for the whole batch
   const overallAccId = resolveAccountFromText(command, accounts, null);
 
-  // Split command into candidate transaction segments
+  // Split command into candidate transaction segments.
+  // CRITICAL: NEVER split on '&' (e.g. "Food & Dining", "Marks & Spencer", "tea & snacks").
+  // Only split on 'and' or commas when followed by a transaction action or amount.
   const lines = command.trim().split(/\r?\n|;/).map(l => l.trim()).filter(Boolean);
   const segments: string[] = [];
 
   for (const line of lines) {
-    const subSegments = line.split(/(?:\s+(?:and|&|\+)\s+)|(?:\s*,\s*(?=(?:spent|paid|received|got|salary|income|debited|credited|for|\d+|[a-zA-Z]+\s+\d+)))/i)
+    const subSegments = line
+      .split(/(?:\s+and\s+(?=(?:spent|paid|withdrew|withdraw|withdrawal|withdrawn|atm|received|got|salary|income|debited|credited|bought|ordered|transferred|transfer|\b(?:₹|rs\.?|inr)?\s*\d+)))|(?:\s*,\s*(?=(?:spent|paid|withdrew|withdraw|withdrawal|withdrawn|atm|received|got|salary|income|debited|credited|bought|ordered|transferred|transfer|\b(?:₹|rs\.?|inr)?\s*\d+)))/i)
       .map(s => s.trim())
       .filter(Boolean);
     segments.push(...subSegments);
@@ -660,18 +664,37 @@ function tryLocalHeuristicFallback(
 
     if (!matchedAmount || isNaN(matchedAmount) || matchedAmount <= 0) continue;
 
+    // Detect withdrawal
+    const isWithdrawal = segText.includes('withdrew') ||
+                         segText.includes('withdraw') ||
+                         segText.includes('withdrawal') ||
+                         segText.includes('withdrawn') ||
+                         segText.includes('atm') ||
+                         segText.includes('cash withdrawal') ||
+                         (segText.includes('cash') && (segText.includes('from bank') || segText.includes('from atm')));
+
+    // Detect transfer
+    const isTransfer = !isWithdrawal && (
+      segText.includes('transfer') ||
+      segText.includes('transferred') ||
+      segText.includes('sent to') ||
+      segText.includes('moved to')
+    );
+
     // Detect income vs expense
     // WARNING: "credit card" does NOT mean income
     const cleanedForIncome = segText.replace(/credit\s*card|creditcard|\bcc\b/g, '');
-    const isIncome = cleanedForIncome.includes('salary') ||
-                     cleanedForIncome.includes('income') ||
-                     cleanedForIncome.includes('received') ||
-                     cleanedForIncome.includes('got paid') ||
-                     cleanedForIncome.includes('credited') ||
-                     cleanedForIncome.includes('deposit') ||
-                     cleanedForIncome.includes('earned') ||
-                     cleanedForIncome.includes('refund') ||
-                     cleanedForIncome.includes('cashback');
+    const isIncome = !isWithdrawal && !isTransfer && (
+      cleanedForIncome.includes('salary') ||
+      cleanedForIncome.includes('income') ||
+      cleanedForIncome.includes('received') ||
+      cleanedForIncome.includes('got paid') ||
+      cleanedForIncome.includes('credited') ||
+      cleanedForIncome.includes('deposit') ||
+      cleanedForIncome.includes('earned') ||
+      cleanedForIncome.includes('refund') ||
+      cleanedForIncome.includes('cashback')
+    );
 
     // Account for this segment
     const segAccId = resolveAccountFromText(seg, accounts, null) || overallAccId;
@@ -684,7 +707,29 @@ function tryLocalHeuristicFallback(
       segDate = d.toISOString().slice(0, 10);
     }
 
-    if (isIncome) {
+    if (isWithdrawal) {
+      extractedBatch.push({
+        transaction_type: 'withdrawal',
+        amount: matchedAmount,
+        from_account_id: segAccId || defaultBankAcc,
+        to_account_id: defaultCashAcc,
+        category: null,
+        income_category: null,
+        description: seg,
+        transaction_date: segDate
+      });
+    } else if (isTransfer) {
+      extractedBatch.push({
+        transaction_type: 'transfer',
+        amount: matchedAmount,
+        from_account_id: segAccId || defaultBankAcc,
+        to_account_id: defaultCashAcc,
+        category: null,
+        income_category: null,
+        description: seg,
+        transaction_date: segDate
+      });
+    } else if (isIncome) {
       const incCat = resolveIncomeCategoryFromText(seg);
       extractedBatch.push({
         transaction_type: 'income',
@@ -714,7 +759,16 @@ function tryLocalHeuristicFallback(
   if (extractedBatch.length > 1) {
     const expCount = extractedBatch.filter(b => b.transaction_type === 'expense').length;
     const incCount = extractedBatch.filter(b => b.transaction_type === 'income').length;
-    const reply = `I've prepared a batch of **${extractedBatch.length} transactions** (${expCount} expense${expCount !== 1 ? 's' : ''}, ${incCount} income). All categories and accounts are assigned. Please review and submit to post them!`;
+    const wthCount = extractedBatch.filter(b => b.transaction_type === 'withdrawal').length;
+    const trfCount = extractedBatch.filter(b => b.transaction_type === 'transfer').length;
+    
+    const countParts: string[] = [];
+    if (expCount > 0) countParts.push(`${expCount} expense${expCount !== 1 ? 's' : ''}`);
+    if (incCount > 0) countParts.push(`${incCount} income`);
+    if (wthCount > 0) countParts.push(`${wthCount} withdrawal${wthCount !== 1 ? 's' : ''}`);
+    if (trfCount > 0) countParts.push(`${trfCount} transfer${trfCount !== 1 ? 's' : ''}`);
+
+    const reply = `I've prepared a batch of **${extractedBatch.length} transactions** (${countParts.join(', ')}). All categories and accounts are assigned. Please review and submit to post them!`;
     return {
       intent: 'transaction',
       extractedInfo: extractedBatch[0],
@@ -728,7 +782,7 @@ function tryLocalHeuristicFallback(
 
   if (extractedBatch.length === 1) {
     const single = extractedBatch[0];
-    const catName = single.transaction_type === 'expense' ? single.category : single.income_category;
+    const catName = single.transaction_type === 'expense' ? single.category : single.transaction_type === 'income' ? single.income_category : null;
     const reply = `I've prepared a ${single.transaction_type} of ₹${single.amount.toLocaleString('en-IN')}${catName ? ` for ${catName}` : ''} on ${single.transaction_date}. Form is auto-filled and ready!`;
     return {
       intent: 'transaction',
@@ -829,13 +883,15 @@ export async function parseSmartChatbotCommand(
          - interest_charge: to_account_id.
        - MULTI-TRANSACTION BATCH POSTING RULES:
          * If the user specifies multiple transactions in the input (e.g. "spent 500 on groceries and 200 on petrol", pasted SMS/statements, or comma/newline separated items), set intent: "transaction".
-         * Multi-transaction batch posting ALLOWS ONLY "income" OR "expense" transactions. Transfers, withdrawals, loans, and repayments are NOT allowed in batch mode (omit or classify as expense/income).
-         * Populate "batchTransactions": an array of items with { transaction_type: "expense" | "income", amount: number, category: string, income_category: string, from_account_id: string | null, to_account_id: string | null, description: string, transaction_date: "YYYY-MM-DD" }.
+         * Multi-transaction batch posting supports "expense", "income", "withdrawal", and "transfer".
+         * Populate "batchTransactions": an array of items with { transaction_type: "expense" | "income" | "withdrawal" | "transfer", amount: number, category: string | null, income_category: string | null, from_account_id: string | null, to_account_id: string | null, description: string, transaction_date: "YYYY-MM-DD" }.
+         * Account & Category rules for batch items:
+           - "expense": "from_account_id" (bank/cash/card), "category" is STRICTLY REQUIRED (must never be empty/null, default to "Others").
+           - "income": "to_account_id" (bank/cash), "income_category" is STRICTLY REQUIRED (one of salaries, allowances, family_income, others).
+           - "withdrawal": "from_account_id" is source bank account, "to_account_id" is destination cash wallet account. "category" and "income_category" must be null.
+           - "transfer": "from_account_id" is source account, "to_account_id" is destination account. "category" and "income_category" must be null.
          * Also populate "extractedInfo" with the first transaction in the batch for backwards compatibility.
-         * CRITICAL CATEGORY RULE: Expense/Income Category SHALL NEVER REMAIN BLANK OR NULL.
-           - For each expense: "category" is STRICTLY REQUIRED. Match with the user's available expense categories (e.g., "Groceries", "Food & Dining", "Utilities", etc.). If no category fits, use "Others". Never leave it empty or null!
-           - For each income: "income_category" is STRICTLY REQUIRED. Must be one of ["salaries", "allowances", "family_income", "others"]. Default to "others" if unspecified. Never leave it empty or null!
-         * Reply clearly summarizing the batch count (e.g. "I have prepared 3 transactions (2 expenses, 1 income) for your review. Please verify the accounts and click Submit to post them!").
+         * Reply clearly summarizing the batch count (e.g. "I have prepared 3 transactions (1 expense, 1 withdrawal, 1 income) for your review. Please verify and submit to post them!").
        - Special Credit Card EMI extraction (single transaction): If the user mentions converting a credit card transaction or expense to EMI (e.g., "convert to 12 months EMI with 500 charges"), extract:
          - "is_emi": true (boolean)
          - "emi_months": total number of months (integer, e.g., 6 or 12)
@@ -1042,25 +1098,74 @@ export async function parseSmartChatbotCommand(
       // Sanitize & enforce non-blank categories and valid accounts for batch transactions
       if (parsedResult.batchTransactions && Array.isArray(parsedResult.batchTransactions)) {
         const defaultBankAcc = accounts.find(a => a.account_type === 'bank' || a.account_type === 'cash')?.id || accounts[0]?.id || null;
+        const defaultCashAcc = accounts.find(a => a.account_type === 'cash')?.id || accounts.find(a => a.account_type === 'bank')?.id || accounts[0]?.id || null;
         const defaultIncomeAcc = accounts.find(a => a.account_type === 'bank')?.id || accounts[0]?.id || null;
 
         parsedResult.batchTransactions = parsedResult.batchTransactions
           .filter(t => t && Number(t.amount) > 0)
           .map(t => {
-            const isInc = t.transaction_type === 'income';
-            const rawAcc = isInc ? t.to_account_id : t.from_account_id;
-            const resolvedAccId = resolveAccountFromText(t.account_name || rawAcc, accounts, isInc ? defaultIncomeAcc : defaultBankAcc);
-            const resolvedCategory = isInc ? null : resolveCategoryFromText(t.category, categories);
-            const resolvedIncCategory = isInc ? resolveIncomeCategoryFromText(t.income_category) : null;
+            const rawType = (t.transaction_type || '').toLowerCase();
+            const type: 'income' | 'expense' | 'withdrawal' | 'transfer' = 
+              rawType === 'income' ? 'income' :
+              rawType === 'withdrawal' ? 'withdrawal' :
+              rawType === 'transfer' ? 'transfer' : 'expense';
 
+            if (type === 'withdrawal') {
+              const fromAccId = resolveAccountFromText(t.from_account_id || t.account_name, accounts, defaultBankAcc);
+              const toAccId = resolveAccountFromText(t.to_account_id, accounts, defaultCashAcc);
+              return {
+                transaction_type: 'withdrawal',
+                amount: Number(t.amount),
+                from_account_id: fromAccId,
+                to_account_id: toAccId,
+                category: null,
+                income_category: null,
+                description: t.description?.trim() || 'Cash Withdrawal',
+                transaction_date: t.transaction_date || currentDate
+              };
+            }
+
+            if (type === 'transfer') {
+              const fromAccId = resolveAccountFromText(t.from_account_id || t.account_name, accounts, defaultBankAcc);
+              const toAccId = resolveAccountFromText(t.to_account_id, accounts, defaultCashAcc);
+              return {
+                transaction_type: 'transfer',
+                amount: Number(t.amount),
+                from_account_id: fromAccId,
+                to_account_id: toAccId,
+                category: null,
+                income_category: null,
+                description: t.description?.trim() || 'Account Transfer',
+                transaction_date: t.transaction_date || currentDate
+              };
+            }
+
+            if (type === 'income') {
+              const toAccId = resolveAccountFromText(t.to_account_id || t.account_name, accounts, defaultIncomeAcc);
+              const resolvedIncCategory = resolveIncomeCategoryFromText(t.income_category);
+              return {
+                transaction_type: 'income',
+                amount: Number(t.amount),
+                from_account_id: null,
+                to_account_id: toAccId,
+                category: null,
+                income_category: resolvedIncCategory,
+                description: t.description?.trim() || 'Income',
+                transaction_date: t.transaction_date || currentDate
+              };
+            }
+
+            // Default to expense
+            const fromAccId = resolveAccountFromText(t.from_account_id || t.account_name, accounts, defaultBankAcc);
+            const resolvedCategory = resolveCategoryFromText(t.category, categories);
             return {
-              transaction_type: isInc ? 'income' : 'expense',
+              transaction_type: 'expense',
               amount: Number(t.amount),
-              from_account_id: isInc ? null : resolvedAccId,
-              to_account_id: isInc ? resolvedAccId : null,
+              from_account_id: fromAccId,
+              to_account_id: null,
               category: resolvedCategory,
-              income_category: resolvedIncCategory,
-              description: t.description?.trim() || (isInc ? 'Income' : 'Expense'),
+              income_category: null,
+              description: t.description?.trim() || 'Expense',
               transaction_date: t.transaction_date || currentDate
             };
           });
@@ -1092,7 +1197,14 @@ export async function parseSmartChatbotCommand(
             const count = parsedResult.batchTransactions.length;
             const expCount = parsedResult.batchTransactions.filter(b => b.transaction_type === 'expense').length;
             const incCount = parsedResult.batchTransactions.filter(b => b.transaction_type === 'income').length;
-            finalReply = `I've prepared a batch of **${count} transactions** (${expCount} expense${expCount !== 1 ? 's' : ''}, ${incCount} income). Categories are assigned and ready for review. Click **Submit** to post them!`;
+            const wthCount = parsedResult.batchTransactions.filter(b => b.transaction_type === 'withdrawal').length;
+            const trfCount = parsedResult.batchTransactions.filter(b => b.transaction_type === 'transfer').length;
+            const countParts: string[] = [];
+            if (expCount > 0) countParts.push(`${expCount} expense${expCount !== 1 ? 's' : ''}`);
+            if (incCount > 0) countParts.push(`${incCount} income`);
+            if (wthCount > 0) countParts.push(`${wthCount} withdrawal${wthCount !== 1 ? 's' : ''}`);
+            if (trfCount > 0) countParts.push(`${trfCount} transfer${trfCount !== 1 ? 's' : ''}`);
+            finalReply = `I've prepared a batch of **${count} transactions** (${countParts.join(', ')}). Categories and accounts are assigned and ready for review. Click **Submit** to post them!`;
           } else {
             const ext = parsedResult.extractedInfo || {};
             const parts: string[] = [];
