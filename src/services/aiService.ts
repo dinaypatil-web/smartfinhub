@@ -537,7 +537,19 @@ const NLP_MONTHS: Record<string, number> = {
   dec: 11, december: 11
 };
 
-const nlpMonthNamesPattern = Object.keys(NLP_MONTHS).join('|');
+const nlpMonthNamesPattern = Object.keys(NLP_MONTHS).sort((a, b) => b.length - a.length).join('|');
+
+const NLP_WEEKDAYS: Record<string, number> = {
+  sunday: 0, sun: 0,
+  monday: 1, mon: 1,
+  tuesday: 2, tue: 2,
+  wednesday: 3, wed: 3,
+  thursday: 4, thu: 4,
+  friday: 5, fri: 5,
+  saturday: 6, sat: 6
+};
+
+const nlpWeekdayPattern = Object.keys(NLP_WEEKDAYS).sort((a, b) => b.length - a.length).join('|');
 
 // Helper to parse dates from natural language text
 export function parseDateFromText(text: string | null | undefined, currentDate: string): string {
@@ -545,35 +557,64 @@ export function parseDateFromText(text: string | null | undefined, currentDate: 
   const t = text.toLowerCase();
   const curr = new Date(currentDate);
   const currYear = curr.getFullYear();
-  const currMonth = curr.getMonth(); // 0-indexed
+  const currMonth = curr.getMonth(); // 0-indexed (0=Jan..11=Dec)
+  const currDayOfWeek = curr.getDay(); // 0=Sun..6=Sat
 
-  // 1. Relative: today
-  if (/\btoday\b/i.test(t)) {
+  // Helper to format date YYYY-MM-DD
+  const formatYMD = (d: Date): string => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  // 1. Relative: today / aaj
+  if (/\b(?:today|aaj)\b/i.test(t)) {
     return currentDate;
   }
 
-  // 2. Relative: yesterday / day before yesterday
-  if (/\bday before yesterday\b/i.test(t)) {
+  // 2. Relative: day before yesterday / parso
+  if (/\b(?:day\s+before\s+yesterday|parso)\b/i.test(t)) {
     const d = new Date(currentDate);
     d.setDate(d.getDate() - 2);
-    return d.toISOString().slice(0, 10);
-  }
-  if (/\byesterday\b/i.test(t)) {
-    const d = new Date(currentDate);
-    d.setDate(d.getDate() - 1);
-    return d.toISOString().slice(0, 10);
+    return formatYMD(d);
   }
 
-  // 3. Relative: X days ago
+  // 3. Relative: yesterday / kal
+  if (/\b(?:yesterday|kal)\b/i.test(t)) {
+    const d = new Date(currentDate);
+    d.setDate(d.getDate() - 1);
+    return formatYMD(d);
+  }
+
+  // 4. Relative: X days ago
   const daysAgoMatch = t.match(/\b(\d+)\s+days?\s+ago\b/i);
   if (daysAgoMatch) {
     const days = parseInt(daysAgoMatch[1], 10);
     const d = new Date(currentDate);
     d.setDate(d.getDate() - days);
-    return d.toISOString().slice(0, 10);
+    return formatYMD(d);
   }
 
-  // 4. ISO Date: YYYY-MM-DD
+  // 5. Weekdays: e.g. "last Sunday", "on Sunday", "this Monday", "Friday"
+  const weekdayMatch = t.match(new RegExp(`\\b(?:(last|this|past|previous|on)\\s+)?(${nlpWeekdayPattern})\\b`, 'i'));
+  if (weekdayMatch) {
+    const prefix = (weekdayMatch[1] || '').toLowerCase();
+    const wdayName = weekdayMatch[2].toLowerCase();
+    const targetWday = NLP_WEEKDAYS[wdayName];
+
+    let diff = (currDayOfWeek - targetWday + 7) % 7;
+    if (prefix === 'last' || prefix === 'past' || prefix === 'previous') {
+      if (diff === 0) diff = 7;
+    } else if (diff === 0) {
+      diff = 0;
+    }
+    const d = new Date(currentDate);
+    d.setDate(d.getDate() - diff);
+    return formatYMD(d);
+  }
+
+  // 6. ISO Date: YYYY-MM-DD
   const isoMatch = t.match(/\b(\d{4})-(\d{1,2})-(\d{1,2})\b/);
   if (isoMatch) {
     const y = parseInt(isoMatch[1], 10);
@@ -582,51 +623,84 @@ export function parseDateFromText(text: string | null | undefined, currentDate: 
     return `${y}-${m}-${d}`;
   }
 
-  // 5. Numeric: DD/MM/YYYY or DD-MM-YYYY
-  const dmyMatch = t.match(/\b(\d{1,2})[/-](\d{1,2})[/-](\d{4})\b/);
+  // 7. Full numeric: DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY
+  const dmyMatch = t.match(/\b(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})\b/);
   if (dmyMatch) {
     const d = String(parseInt(dmyMatch[1], 10)).padStart(2, '0');
     const m = String(parseInt(dmyMatch[2], 10)).padStart(2, '0');
-    const y = parseInt(dmyMatch[3], 10);
+    let y = parseInt(dmyMatch[3], 10);
+    if (y < 100) y += 2000;
     return `${y}-${m}-${d}`;
   }
 
-  // 6. Numeric: DD/MM or DD-MM (assumes current year)
-  const dmMatch = t.match(/\b(\d{1,2})[/-](\d{1,2})\b/);
-  if (dmMatch) {
-    const d = String(parseInt(dmMatch[1], 10)).padStart(2, '0');
-    const m = String(parseInt(dmMatch[2], 10)).padStart(2, '0');
-    return `${currYear}-${m}-${d}`;
-  }
-
-  // 7. Pattern A: Day Month (e.g. 15th Nov, 15 November 2026, 15 Nov)
-  const dayMonthRegex = new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(${nlpMonthNamesPattern})(?:\\s+(\\d{4}))?\\b`, 'i');
+  // 8. Day Month (e.g. "15th Nov", "15th of Nov", "15 November 2026", "15 Nov")
+  const dayMonthRegex = new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(?:of\\s+)?(${nlpMonthNamesPattern})(?:\\s*,?\\s*(\\d{2,4}))?\\b`, 'i');
   const dmWordMatch = t.match(dayMonthRegex);
   if (dmWordMatch) {
     const day = String(parseInt(dmWordMatch[1], 10)).padStart(2, '0');
     const mStr = dmWordMatch[2].toLowerCase();
     const monthNum = String(NLP_MONTHS[mStr] + 1).padStart(2, '0');
-    const year = dmWordMatch[3] ? parseInt(dmWordMatch[3], 10) : currYear;
+    let year = dmWordMatch[3] ? parseInt(dmWordMatch[3], 10) : currYear;
+    if (year < 100) year += 2000;
     return `${year}-${monthNum}-${day}`;
   }
 
-  // Pattern B: Month Day (e.g. Nov 15, November 15th, Nov 15 2026)
-  const monthDayRegex = new RegExp(`\\b(${nlpMonthNamesPattern})\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:\\s+(\\d{4}))?\\b`, 'i');
+  // 9. Month Day (e.g. "Nov 15", "November 15th", "Nov the 15th", "Nov 15, 2026")
+  const monthDayRegex = new RegExp(`\\b(${nlpMonthNamesPattern})\\s+(?:the\\s+)?(\\d{1,2})(?:st|nd|rd|th)?(?:\\s*,?\\s*(\\d{2,4}))?\\b`, 'i');
   const mdWordMatch = t.match(monthDayRegex);
   if (mdWordMatch) {
     const mStr = mdWordMatch[1].toLowerCase();
     const monthNum = String(NLP_MONTHS[mStr] + 1).padStart(2, '0');
     const day = String(parseInt(mdWordMatch[2], 10)).padStart(2, '0');
-    const year = mdWordMatch[3] ? parseInt(mdWordMatch[3], 10) : currYear;
+    let year = mdWordMatch[3] ? parseInt(mdWordMatch[3], 10) : currYear;
+    if (year < 100) year += 2000;
     return `${year}-${monthNum}-${day}`;
   }
 
-  // 8. Day of current month: e.g. "on 15th", "on 5th", "on the 10th"
-  const onDayMatch = t.match(/\b(?:on\s+(?:the\s+)?)(\d{1,2})(?:st|nd|rd|th)\b/i);
-  if (onDayMatch) {
-    const day = String(parseInt(onDayMatch[1], 10)).padStart(2, '0');
-    const monthNum = String(currMonth + 1).padStart(2, '0');
-    return `${currYear}-${monthNum}-${day}`;
+  // 10. Short numeric: DD/MM, DD-MM, DD.MM (e.g. "15/11", "15-11", "15.11")
+  const dmShortMatch = t.match(/\b(?:on|dated?|dt[:\s]*)?\s*(\d{1,2})[/.-](\d{1,2})\b/i);
+  if (dmShortMatch) {
+    const dVal = parseInt(dmShortMatch[1], 10);
+    const mVal = parseInt(dmShortMatch[2], 10);
+    if (dVal >= 1 && dVal <= 31 && mVal >= 1 && mVal <= 12) {
+      const d = String(dVal).padStart(2, '0');
+      const m = String(mVal).padStart(2, '0');
+      return `${currYear}-${m}-${d}`;
+    }
+  }
+
+  // 11. Prefixed day of current month:
+  // e.g. "on 15", "on 15th", "dated 15", "dated 15th", "date 15", "date: 15th", "dt 15", "15th ko"
+  const prefixedDayMatch = t.match(/\b(?:on|dated?|date[:\s]*|dt[:\s]*)\s*(?:the\s*)?(\d{1,2})(?:st|nd|rd|th)?\b/i);
+  if (prefixedDayMatch) {
+    const dayVal = parseInt(prefixedDayMatch[1], 10);
+    if (dayVal >= 1 && dayVal <= 31) {
+      const day = String(dayVal).padStart(2, '0');
+      const monthNum = String(currMonth + 1).padStart(2, '0');
+      return `${currYear}-${monthNum}-${day}`;
+    }
+  }
+
+  // 12. Day with Indian suffix "ko" or "tarikh": e.g. "15th ko", "15 tarikh", "15 ko"
+  const indianDayMatch = t.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s*(?:ko|tarikh)\b/i);
+  if (indianDayMatch) {
+    const dayVal = parseInt(indianDayMatch[1], 10);
+    if (dayVal >= 1 && dayVal <= 31) {
+      const day = String(dayVal).padStart(2, '0');
+      const monthNum = String(currMonth + 1).padStart(2, '0');
+      return `${currYear}-${monthNum}-${day}`;
+    }
+  }
+
+  // 13. Standalone ordinal day: e.g. "15th" in "15th petrol 500" or "paid 500 15th"
+  const standaloneOrdinal = t.match(/\b(\d{1,2})(?:st|nd|rd|th)\b/i);
+  if (standaloneOrdinal) {
+    const dayVal = parseInt(standaloneOrdinal[1], 10);
+    if (dayVal >= 1 && dayVal <= 31) {
+      const day = String(dayVal).padStart(2, '0');
+      const monthNum = String(currMonth + 1).padStart(2, '0');
+      return `${currYear}-${monthNum}-${day}`;
+    }
   }
 
   return currentDate;
@@ -636,48 +710,91 @@ function toTitleCase(str: string): string {
   return str.replace(/\b[a-zA-Z]/g, match => match.toUpperCase());
 }
 
-// Clean and extract a professional description from a natural language segment
+// Clean and summarize a concise, professional description from a natural language transaction
 export function cleanDescriptionFromText(seg: string, category: string | null, transactionType: string): string {
   let d = seg;
+  const isRecharge = /\brecharg(?:e|ed|ing)\b/i.test(seg);
 
-  // 1. Remove date expressions first so they don't get partially stripped by number regexes
-  d = d.replace(/\b(?:on\s+)?(?:day before yesterday|yesterday|today|\d+\s+days?\s+ago)\b/gi, ' ');
-  d = d.replace(new RegExp(`\\b(?:on\\s+)?\\d{1,2}(?:st|nd|rd|th)?\\s+(?:${nlpMonthNamesPattern})(?:\\s+\\d{2,4})?\\b`, 'gi'), ' ');
-  d = d.replace(new RegExp(`\\b(?:on\\s+)?(?:${nlpMonthNamesPattern})\\s+\\d{1,2}(?:st|nd|rd|th)?(?:\\s+\\d{2,4})?\\b`, 'gi'), ' ');
-  d = d.replace(/\b(?:on\s+)?\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?\b/gi, ' ');
-  d = d.replace(/\b(?:on\s+(?:the\s+)?)?\d{1,2}(?:st|nd|rd|th)\b/gi, ' ');
+  // 1. Remove command prefix verbs & intent filler phrases
+  d = d.replace(/\b(?:please\s+)?(?:add|record|enter|punch|note\s+down|note|track|create|put|save|log)\s+(?:as+news+|ans+|thes+)?(?:expense|transaction|payment|income|transfer|withdrawal|entry|record)?(?:\s+of)?\b/gi, ' ');
+  d = d.replace(/\b(?:i|we|they|he|she|my\s+friend)\s+(?:have\s+|had\s+)?(?:spent|paid|bought|purchased|ordered|received|got|withdrew|transferred|sent|recharged|went|visited|eaten|consumed|done|taken)\b/gi, ' ');
+  d = d.replace(/\b(?:i|we|they|he|she)\b/gi, ' ');
+  d = d.replace(/\b(?:went\s+to|gone\s+to|visited|hads+gones+to)\b/gi, ' ');
+  d = d.replace(/\b(?:had|took|taken|done|made)\b/gi, ' ');
+  d = d.replace(/\b(?:somes+items?|somes+stuff|items?|stuff|things?)\b/gi, ' ');
+  d = d.replace(/\b(?:fors+my|fors+our|fors+the|fors+a|fors+an|fors+some|fors+personals+use)\b/gi, ' ');
+  d = d.replace(/\b(?:withs+friends?|withs+family|withs+team|withs+colleagues?|withs+office)\b/gi, ' ');
 
-  // 2. Remove bank / account references
-  d = d.replace(/\b(?:from|via|through|using|by|with|in)\s+(?:(?:my|the)\s+)?(?:(?:hdfc|sbi|icici|axis|kotak|pnb|bob|canara|union|idfc|yes|indusind|rbl|citi|hsbc|standard chartered)\s*(?:bank|card|credit\s*card|debit\s*card|savings|account)?|cash\s*(?:wallet|pocket|account)?|credit\s*card|debit\s*card|upi|paytm|gpay|google\s*pay|phonepe)\b/gi, ' ');
+  // 2. Remove date expressions first so they don't get partially stripped by number regexes
+  d = d.replace(/\b(?:on\s+)?(?:day before yesterday|yesterday|today|aaj|kal|parso|\d+\s+days?\s+ago)\b/gi, ' ');
+  d = d.replace(new RegExp(`\\b(?:(last|this|past|previous|on)\\s+)?(?:${nlpWeekdayPattern})\\b`, 'gi'), ' ');
+  d = d.replace(new RegExp(`\\b(?:(?:on|dated?|date[:\\s]*|dt[:\\s]*)\\s*)?\\d{1,2}(?:st|nd|rd|th)?\\s+(?:of\\s+)?(?:${nlpMonthNamesPattern})(?:\\s*,?\\s*\\d{2,4})?\\b`, 'gi'), ' ');
+  d = d.replace(new RegExp(`\\b(?:(?:on|dated?|date[:\\s]*|dt[:\\s]*)\\s*)?(?:${nlpMonthNamesPattern})\\s+(?:the\\s+)?\\d{1,2}(?:st|nd|rd|th)?(?:\\s*,?\\s*\\d{2,4})?\\b`, 'gi'), ' ');
+  d = d.replace(/\b(?:(?:on|dated?|date[:\s]*|dt[:\s]*)\s*)?\d{1,2}[/.-]\d{1,2}(?:[/.-]\d{2,4})?\b/gi, ' ');
+  d = d.replace(/\b(?:on|dated?|date[:\s]*|dt[:\s]*)s*(?:the\s*)?\d{1,2}(?:st|nd|rd|th)?\b/gi, ' ');
+  d = d.replace(/\b\d{1,2}(?:st|nd|rd|th)?\s*(?:ko|tarikh)\b/gi, ' ');
+  d = d.replace(/\b\d{1,2}(?:st|nd|rd|th)\b/gi, ' ');
+  d = d.replace(new RegExp(`\\b(?:of\\s+)?(?:${nlpMonthNamesPattern})\\b`, 'gi'), ' ');
+  d = d.replace(/\b(?:dated?|date[:\s]*|dt[:\s]*)\b/gi, ' ');
+
+  // 3. Remove bank / account references
+  d = d.replace(/\b(?:from|via|through|using|by|with|in|to)\s+(?:(?:my|the)\s+)?(?:(?:hdfc|sbi|icici|axis|kotak|pnb|bob|canara|union|idfc|yes|indusind|rbl|citi|hsbc|standard chartered)\s*(?:bank|card|credit\s*card|debit\s*card|savings|account)?|cash\s*(?:wallet|pocket|account)?|credit\s*card|debit\s*card|upi|paytm|gpay|google\s*pay|phonepe)\b/gi, ' ');
   d = d.replace(/\b(?:from|at|via)\s+(?:sbi|hdfc|icici|axis|kotak|pnb|bob)?\s*atm\b/gi, ' ');
   d = d.replace(/\b(?:in|into|to|from)\s+(?:hdfc|sbi|icici|axis|kotak|pnb|bob)\s*(?:bank|account)?\b/gi, ' ');
+  d = d.replace(/\b(?:via|by|through|using)?\s*(?:upi|gpay|google\s*pay|phonepe|paytm|netbanking)\b/gi, ' ');
 
-  // 3. Remove amounts (₹500, Rs. 500, 500 rs, 500)
-  d = d.replace(/(?:(?:₹|rs\.?|inr)\s*)?\b\d+(?:,\d+)*(?:\.\d{1,2})?\s*(?:rs|inr|bucks|rupees)?/gi, ' ');
+  // 4. Remove amounts (₹500, Rs. 500, 500 rs, 500) anywhere (middle, start, or end of string)
+  d = d.replace(/(?:(?:₹|rs\.?|inr|usd|\$)\s*)?\b\d+(?:,\d+)*(?:\.\d{1,2})?\s*(?:rs|inr|bucks|rupees)?(?=\s|$|[,-.;])/gi, ' ');
+  d = d.replace(/\b(?:amount\s+of|sum\s+of|worth|costing|cost\s+of)\b/gi, ' ');
 
-  // 4. Remove common action verbs
+  // 5. Remove common action verbs
   d = d.replace(/\b(?:spent|paid\s+to|paid|bought|ordered|purchased|received|got|credited|debited|withdrew|withdrawn|withdraw|transferred|transfer|sent\s+to|moved\s+to|recharged)\b/gi, ' ');
 
-  // 5. Clean up extra prepositions and punctuation
-  d = d.replace(/[,\-_;:~|/]+/g, ' ');
-  d = d.replace(/^\s*(?:for|at|on|to|in|via|with|by|of|from|using|a|an|the)\s+/gi, ' ');
-  d = d.replace(/\s+(?:for|at|on|to|in|via|with|by|of|from|using|a|an|the)\s*$/gi, ' ');
+  // 6. Clean up connectors, dangling prepositions and punctuation
+  d = d.replace(/\b(?:fors+at|fors+in|fors+on)/gi, 'at ');
+  d = d.replace(/[,-_;:~|/.]+/g, ' ');
+  d = d.replace(/\b(?:ands+and|fors+for)\b/gi, ' ');
+  d = d.replace(/^\s*(?:for|at|on|to|in|via|with|by|of|from|using|a|an|the|and)\s+/gi, ' ');
+  d = d.replace(/\s+(?:for|at|on|to|in|via|with|by|of|from|using|a|an|the|and)\s*$/gi, ' ');
+  d = d.replace(/^\s*(?:for|at|on|to|in|via|with|by|of|from|using|a|an|the|and)\s+/gi, ' ');
   d = d.replace(/\s+/g, ' ').trim();
 
-  // 6. Handle withdrawal / transfer defaults
+  // 7. Handle mobile/DTH recharge
+  if (isRecharge) {
+    if (!d || d.length <= 2) {
+      d = 'Mobile Recharge';
+    } else if (!d.toLowerCase().includes('recharge')) {
+      d = `${d} Recharge`;
+    }
+  }
+
+  // 8. Handle withdrawal / transfer defaults
   if (transactionType === 'withdrawal') {
-    return d && d.length > 2 && !d.toLowerCase().includes('atm') ? toTitleCase(d) : 'ATM Cash Withdrawal';
+    if (!d || d.length <= 2 || /^(?:atm|cash|atm\s*cash)?\s*withdrawal$/i.test(d.trim()) || d.toLowerCase() === 'atm') {
+      return 'ATM Cash Withdrawal';
+    }
+    return toTitleCase(d.toLowerCase().includes('atm') ? d : `ATM Cash Withdrawal - ${d}`);
   }
   if (transactionType === 'transfer') {
     return d && d.length > 2 ? toTitleCase(d) : 'Account Transfer';
   }
 
-  // 7. If clean text is empty or meaningless, use category
-  if (!d || d.length < 2) {
+  // 9. If clean text is empty or meaningless, use category
+  if (!d || d.length < 2 || /^\d+$/.test(d)) {
     return category || (transactionType === 'income' ? 'Income' : 'Expense');
   }
 
-  return toTitleCase(d);
+  // 10. Format common brand & conjunction patterns
+  let formatted = toTitleCase(d);
+  formatted = formatted.replace(/\bAtm\b/g, 'ATM')
+                       .replace(/\bUpi\b/g, 'UPI')
+                       .replace(/\bOtp\b/g, 'OTP')
+                       .replace(/\bEmi\b/g, 'EMI')
+                       .replace(/\bAnd\b/g, '&')
+                       .replace(/\s+/g, ' ')
+                       .trim();
+
+  return formatted;
 }
 
 const CATEGORY_TAXONOMY = [
@@ -1116,7 +1233,9 @@ export async function parseSmartChatbotCommand(
          - income: to_account_id (matched from accounts), income_category (salaries/allowances/family_income/others).
          - transfer / withdrawal / loan_payment / credit_card_repayment: both from_account_id and to_account_id.
          - interest_charge: to_account_id.
-       - MULTI-TRANSACTION BATCH POSTING RULES:
+       - Summarize "description" into a clean, concise merchant or item title (e.g. "Groceries", "Starbucks - Coffee", "Petrol", "ATM Cash Withdrawal", "Dinner at Barbeque Nation", "Jio Mobile Recharge"). NEVER copy raw conversational sentences like "spent 500 on groceries yesterday with sbi" or command phrasing like "add expense of 500 for groceries" into the description!
+        - Extract "transaction_date" accurately in "YYYY-MM-DD" format from natural language expressions (e.g. "yesterday", "on 15th", "on 15", "15 Nov", "last Sunday", "3 days ago"). If no date is mentioned, use today's date (${currentDate}).
+        - MULTI-TRANSACTION BATCH POSTING RULES:
          * If the user specifies multiple transactions in the input (e.g. "spent 500 on groceries and 200 on petrol", pasted SMS/statements, or comma/newline separated items), set intent: "transaction".
          * Multi-transaction batch posting supports "expense", "income", "withdrawal", and "transfer".
          * Populate "batchTransactions": an array of items with { transaction_type: "expense" | "income" | "withdrawal" | "transfer", amount: number, category: string | null, income_category: string | null, from_account_id: string | null, to_account_id: string | null, description: string, transaction_date: "YYYY-MM-DD" }.
@@ -1410,8 +1529,21 @@ export async function parseSmartChatbotCommand(
         }
       }
 
-      // Enforce non-blank category for single extractedInfo transaction as well
+      // Enforce non-blank category, summarized description, and accurate date for single extractedInfo
       if (parsedResult.intent === 'transaction' && parsedResult.extractedInfo) {
+        // Ensure date is accurately extracted from the command if missing or defaulted to today
+        if (!parsedResult.extractedInfo.transaction_date || parsedResult.extractedInfo.transaction_date === currentDate) {
+          parsedResult.extractedInfo.transaction_date = parseDateFromText(command, currentDate);
+        }
+
+        // Summarize description into a clean title
+        if (parsedResult.extractedInfo.description) {
+          parsedResult.extractedInfo.description = cleanDescriptionFromText(
+            parsedResult.extractedInfo.description,
+            parsedResult.extractedInfo.category || null,
+            parsedResult.extractedInfo.transaction_type || 'expense'
+          );
+        }
         if (parsedResult.extractedInfo.transaction_type === 'expense') {
           if (!parsedResult.extractedInfo.category || !parsedResult.extractedInfo.category.trim()) {
             parsedResult.extractedInfo.category = categories[0]?.name || 'Others';
