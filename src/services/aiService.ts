@@ -10,9 +10,6 @@ import {
 
 export { recordLearnedTransaction, buildLearnedProfileFromHistory, generateMissingFieldOptions, type MissingOptionsConfig };
 
-const APP_ID = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_APP_ID) || 'smartfinhub';
-const AI_API_URL = 'https://api-integrations.appmedo.com/app-7wraacwkpcld/api-rLob8RdzAOl9/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse';
-
 export interface AIMessage {
   role: 'user' | 'model';
   parts: Array<{ text: string }>;
@@ -50,102 +47,477 @@ export interface AIAnalysisData {
   };
 }
 
+export type AIProviderType = 'gemini' | 'groq' | 'builtin';
+
+export interface AIProviderConfig {
+  provider: AIProviderType;
+  geminiApiKey: string;
+  geminiModel: string;
+  groqApiKey: string;
+  groqModel: string;
+}
+
+export function getAIProviderConfig(): AIProviderConfig {
+  let provider: AIProviderType = 'builtin';
+  let geminiApiKey = '';
+  let geminiModel = 'gemini-1.5-flash';
+  let groqApiKey = '';
+  let groqModel = 'llama-3.3-70b-versatile';
+
+  if (typeof window !== 'undefined' && window.localStorage) {
+    const savedProvider = localStorage.getItem('smartfin_ai_provider') as AIProviderType | null;
+    const savedGeminiKey = localStorage.getItem('smartfin_gemini_api_key');
+    const savedGeminiModel = localStorage.getItem('smartfin_gemini_model');
+    const savedGroqKey = localStorage.getItem('smartfin_groq_api_key');
+    const savedGroqModel = localStorage.getItem('smartfin_groq_model');
+
+    if (savedGeminiKey) geminiApiKey = savedGeminiKey.trim();
+    if (savedGeminiModel) geminiModel = savedGeminiModel.trim();
+    if (savedGroqKey) groqApiKey = savedGroqKey.trim();
+    if (savedGroqModel) groqModel = savedGroqModel.trim();
+
+    if (savedProvider && ['gemini', 'groq', 'builtin'].includes(savedProvider)) {
+      provider = savedProvider;
+    } else if (geminiApiKey) {
+      provider = 'gemini';
+    } else if (groqApiKey) {
+      provider = 'groq';
+    }
+  }
+
+  // Fallback to env vars if available
+  if (!geminiApiKey && typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_API_KEY) {
+    geminiApiKey = String(import.meta.env.VITE_GEMINI_API_KEY).trim();
+    if (provider === 'builtin') provider = 'gemini';
+  }
+  if (!groqApiKey && typeof import.meta !== 'undefined' && import.meta.env?.VITE_GROQ_API_KEY) {
+    groqApiKey = String(import.meta.env.VITE_GROQ_API_KEY).trim();
+    if (provider === 'builtin' && !geminiApiKey) provider = 'groq';
+  }
+
+  return { provider, geminiApiKey, geminiModel, groqApiKey, groqModel };
+}
+
+export function saveAIProviderConfig(config: Partial<AIProviderConfig>) {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  if (config.provider) localStorage.setItem('smartfin_ai_provider', config.provider);
+  if (config.geminiApiKey !== undefined) localStorage.setItem('smartfin_gemini_api_key', config.geminiApiKey.trim());
+  if (config.geminiModel) localStorage.setItem('smartfin_gemini_model', config.geminiModel.trim());
+  if (config.groqApiKey !== undefined) localStorage.setItem('smartfin_groq_api_key', config.groqApiKey.trim());
+  if (config.groqModel) localStorage.setItem('smartfin_groq_model', config.groqModel.trim());
+}
+
+export async function testAIProviderConnection(
+  provider: AIProviderType,
+  apiKey: string,
+  model?: string
+): Promise<{ success: boolean; message: string }> {
+  if (provider === 'builtin') {
+    return {
+      success: true,
+      message: 'Smart Built-in Offline Engine is active, responsive, and ready!'
+    };
+  }
+
+  if (!apiKey || !apiKey.trim()) {
+    return {
+      success: false,
+      message: `Please enter a valid API key for ${provider === 'gemini' ? 'Google Gemini' : 'Groq Cloud'}.`
+    };
+  }
+
+  const trimmedKey = apiKey.trim();
+
+  if (provider === 'gemini') {
+    const targetModel = model || 'gemini-1.5-flash';
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(targetModel)}:generateContent?key=${encodeURIComponent(trimmedKey)}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: 'Respond with: OK' }] }]
+        })
+      });
+      if (res.ok) {
+        return {
+          success: true,
+          message: `Successfully connected to Google Gemini (${targetModel})!`
+        };
+      }
+      const err = await res.json().catch(() => ({}));
+      return {
+        success: false,
+        message: err.error?.message || `Gemini test failed with HTTP ${res.status}`
+      };
+    } catch (e: any) {
+      return {
+        success: false,
+        message: e.message || 'Failed to reach Google Gemini API'
+      };
+    }
+  }
+
+  if (provider === 'groq') {
+    const targetModel = model || 'llama-3.3-70b-versatile';
+    try {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${trimmedKey}`
+        },
+        body: JSON.stringify({
+          model: targetModel,
+          messages: [{ role: 'user', content: 'Respond with OK' }],
+          max_tokens: 5
+        })
+      });
+      if (res.ok) {
+        return {
+          success: true,
+          message: `Successfully connected to Groq Cloud (${targetModel})!`
+        };
+      }
+      const err = await res.json().catch(() => ({}));
+      return {
+        success: false,
+        message: err.error?.message || `Groq test failed with HTTP ${res.status}`
+      };
+    } catch (e: any) {
+      return {
+        success: false,
+        message: e.message || 'Failed to reach Groq Cloud API'
+      };
+    }
+  }
+
+  return { success: false, message: 'Unknown AI provider' };
+}
+
+async function callGeminiStream(
+  apiKey: string,
+  model: string,
+  contents: any[],
+  systemInstruction?: string,
+  responseMimeType?: string,
+  onChunk?: (text: string) => void
+): Promise<string> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?key=${encodeURIComponent(apiKey)}&alt=sse`;
+  const body: any = {
+    contents,
+    generationConfig: {
+      temperature: 0.2
+    }
+  };
+  if (responseMimeType) {
+    body.generationConfig.responseMimeType = responseMimeType;
+  }
+  if (systemInstruction) {
+    body.systemInstruction = {
+      parts: [{ text: systemInstruction }]
+    };
+  }
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+
+  if (!response.ok) {
+    const errorJson = await response.json().catch(() => ({}));
+    const message = errorJson.error?.message || response.statusText || 'Gemini API call failed';
+    throw new Error(`Gemini API Error (${response.status}): ${message}`);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error('No response body from Gemini');
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let fullText = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || !trimmed.startsWith('data: ')) continue;
+      const dataStr = trimmed.slice(6);
+      if (dataStr === '[DONE]') break;
+
+      try {
+        const parsed = JSON.parse(dataStr);
+        const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) {
+          fullText += text;
+          if (onChunk) onChunk(text);
+        }
+      } catch {
+        // ignore chunk parse
+      }
+    }
+  }
+
+  return fullText;
+}
+
+async function callGroqStream(
+  apiKey: string,
+  model: string,
+  messages: Array<{ role: string; content: string }>,
+  responseFormatJson?: boolean,
+  onChunk?: (text: string) => void
+): Promise<string> {
+  const url = 'https://api.groq.com/openai/v1/chat/completions';
+  const body: any = {
+    model,
+    messages,
+    temperature: 0.2,
+    stream: true
+  };
+  if (responseFormatJson) {
+    body.response_format = { type: 'json_object' };
+  }
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!response.ok) {
+    const errJson = await response.json().catch(() => ({}));
+    const message = errJson.error?.message || response.statusText || 'Groq API call failed';
+    throw new Error(`Groq API Error (${response.status}): ${message}`);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error('No response body from Groq');
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let fullText = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || !trimmed.startsWith('data: ')) continue;
+      const dataStr = trimmed.slice(6);
+      if (dataStr === '[DONE]') break;
+
+      try {
+        const parsed = JSON.parse(dataStr);
+        const chunk = parsed.choices?.[0]?.delta?.content;
+        if (chunk) {
+          fullText += chunk;
+          if (onChunk) onChunk(chunk);
+        }
+      } catch {
+        // ignore chunk parse
+      }
+    }
+  }
+
+  return fullText;
+}
+
+function generateLocalFinancialAnalysis(
+  data: AIAnalysisData,
+  onChunk: (text: string) => void,
+  onComplete: () => void
+): void {
+  const income = Number(data.totalIncome || 0);
+  const expenses = Number(data.totalExpenses || 0);
+  const netSavings = income - expenses;
+  const savingsRate = income > 0 ? ((netSavings / income) * 100).toFixed(1) : '0.0';
+  const budget = Number(data.budgetedExpenses || 0);
+
+  // Group expenses by category
+  const catMap: Record<string, number> = {};
+  for (const t of data.transactions || []) {
+    if (t.type === 'expense') {
+      const amt = Number(t.amount || 0);
+      catMap[t.category] = (catMap[t.category] || 0) + amt;
+    }
+  }
+  const sortedCats: Array<[string, number]> = Object.entries(catMap).sort((a, b) => b[1] - a[1]);
+  const topCategoriesText = sortedCats.length > 0
+    ? sortedCats.slice(0, 5).map(([cat, amt]: [string, number]) => `- **${cat}**: ₹${amt.toLocaleString('en-IN')} (${income > 0 ? ((amt / income) * 100).toFixed(1) : 0}% of income)`).join('\n')
+    : '- No tracked expenses recorded yet this month.';
+
+  const isPositiveSavings = netSavings >= 0;
+
+  const report = `## Executive Financial Overview
+- **Total Monthly Inflows:** ₹${income.toLocaleString('en-IN')}
+- **Total Monthly Outflows:** ₹${expenses.toLocaleString('en-IN')}
+- **Net Cash Flow:** ₹${netSavings.toLocaleString('en-IN')} (${savingsRate}% savings rate)
+${budget > 0 ? `- **Budget Health:** ${expenses <= budget ? `Under budget by ₹${(budget - expenses).toLocaleString('en-IN')}` : `Over budget by ₹${(expenses - budget).toLocaleString('en-IN')}`}` : ''}
+
+---
+
+## 1. Income & Expense Dynamics
+${isPositiveSavings
+  ? `Your finances are in a **healthy surplus position** with an estimated savings rate of **${savingsRate}%**. Maintaining an operational buffer above 20% provides strong protection against unexpected shocks and supports systematic capital accumulation.`
+  : `Your current monthly expenses exceed your income by **₹${Math.abs(netSavings).toLocaleString('en-IN')}**. Immediate attention to discretionary spending and credit line burn rate is advised.`
+}
+
+### Top Expense Categories
+${topCategoriesText}
+
+---
+
+## 2. Liquidity & Account Health
+${(data.accountBalances && data.accountBalances.length > 0)
+  ? data.accountBalances.map((a: { name: string; balance: number; type: string }) => `- **${a.name}** (${a.type}): ₹${Number(a.balance).toLocaleString('en-IN')}`).join('\n')
+  : '- Account balances are stable across configured ledgers.'
+}
+
+---
+
+## 3. Actionable Recommendations
+1. **Discretionary Pacing:** Target a 10-15% reduction in your top category (${sortedCats[0]?.[0] || 'lifestyle'}) through mindful substitution.
+2. **Automate Surplus Allocation:** Direct at least 50% of monthly surplus into high-yield emergency reserves or diversified index funds.
+3. **Debt Optimization:** Ensure high-interest revolving credit balances are settled before the due date to avoid interest slippage.
+
+---
+*Generated by SmartFinHub Intelligent Financial Engine.*`;
+
+  const chunks = report.split('\n\n');
+  let i = 0;
+  const interval = setInterval(() => {
+    if (i < chunks.length) {
+      onChunk(chunks[i] + '\n\n');
+      i++;
+    } else {
+      clearInterval(interval);
+      onComplete();
+    }
+  }, 40);
+}
+
+function generateLocalBudgetOptimization(
+  data: AIAnalysisData,
+  onChunk: (text: string) => void,
+  onComplete: () => void
+): void {
+  const income = Number(data.totalIncome || 0);
+  const expenses = Number(data.totalExpenses || 0);
+  const targetNeeds = income * 0.5;
+  const targetWants = income * 0.3;
+  const targetSavings = income * 0.2;
+
+  const catMap: Record<string, number> = {};
+  for (const t of data.transactions || []) {
+    if (t.type === 'expense') {
+      const amt = Number(t.amount || 0);
+      catMap[t.category] = (catMap[t.category] || 0) + amt;
+    }
+  }
+  const sortedCats: Array<[string, number]> = Object.entries(catMap).sort((a, b) => b[1] - a[1]);
+
+  const report = `## Budget Optimization Strategy (50/30/20 Framework)
+
+Based on your current monthly income of **₹${income.toLocaleString('en-IN')}** and recorded expenses of **₹${expenses.toLocaleString('en-IN')}**, here is your optimized financial blueprint:
+
+### 1. Target Category Allocations
+- **Essential Needs (50% max):** Target budget ₹${targetNeeds.toLocaleString('en-IN')}/mo (Housing, Utilities, Groceries, Commute, Minimum Debt Payments)
+- **Discretionary Wants (30% max):** Target budget ₹${targetWants.toLocaleString('en-IN')}/mo (Dining Out, Entertainment, Non-essential Shopping)
+- **Savings & Debt Acceleration (20% min):** Target allocation ₹${targetSavings.toLocaleString('en-IN')}/mo (Emergency Fund, SIPs, Prepayments)
+
+---
+
+### 2. Category Reduction Targets
+${sortedCats.length > 0 ? sortedCats.slice(0, 4).map(([cat, amt]: [string, number]) => {
+  const suggestedCut = Math.round(amt * 0.15);
+  const newBudget = Math.round(amt * 0.85);
+  return `- **${cat}:** Current ₹${amt.toLocaleString('en-IN')} → Recommended Target **₹${newBudget.toLocaleString('en-IN')}** (Save ~₹${suggestedCut.toLocaleString('en-IN')}/mo)`;
+}).join('\n') : '- Record categorised transactions to receive granular item-by-item reduction targets.'}
+
+---
+
+### 3. Immediate High-Priority Actions
+1. **Trim Top Discretionary Leaks:** Review recurring subscriptions and dining/takeout deliveries from the past 30 days.
+2. **Zero-Balance Buffer:** Keep 1 month of essential expenses in your primary checking account to prevent overdrafts.
+3. **Automate Pay-Yourself-First:** Schedule transfers to your savings or investment accounts on salary day before discretionary spending begins.
+
+---
+*Generated by SmartFinHub Built-in Financial Optimization Engine.*`;
+
+  const chunks = report.split('\n\n');
+  let i = 0;
+  const interval = setInterval(() => {
+    if (i < chunks.length) {
+      onChunk(chunks[i] + '\n\n');
+      i++;
+    } else {
+      clearInterval(interval);
+      onComplete();
+    }
+  }, 40);
+}
+
 export async function generateFinancialAnalysis(
   data: AIAnalysisData,
   onChunk: (text: string) => void,
   onComplete: () => void,
   onError: (error: string) => void
 ): Promise<void> {
-  try {
-    const prompt = buildFinancialAnalysisPrompt(data);
+  const config = getAIProviderConfig();
+  const prompt = buildFinancialAnalysisPrompt(data);
 
-    const payload = {
-      contents: [
-        {
-          role: 'user' as const,
-          parts: [{ text: prompt }],
-        },
-      ],
-    };
-
-    if (!APP_ID) {
-      throw new Error('AI service not configured. Please set VITE_APP_ID in your .env file.');
-    }
-
-    const response = await fetch(AI_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-App-Id': APP_ID,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      if (errorData.status === 999) {
-        throw new Error(errorData.msg || 'API request failed');
-      }
-      throw new Error(`API request failed: ${response.statusText}`);
-    }
-
-    const reader = response.body?.getReader();
-    if (!reader) {
-      throw new Error('No response body');
-    }
-
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let completed = false;
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed || !trimmed.startsWith('data: ')) continue;
-
-        const dataStr = trimmed.slice(6);
-        if (dataStr === '[DONE]') {
-          completed = true;
-          onComplete();
-          break;
-        }
-
-        try {
-          const parsedData = JSON.parse(dataStr);
-          const text = parsedData.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (text) {
-            onChunk(text);
-          }
-
-          const finishReason = parsedData.candidates?.[0]?.finishReason;
-          if (finishReason === 'STOP' && !completed) {
-            completed = true;
-            onComplete();
-            break;
-          }
-        } catch (e) {
-          console.error('Error parsing SSE line:', e, dataStr);
-        }
-      }
-
-      if (completed) {
-        break;
-      }
-    }
-
-    if (!completed) {
+  if (config.provider === 'gemini' && config.geminiApiKey) {
+    try {
+      await callGeminiStream(
+        config.geminiApiKey,
+        config.geminiModel,
+        [{ role: 'user', parts: [{ text: prompt }] }],
+        undefined,
+        undefined,
+        onChunk
+      );
       onComplete();
+      return;
+    } catch (e: any) {
+      console.warn('Gemini generateFinancialAnalysis failed, falling back to local analysis engine:', e);
     }
-  } catch (error) {
-    console.error('AI Service Error:', error);
-    onError(error instanceof Error ? error.message : 'Failed to generate analysis');
+  } else if (config.provider === 'groq' && config.groqApiKey) {
+    try {
+      await callGroqStream(
+        config.groqApiKey,
+        config.groqModel,
+        [{ role: 'user', content: prompt }],
+        false,
+        onChunk
+      );
+      onComplete();
+      return;
+    } catch (e: any) {
+      console.warn('Groq generateFinancialAnalysis failed, falling back to local analysis engine:', e);
+    }
+  }
+
+  // Fallback to local financial analysis generator
+  try {
+    generateLocalFinancialAnalysis(data, onChunk, onComplete);
+  } catch (err: any) {
+    onError(err?.message || 'Failed to generate financial analysis');
   }
 }
 
@@ -317,89 +689,44 @@ Please provide:
 
 Be realistic and practical. Focus on sustainable changes.`;
 
-    const payload = {
-      contents: [
-        {
-          role: 'user' as const,
-          parts: [{ text: prompt }],
-        },
-      ],
-    };
+    const config = getAIProviderConfig();
 
-    if (!APP_ID) {
-      throw new Error('AI service not configured. Please set VITE_APP_ID in your .env file.');
-    }
-
-    const response = await fetch(AI_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-App-Id': APP_ID,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      if (errorData.status === 999) {
-        throw new Error(errorData.msg || 'API request failed');
+    if (config.provider === 'gemini' && config.geminiApiKey) {
+      try {
+        await callGeminiStream(
+          config.geminiApiKey,
+          config.geminiModel,
+          [{ role: 'user', parts: [{ text: prompt }] }],
+          undefined,
+          undefined,
+          onChunk
+        );
+        onComplete();
+        return;
+      } catch (e: any) {
+        console.warn('Gemini generateBudgetOptimization failed, falling back to local optimization engine:', e);
       }
-      throw new Error(`API request failed: ${response.statusText}`);
-    }
-
-    const reader = response.body?.getReader();
-    if (!reader) {
-      throw new Error('No response body');
-    }
-
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let completed = false;
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed || !trimmed.startsWith('data: ')) continue;
-
-        const dataStr = trimmed.slice(6);
-        if (dataStr === '[DONE]') {
-          completed = true;
-          onComplete();
-          break;
-        }
-
-        try {
-          const parsedData = JSON.parse(dataStr);
-          const text = parsedData.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (text) {
-            onChunk(text);
-          }
-
-          const finishReason = parsedData.candidates?.[0]?.finishReason;
-          if (finishReason === 'STOP' && !completed) {
-            completed = true;
-            onComplete();
-            break;
-          }
-        } catch (e) {
-          console.error('Error parsing SSE line:', e, dataStr);
-        }
-      }
-
-      if (completed) {
-        break;
+    } else if (config.provider === 'groq' && config.groqApiKey) {
+      try {
+        await callGroqStream(
+          config.groqApiKey,
+          config.groqModel,
+          [{ role: 'user', content: prompt }],
+          false,
+          onChunk
+        );
+        onComplete();
+        return;
+      } catch (e: any) {
+        console.warn('Groq generateBudgetOptimization failed, falling back to local optimization engine:', e);
       }
     }
 
-    if (!completed) {
-      onComplete();
+    // Fallback to local budget optimization generator
+    try {
+      generateLocalBudgetOptimization(data, onChunk, onComplete);
+    } catch (err: any) {
+      onError(err instanceof Error ? err.message : 'Failed to generate optimization');
     }
   } catch (error) {
     console.error('AI Service Error:', error);
@@ -723,18 +1050,19 @@ function toTitleCase(str: string): string {
 
 // Clean and summarize a concise, professional description from a natural language transaction
 export function cleanDescriptionFromText(seg: string, category: string | null, transactionType: string): string {
-  let d = seg;
+  if (!seg) return category || (transactionType === 'income' ? 'Income' : 'Expense');
+  let d = seg.trim();
   const isRecharge = /\brecharg(?:e|ed|ing)\b/i.test(seg);
 
   // 1. Remove command prefix verbs & intent filler phrases
-  d = d.replace(/\b(?:please\s+)?(?:add|record|enter|punch|note\s+down|note|track|create|put|save|log)\s+(?:as+news+|ans+|thes+)?(?:expense|transaction|payment|income|transfer|withdrawal|entry|record)?(?:\s+of)?\b/gi, ' ');
+  d = d.replace(/\b(?:please\s+)?(?:add|record|enter|punch|note\s+down|note|track|create|put|save|log)\s+(?:a\s+new\s+|an?\s+|the\s+)?(?:expense|transaction|payment|income|transfer|withdrawal|entry|record)?(?:\s+(?:of|for|amount))?\b/gi, ' ');
   d = d.replace(/\b(?:i|we|they|he|she|my\s+friend)\s+(?:have\s+|had\s+)?(?:spent|paid|bought|purchased|ordered|received|got|withdrew|transferred|sent|recharged|went|visited|eaten|consumed|done|taken)\b/gi, ' ');
   d = d.replace(/\b(?:i|we|they|he|she)\b/gi, ' ');
-  d = d.replace(/\b(?:went\s+to|gone\s+to|visited|hads+gones+to)\b/gi, ' ');
+  d = d.replace(/\b(?:went\s+to|gone\s+to|visited|had\s+gone\s+to)\b/gi, ' ');
   d = d.replace(/\b(?:had|took|taken|done|made)\b/gi, ' ');
-  d = d.replace(/\b(?:somes+items?|somes+stuff|items?|stuff|things?)\b/gi, ' ');
-  d = d.replace(/\b(?:fors+my|fors+our|fors+the|fors+a|fors+an|fors+some|fors+personals+use)\b/gi, ' ');
-  d = d.replace(/\b(?:withs+friends?|withs+family|withs+team|withs+colleagues?|withs+office)\b/gi, ' ');
+  d = d.replace(/\b(?:some\s+items?|some\s+stuff|items?|stuff|things?)\b/gi, ' ');
+  d = d.replace(/\b(?:for\s+my|for\s+our|for\s+the|for\s+a|for\s+an|for\s+some|for\s+personal\s+use)\b/gi, ' ');
+  d = d.replace(/\b(?:with\s+friends?|with\s+family|with\s+team|with\s+colleagues?|with\s+office)\b/gi, ' ');
 
   // 2. Remove date expressions first so they don't get partially stripped by number regexes
   d = d.replace(/\b(?:on\s+)?(?:day before yesterday|yesterday|today|aaj|kal|parso|\d+\s+days?\s+ago)\b/gi, ' ');
@@ -742,19 +1070,20 @@ export function cleanDescriptionFromText(seg: string, category: string | null, t
   d = d.replace(new RegExp(`\\b(?:(?:on|dated?|date[:\\s]*|dt[:\\s]*)\\s*)?\\d{1,2}(?:st|nd|rd|th)?\\s+(?:of\\s+)?(?:${nlpMonthNamesPattern})(?:\\s*,?\\s*\\d{2,4})?\\b`, 'gi'), ' ');
   d = d.replace(new RegExp(`\\b(?:(?:on|dated?|date[:\\s]*|dt[:\\s]*)\\s*)?(?:${nlpMonthNamesPattern})\\s+(?:the\\s+)?\\d{1,2}(?:st|nd|rd|th)?(?:\\s*,?\\s*\\d{2,4})?\\b`, 'gi'), ' ');
   d = d.replace(/\b(?:(?:on|dated?|date[:\s]*|dt[:\s]*)\s*)?\d{1,2}[/.-]\d{1,2}(?:[/.-]\d{2,4})?\b/gi, ' ');
-  d = d.replace(/\b(?:on|dated?|date[:\s]*|dt[:\s]*)s*(?:the\s*)?\d{1,2}(?:st|nd|rd|th)?\b/gi, ' ');
+  d = d.replace(/\b(?:on|dated?|date[:\s]*|dt[:\s]*)\s*(?:the\s*)?\d{1,2}(?:st|nd|rd|th)?\b/gi, ' ');
   d = d.replace(/\b\d{1,2}(?:st|nd|rd|th)?\s*(?:ko|tarikh)\b/gi, ' ');
   d = d.replace(/\b\d{1,2}(?:st|nd|rd|th)\b/gi, ' ');
   d = d.replace(new RegExp(`\\b(?:of\\s+)?(?:${nlpMonthNamesPattern})\\b`, 'gi'), ' ');
   d = d.replace(/\b(?:dated?|date[:\s]*|dt[:\s]*)\b/gi, ' ');
 
   // 3. Remove bank / account references
-  d = d.replace(/\b(?:from|via|through|using|by|with|in|to)\s+(?:(?:my|the)\s+)?(?:(?:hdfc|sbi|icici|axis|kotak|pnb|bob|canara|union|idfc|yes|indusind|rbl|citi|hsbc|standard chartered)\s*(?:bank|card|credit\s*card|debit\s*card|savings|account)?|cash\s*(?:wallet|pocket|account)?|credit\s*card|debit\s*card|upi|paytm|gpay|google\s*pay|phonepe)\b/gi, ' ');
+  d = d.replace(/\b(?:from|via|through|using|by|with|in|to)\s+(?:(?:my|the)\s+)?(?:(?:hdfc|sbi|icici|axis|kotak|pnb|bob|canara|union|idfc|yes|indusind|rbl|citi|hsbc|standard\s*chartered)\s*(?:bank|card|credit\s*card|debit\s*card|savings|account)?|cash\s*(?:wallet|pocket|account)?|credit\s*card|debit\s*card|upi|paytm|gpay|google\s*pay|phonepe)\b/gi, ' ');
   d = d.replace(/\b(?:from|at|via)\s+(?:sbi|hdfc|icici|axis|kotak|pnb|bob)?\s*atm\b/gi, ' ');
   d = d.replace(/\b(?:in|into|to|from)\s+(?:hdfc|sbi|icici|axis|kotak|pnb|bob)\s*(?:bank|account)?\b/gi, ' ');
   d = d.replace(/\b(?:via|by|through|using)?\s*(?:upi|gpay|google\s*pay|phonepe|paytm|netbanking)\b/gi, ' ');
 
-  // 4. Remove amounts (₹500, Rs. 500, 500 rs, 500) anywhere (middle, start, or end of string)
+  // 4. Remove amounts with preceding prepositions like "for 2500", "worth 2500", "costing 2500"
+  d = d.replace(/\b(?:for|worth|costing|of|sum\s+of|amount\s+of)\s+(?:(?:₹|rs\.?|inr|usd|\$)\s*)?\b\d+(?:,\d+)*(?:\.\d{1,2})?\s*(?:rs|inr|bucks|rupees)?(?=\s|$|[,-.;])/gi, ' ');
   d = d.replace(/(?:(?:₹|rs\.?|inr|usd|\$)\s*)?\b\d+(?:,\d+)*(?:\.\d{1,2})?\s*(?:rs|inr|bucks|rupees)?(?=\s|$|[,-.;])/gi, ' ');
   d = d.replace(/\b(?:amount\s+of|sum\s+of|worth|costing|cost\s+of)\b/gi, ' ');
 
@@ -762,12 +1091,14 @@ export function cleanDescriptionFromText(seg: string, category: string | null, t
   d = d.replace(/\b(?:spent|paid\s+to|paid|bought|ordered|purchased|received|got|credited|debited|withdrew|withdrawn|withdraw|transferred|transfer|sent\s+to|moved\s+to|recharged)\b/gi, ' ');
 
   // 6. Clean up connectors, dangling prepositions and punctuation
-  d = d.replace(/\b(?:fors+at|fors+in|fors+on)/gi, 'at ');
-  d = d.replace(/[,-_;:~|/.]+/g, ' ');
-  d = d.replace(/\b(?:ands+and|fors+for)\b/gi, ' ');
-  d = d.replace(/^\s*(?:for|at|on|to|in|via|with|by|of|from|using|a|an|the|and)\s+/gi, ' ');
-  d = d.replace(/\s+(?:for|at|on|to|in|via|with|by|of|from|using|a|an|the|and)\s*$/gi, ' ');
-  d = d.replace(/^\s*(?:for|at|on|to|in|via|with|by|of|from|using|a|an|the|and)\s+/gi, ' ');
+  d = d.replace(/\b(?:for\s+at|for\s+in|for\s+on|for\s+from|from\s+at)\b/gi, 'at ');
+  d = d.replace(/[,_\-;:~|/.]+/g, ' ');
+  d = d.replace(/\b(?:and\s+and|for\s+for)\b/gi, ' ');
+  d = d.replace(/\b(?:for|at|in|on|from|to|with|of|by)\s+(?:for|at|in|on|from|to|with|of|by)\b/gi, (m) => m.split(/\s+/).pop() || '');
+  for (let i = 0; i < 3; i++) {
+    d = d.replace(/^\s*(?:for|at|on|to|in|via|with|by|of|from|using|a|an|the|and)\s+/gi, ' ');
+    d = d.replace(/\s+(?:for|at|on|to|in|via|with|by|of|from|using|a|an|the|and)\s*$/gi, ' ');
+  }
   d = d.replace(/\s+/g, ' ').trim();
 
   // 7. Handle mobile/DTH recharge
@@ -797,15 +1128,41 @@ export function cleanDescriptionFromText(seg: string, category: string | null, t
 
   // 10. Format common brand & conjunction patterns
   let formatted = toTitleCase(d);
-  formatted = formatted.replace(/\bAtm\b/g, 'ATM')
-                       .replace(/\bUpi\b/g, 'UPI')
-                       .replace(/\bOtp\b/g, 'OTP')
-                       .replace(/\bEmi\b/g, 'EMI')
-                       .replace(/\bAnd\b/g, '&')
-                       .replace(/\s+/g, ' ')
-                       .trim();
+  
+  const brandMap: [RegExp, string][] = [
+    [/\bAtm\b/g, 'ATM'],
+    [/\bUpi\b/g, 'UPI'],
+    [/\bOtp\b/g, 'OTP'],
+    [/\bEmi\b/g, 'EMI'],
+    [/\bMcdonald'?s\b/gi, "McDonald's"],
+    [/\bDmart\b/gi, 'DMart'],
+    [/\bZomato\b/gi, 'Zomato'],
+    [/\bSwiggy\b/gi, 'Swiggy'],
+    [/\bStarbucks\b/gi, 'Starbucks'],
+    [/\bBlinkit\b/gi, 'Blinkit'],
+    [/\bZepto\b/gi, 'Zepto'],
+    [/\bBigbasket\b/gi, 'BigBasket'],
+    [/\bMyntra\b/gi, 'Myntra'],
+    [/\bAjio\b/gi, 'Ajio'],
+    [/\bZara\b/gi, 'Zara'],
+    [/\bH&m\b/gi, 'H&M'],
+    [/\bMarks\s*(?:&|and)\s*Spencer\b/gi, 'Marks & Spencer'],
+    [/\bBarbeque\s*Nation\b/gi, 'Barbeque Nation'],
+    [/\bJio\b/gi, 'Jio'],
+    [/\bAirtel\b/gi, 'Airtel'],
+    [/\bVodafone\b/gi, 'Vodafone'],
+    [/\bNetflix\b/gi, 'Netflix'],
+    [/\bAmazon\b/gi, 'Amazon'],
+    [/\bFlipkart\b/gi, 'Flipkart'],
+    [/\bUber\b/gi, 'Uber'],
+    [/\bOla\b/gi, 'Ola']
+  ];
 
-  return formatted;
+  for (const [pattern, replacement] of brandMap) {
+    formatted = formatted.replace(pattern, replacement);
+  }
+
+  return formatted.replace(/\s+/g, ' ').trim();
 }
 
 const CATEGORY_TAXONOMY = [
@@ -1448,93 +1805,68 @@ export async function parseSmartChatbotCommand(
     }
     `;
 
-    // Incorporate chat history if available to understand context/clarifications
-    const contentsPayload = [];
-    for (const msg of chatHistory) {
-      contentsPayload.push({
-        role: msg.role,
-        parts: [{ text: msg.content }]
-      });
-    }
-    contentsPayload.push({
-      role: 'user' as const,
-      parts: [{ text: prompt }]
-    });
-
-    const payload = {
-      contents: contentsPayload,
-    };
-
-    if (!APP_ID) {
-      throw new Error('AI service not configured. Please set VITE_APP_ID in your .env file.');
-    }
-
-    const response = await fetch(AI_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-App-Id': APP_ID,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      if (errorData.status === 999) {
-        throw new Error(errorData.msg || 'API request failed');
-      }
-      throw new Error(`API request failed: ${response.statusText}`);
-    }
-
-    const reader = response.body?.getReader();
-    if (!reader) {
-      throw new Error('No response body');
-    }
-
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let completed = false;
+    const config = getAIProviderConfig();
     let fullResponseText = '';
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed || !trimmed.startsWith('data: ')) continue;
-
-        const dataStr = trimmed.slice(6);
-        if (dataStr === '[DONE]') {
-          completed = true;
-          break;
+    if (config.provider === 'gemini' && config.geminiApiKey) {
+      try {
+        const contentsPayload = [];
+        for (const msg of chatHistory) {
+          contentsPayload.push({
+            role: msg.role === 'model' ? 'model' : 'user',
+            parts: [{ text: msg.content }]
+          });
         }
+        contentsPayload.push({
+          role: 'user',
+          parts: [{ text: prompt }]
+        });
 
-        try {
-          const parsedData = JSON.parse(dataStr);
-          const text = parsedData.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (text) {
-            fullResponseText += text;
-            onChunk(text);
-          }
-
-          const finishReason = parsedData.candidates?.[0]?.finishReason;
-          if (finishReason === 'STOP' && !completed) {
-            completed = true;
-            break;
-          }
-        } catch (e) {
-          console.error('Error parsing SSE line:', e, dataStr);
+        fullResponseText = await callGeminiStream(
+          config.geminiApiKey,
+          config.geminiModel,
+          contentsPayload,
+          undefined,
+          'application/json',
+          onChunk
+        );
+      } catch (err) {
+        console.warn('Gemini parseSmartChatbotCommand failed, falling back to local NLP engine:', err);
+      }
+    } else if (config.provider === 'groq' && config.groqApiKey) {
+      try {
+        const messages: Array<{ role: string; content: string }> = [];
+        for (const msg of chatHistory) {
+          messages.push({
+            role: msg.role === 'model' ? 'assistant' : 'user',
+            content: msg.content
+          });
         }
-      }
+        messages.push({
+          role: 'user',
+          content: prompt
+        });
 
-      if (completed) {
-        break;
+        fullResponseText = await callGroqStream(
+          config.groqApiKey,
+          config.groqModel,
+          messages,
+          true,
+          onChunk
+        );
+      } catch (err) {
+        console.warn('Groq parseSmartChatbotCommand failed, falling back to local NLP engine:', err);
       }
+    }
+
+    if (!fullResponseText || !fullResponseText.trim()) {
+      const fallbackResult = tryLocalHeuristicFallback(command, accounts, categories, currentDate, transactions);
+      if (fallbackResult) {
+        onComplete(fallbackResult);
+      } else {
+        onError('Could not parse transaction from command');
+      }
+      return;
     }
 
     // Try to parse the accumulated full text as a JSON object
@@ -1575,7 +1907,7 @@ export async function parseSmartChatbotCommand(
                 to_account_id: toAccId,
                 category: null,
                 income_category: null,
-                description: t.description?.trim() || 'Cash Withdrawal',
+                description: cleanDescriptionFromText(t.description?.trim() || 'Cash Withdrawal', null, 'withdrawal'),
                 transaction_date: t.transaction_date || currentDate
               };
             }
@@ -1590,7 +1922,7 @@ export async function parseSmartChatbotCommand(
                 to_account_id: toAccId,
                 category: null,
                 income_category: null,
-                description: t.description?.trim() || 'Account Transfer',
+                description: cleanDescriptionFromText(t.description?.trim() || 'Account Transfer', null, 'transfer'),
                 transaction_date: t.transaction_date || currentDate
               };
             }
@@ -1605,7 +1937,7 @@ export async function parseSmartChatbotCommand(
                 to_account_id: toAccId,
                 category: null,
                 income_category: resolvedIncCategory,
-                description: t.description?.trim() || 'Income',
+                description: cleanDescriptionFromText(t.description?.trim() || 'Income', 'Salary', 'income'),
                 transaction_date: t.transaction_date || currentDate
               };
             }
@@ -1620,7 +1952,7 @@ export async function parseSmartChatbotCommand(
               to_account_id: null,
               category: resolvedCategory,
               income_category: null,
-              description: t.description?.trim() || 'Expense',
+              description: cleanDescriptionFromText(t.description?.trim() || 'Expense', resolvedCategory, 'expense'),
               transaction_date: t.transaction_date || currentDate
             };
           });
@@ -1984,80 +2316,36 @@ Respond strictly in JSON format matching this schema:
 
 Do not include any extra text, commentary, or markdown formatting outside the JSON object.`;
 
-    const payload = {
-      contents: [
-        {
-          role: 'user' as const,
-          parts: [{ text: prompt }],
-        },
-      ],
-    };
-
-    if (!APP_ID) {
-      return fallback;
-    }
-
-    const response = await fetch(AI_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-App-Id': APP_ID,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      return fallback;
-    }
-
-    const reader = response.body?.getReader();
-    if (!reader) {
-      return fallback;
-    }
-
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let completed = false;
+    const config = getAIProviderConfig();
     let fullResponseText = '';
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed || !trimmed.startsWith('data: ')) continue;
-
-        const dataStr = trimmed.slice(6);
-        if (dataStr === '[DONE]') {
-          completed = true;
-          break;
-        }
-
-        try {
-          const parsedData = JSON.parse(dataStr);
-          const text = parsedData.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (text) {
-            fullResponseText += text;
-          }
-
-          const finishReason = parsedData.candidates?.[0]?.finishReason;
-          if (finishReason === 'STOP' && !completed) {
-            completed = true;
-            break;
-          }
-        } catch {
-          // ignore chunk parse error
-        }
+    if (config.provider === 'gemini' && config.geminiApiKey) {
+      try {
+        fullResponseText = await callGeminiStream(
+          config.geminiApiKey,
+          config.geminiModel,
+          [{ role: 'user', parts: [{ text: prompt }] }],
+          undefined,
+          'application/json'
+        );
+      } catch (e) {
+        console.warn('Gemini generateTransactionAIInsight failed, using heuristic:', e);
       }
-
-      if (completed) {
-        break;
+    } else if (config.provider === 'groq' && config.groqApiKey) {
+      try {
+        fullResponseText = await callGroqStream(
+          config.groqApiKey,
+          config.groqModel,
+          [{ role: 'user', content: prompt }],
+          true
+        );
+      } catch (e) {
+        console.warn('Groq generateTransactionAIInsight failed, using heuristic:', e);
       }
+    }
+
+    if (!fullResponseText || !fullResponseText.trim()) {
+      return fallback;
     }
 
     // Clean JSON text
