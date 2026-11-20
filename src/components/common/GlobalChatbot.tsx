@@ -11,7 +11,13 @@ import {
   Bot, Sparkles, Mic, MicOff, Send, X, Calendar, Loader2, Trash2, Volume2, Check
 } from 'lucide-react';
 import { transactionApi, accountApi, categoryApi, budgetApi, emiApi, interestRateApi, userCustomBankLinksApi } from '@/db/api';
-import { parseSmartChatbotCommand, type SmartChatbotResult } from '@/services/aiService';
+import { 
+  parseSmartChatbotCommand, 
+  type SmartChatbotResult, 
+  recordLearnedTransaction, 
+  generateMissingFieldOptions, 
+  type MissingOptionsConfig 
+} from '@/services/aiService';
 import { calculateMonthlyEMI, calculateFirstEMIDueDate } from '@/utils/emiCalculations';
 import { getIncomeCategoryName } from '@/constants/incomeCategories';
 import { cache } from '@/utils/cache';
@@ -167,6 +173,7 @@ export default function GlobalChatbot() {
   });
 
   const [missingFields, setMissingFields] = useState<string[]>([]);
+  const [currentMissingOptions, setCurrentMissingOptions] = useState<MissingOptionsConfig | null>(null);
 
   // Exclude rendering on auth pages
   const isAuthPage = ['/login', '/register', '/reset-password', '/auth/callback', '/confirm-email'].includes(location.pathname);
@@ -524,6 +531,7 @@ export default function GlobalChatbot() {
                 bank_charges: null
               });
               setMissingFields([]);
+              setCurrentMissingOptions(null);
 
               setChatMessages(prev => [...prev, {
                 id: botMsgId,
@@ -552,6 +560,15 @@ export default function GlobalChatbot() {
               const clientMissing = validateCurrentDraft('transaction', updatedDraft);
               setDraft(updatedDraft);
               setMissingFields(clientMissing);
+
+              if (parsedResult.missingOptions) {
+                setCurrentMissingOptions(parsedResult.missingOptions);
+              } else if (clientMissing.length > 0) {
+                const generated = generateMissingFieldOptions(clientMissing[0], updatedDraft, accounts, categories);
+                setCurrentMissingOptions(generated);
+              } else {
+                setCurrentMissingOptions(null);
+              }
               
               setChatMessages(prev => [...prev, {
                 id: botMsgId,
@@ -561,6 +578,7 @@ export default function GlobalChatbot() {
               }]);
             }
           } else if (parsedResult.intent === 'account') {
+            setCurrentMissingOptions(null);
             const updatedAccount: DraftAccount = {
               account_type: ext.account_type || draftAccount.account_type,
               account_name: ext.account_name || draftAccount.account_name,
@@ -695,11 +713,75 @@ export default function GlobalChatbot() {
     });
     
     setMissingFields([]);
+    setCurrentMissingOptions(null);
     
     toast({
       title: 'Draft discarded',
       description: `The draft has been cleared.`
     });
+  };
+
+  const handleSelectMissingOption = (field: string, value: any, label: string) => {
+    if (currentIntent === 'transaction') {
+      const updatedDraft: DraftTransaction = {
+        ...draft,
+        [field]: value,
+      };
+      if (field === 'transaction_type') {
+        if (value === 'expense') {
+          updatedDraft.to_account_id = null;
+          updatedDraft.income_category = null;
+        } else if (value === 'income') {
+          updatedDraft.from_account_id = null;
+          updatedDraft.category = null;
+        } else if (['transfer', 'withdrawal', 'loan_payment', 'credit_card_repayment'].includes(value)) {
+          updatedDraft.category = null;
+          updatedDraft.income_category = null;
+        }
+      }
+      if (field === 'category' && updatedDraft.transaction_type === 'expense') {
+        updatedDraft.income_category = null;
+      }
+
+      recordLearnedTransaction({
+        transaction_type: updatedDraft.transaction_type,
+        amount: updatedDraft.amount,
+        from_account_id: updatedDraft.from_account_id,
+        to_account_id: updatedDraft.to_account_id,
+        category: updatedDraft.category,
+        description: updatedDraft.description,
+        transaction_date: updatedDraft.transaction_date,
+      });
+
+      const clientMissing = validateCurrentDraft('transaction', updatedDraft);
+      setDraft(updatedDraft);
+      setMissingFields(clientMissing);
+
+      if (clientMissing.length === 0) {
+        setCurrentMissingOptions(null);
+        setChatMessages(prev => [
+          ...prev,
+          {
+            id: Math.random().toString(),
+            role: 'model',
+            content: `Great! I've set the ${field.replace('_id', '').replace('_', ' ')} to "${label}". All details are complete! Would you like to confirm and save this transaction?`,
+            isInteractive: true,
+          }
+        ]);
+      } else {
+        const nextOpts = generateMissingFieldOptions(clientMissing[0], updatedDraft, accounts, categories);
+        setCurrentMissingOptions(nextOpts);
+        setChatMessages(prev => [
+          ...prev,
+          {
+            id: Math.random().toString(),
+            role: 'model',
+            content: `Updated ${field.replace('_id', '').replace('_', ' ')} to "${label}". Please select or provide the ${clientMissing[0].replace('_id', '').replace('_', ' ')}:`,
+            isInteractive: false,
+          }
+        ]);
+      }
+    }
   };
 
   // Save Transaction
@@ -724,6 +806,16 @@ export default function GlobalChatbot() {
         description: draft.description || draft.category || getIncomeCategoryName(draft.income_category || 'others'),
         transaction_date: draft.transaction_date || new Date().toISOString().slice(0, 10)
       };
+
+      recordLearnedTransaction({
+        transaction_type: transactionPayload.transaction_type,
+        amount: transactionPayload.amount,
+        from_account_id: transactionPayload.from_account_id,
+        to_account_id: transactionPayload.to_account_id,
+        category: transactionPayload.category,
+        description: transactionPayload.description,
+        transaction_date: transactionPayload.transaction_date,
+      });
       
       const newTx = await transactionApi.createTransaction(transactionPayload);
 
@@ -931,6 +1023,16 @@ export default function GlobalChatbot() {
           ),
           transaction_date: item.transaction_date || new Date().toISOString().slice(0, 10),
         };
+
+        recordLearnedTransaction({
+          transaction_type: payload.transaction_type,
+          amount: payload.amount,
+          from_account_id: payload.from_account_id,
+          to_account_id: payload.to_account_id,
+          category: payload.category,
+          description: payload.description,
+          transaction_date: payload.transaction_date,
+        });
 
         await transactionApi.createTransaction(payload);
 
@@ -1518,6 +1620,62 @@ export default function GlobalChatbot() {
         {/* Input container at the bottom */}
         <div className="p-4 border-t border-white/10 bg-slate-900/90 dark:bg-slate-950/95 backdrop-blur-md shrink-0 space-y-3">
           
+          {/* Missing Information Selection Options */}
+          {currentMissingOptions && (
+            <div className="space-y-2 p-3 rounded-xl bg-slate-950/90 border border-teal-500/30 animate-in fade-in-50 duration-300 shadow-lg">
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] text-teal-300 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                  <Sparkles className="h-3 w-3 text-teal-400 animate-pulse" />
+                  Select {currentMissingOptions.fieldLabel || currentMissingOptions.field.replace('_id', '').replace('_', ' ')}:
+                </p>
+                <Badge variant="outline" className="text-[9px] border-amber-500/40 text-amber-300 bg-amber-500/10">
+                  Select Option
+                </Badge>
+              </div>
+              <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pr-1">
+                {currentMissingOptions.options.map((opt, idx) => (
+                  <Button
+                    key={idx}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-[11px] h-8 px-3 rounded-full bg-slate-900 text-slate-100 hover:bg-teal-500 hover:text-slate-950 border border-teal-500/30 hover:border-teal-500 transition-all duration-200 shadow-sm font-medium hover:-translate-y-0.5 active:scale-95 flex items-center gap-1.5"
+                    onClick={() => handleSelectMissingOption(currentMissingOptions.field, opt.value, opt.label)}
+                  >
+                    {opt.icon && <span>{opt.icon}</span>}
+                    <span>{opt.label}</span>
+                    {opt.sublabel && <span className="text-[9px] opacity-70">({opt.sublabel})</span>}
+                  </Button>
+                ))}
+                {currentMissingOptions.allowCustomInput && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-[11px] h-8 px-3 rounded-full bg-slate-900 text-amber-300 hover:bg-amber-500 hover:text-slate-950 border border-dashed border-amber-500/40 hover:border-amber-500 transition-all duration-200 shadow-sm font-medium"
+                    onClick={() => {
+                      const customVal = prompt(`Enter custom ${currentMissingOptions.fieldLabel || currentMissingOptions.field}:`);
+                      if (customVal && customVal.trim()) {
+                        const val = currentMissingOptions.field === 'amount' ? parseFloat(customVal.trim()) : customVal.trim();
+                        if (currentMissingOptions.field === 'amount' && (isNaN(val as number) || (val as number) <= 0)) {
+                          alert('Please enter a valid positive amount.');
+                          return;
+                        }
+                        handleSelectMissingOption(
+                          currentMissingOptions.field,
+                          val,
+                          currentMissingOptions.field === 'amount' ? `₹${Number(val).toLocaleString('en-IN')}` : String(val)
+                        );
+                      }
+                    }}
+                  >
+                    ➕ Custom {currentMissingOptions.fieldLabel || 'Value'}
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Autocomplete Suggestion Chips */}
           {suggestions.length > 0 && (
             <div className="space-y-1.5 animate-in fade-in-50 duration-300">

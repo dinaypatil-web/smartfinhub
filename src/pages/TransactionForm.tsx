@@ -46,7 +46,10 @@ import {
   parseSmartChatbotCommand,
   generateTransactionAIInsight,
   generateHeuristicTransactionInsight,
+  recordLearnedTransaction,
+  generateMissingFieldOptions,
   type PostPostingAIInsight,
+  type MissingOptionsConfig,
 } from '@/services/aiService';
 import { formatCurrency } from '@/utils/format';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -265,6 +268,78 @@ export default function TransactionForm() {
 
   // Autocomplete Suggestions logic
   const [suggestions, setSuggestions] = useState<{ text: string; type: 'reason' | 'account' }[]>([]);
+  const [currentMissingOptions, setCurrentMissingOptions] = useState<MissingOptionsConfig | null>(null);
+
+  const handleSelectMissingOption = (field: string, value: any, label: string) => {
+    const updatedFormData = { ...formData };
+    if (field === 'amount') {
+      updatedFormData.amount = String(value);
+    } else if (field === 'from_account_id') {
+      updatedFormData.from_account_id = String(value);
+    } else if (field === 'to_account_id') {
+      updatedFormData.to_account_id = String(value);
+    } else if (field === 'category') {
+      updatedFormData.category = String(value);
+    } else if (field === 'income_category') {
+      updatedFormData.income_category = String(value);
+    } else if (field === 'transaction_type') {
+      updatedFormData.transaction_type = value;
+    } else {
+      (updatedFormData as any)[field] = value;
+    }
+
+    setFormData(updatedFormData);
+    recordLearnedTransaction({
+      transaction_type: updatedFormData.transaction_type,
+      amount: parseFloat(updatedFormData.amount) || 0,
+      from_account_id: updatedFormData.from_account_id || null,
+      to_account_id: updatedFormData.to_account_id || null,
+      category: updatedFormData.category || null,
+      description: updatedFormData.description || '',
+      transaction_date: updatedFormData.transaction_date,
+    });
+
+    toast({
+      title: 'Field Updated ✨',
+      description: `Set ${field.replace('_id', '').replace('_', ' ')} to ${label}`,
+    });
+
+    const remainingMissing: string[] = [];
+    if (!updatedFormData.amount || parseFloat(updatedFormData.amount) <= 0) remainingMissing.push('amount');
+    if (updatedFormData.transaction_type === 'expense') {
+      if (!updatedFormData.from_account_id) remainingMissing.push('from_account_id');
+      if (!updatedFormData.category) remainingMissing.push('category');
+    } else if (updatedFormData.transaction_type === 'income') {
+      if (!updatedFormData.to_account_id) remainingMissing.push('to_account_id');
+      if (!updatedFormData.income_category) remainingMissing.push('income_category');
+    } else if (['transfer', 'withdrawal', 'loan_payment', 'credit_card_repayment'].includes(updatedFormData.transaction_type)) {
+      if (!updatedFormData.from_account_id) remainingMissing.push('from_account_id');
+      if (!updatedFormData.to_account_id) remainingMissing.push('to_account_id');
+    }
+
+    if (remainingMissing.length === 0) {
+      setCurrentMissingOptions(null);
+      setChatMessages(prev => [
+        ...prev,
+        {
+          id: Math.random().toString(),
+          role: 'model',
+          content: `All required details are complete! The transaction form is now ready for submission.`,
+        }
+      ]);
+    } else {
+      const nextOpts = generateMissingFieldOptions(remainingMissing[0], updatedFormData, accounts, categories);
+      setCurrentMissingOptions(nextOpts);
+      setChatMessages(prev => [
+        ...prev,
+        {
+          id: Math.random().toString(),
+          role: 'model',
+          content: `Updated ${field.replace('_id', '').replace('_', ' ')} to ${label}. Please select ${nextOpts?.fieldLabel || remainingMissing[0]}:`,
+        }
+      ]);
+    }
+  };
 
   useEffect(() => {
     if (!chatInput) {
@@ -945,6 +1020,7 @@ export default function TransactionForm() {
                   title: 'Batch Mode Activated 📋',
                   description: `Loaded ${sanitizedBatch.length} transactions. Transaction #1 is ready in the form.`,
                 });
+                setCurrentMissingOptions(null);
                 return;
               }
             }
@@ -1043,6 +1119,15 @@ export default function TransactionForm() {
                 title: 'Form Auto-Filled ✨',
                 description: `Successfully set: ${updatedNames.join(', ')}`,
               });
+            }
+
+            if (result.missingOptions) {
+              setCurrentMissingOptions(result.missingOptions);
+            } else if (result.missingFields && result.missingFields.length > 0) {
+              const opts = generateMissingFieldOptions(result.missingFields[0], { ...formData, ...updates }, accounts, categories);
+              setCurrentMissingOptions(opts);
+            } else {
+              setCurrentMissingOptions(null);
             }
           }
         }
@@ -1215,6 +1300,16 @@ export default function TransactionForm() {
           ),
           transaction_date: item.transaction_date || today,
         };
+
+        recordLearnedTransaction({
+          transaction_type: payload.transaction_type,
+          amount: payload.amount,
+          from_account_id: payload.from_account_id,
+          to_account_id: payload.to_account_id,
+          category: payload.category,
+          description: payload.description,
+          transaction_date: payload.transaction_date,
+        });
 
         await transactionApi.createTransaction(payload);
         item.isPosted = true;
@@ -1892,6 +1987,15 @@ export default function TransactionForm() {
         transaction_splits: (formData.transaction_type === 'expense' && isSplitCategory) ? splitCategories : undefined,
       };
 
+      recordLearnedTransaction({
+        transaction_type: formData.transaction_type,
+        amount: parseFloat(formData.amount) || 0,
+        from_account_id: formData.from_account_id || null,
+        to_account_id: formData.to_account_id || null,
+        category: formData.category || null,
+        description: formData.description || '',
+        transaction_date: formData.transaction_date,
+      });
 
       if (id) {
         const transactionId = id as string;
@@ -3911,6 +4015,62 @@ export default function TransactionForm() {
                       {s.text}
                     </Button>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Missing Information Selection Options */}
+            {currentMissingOptions && (
+              <div className="mb-3 p-2.5 rounded-xl bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-900/40 space-y-2 animate-in fade-in-50 duration-300 shadow-sm shrink-0">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-purple-900 dark:text-purple-200 flex items-center gap-1.5">
+                    <Sparkles className="h-3 w-3 text-purple-600 animate-pulse" />
+                    Select {currentMissingOptions.fieldLabel || currentMissingOptions.field.replace('_id', '').replace('_', ' ')}:
+                  </span>
+                  <Badge variant="outline" className="text-[9px] bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 border-amber-300">
+                    Missing Info
+                  </Badge>
+                </div>
+                <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pr-1">
+                  {currentMissingOptions.options.map((opt, idx) => (
+                    <Button
+                      key={idx}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="text-[10px] h-7 px-2.5 rounded-full bg-white dark:bg-slate-850 hover:bg-purple-100 dark:hover:bg-purple-900/40 text-purple-800 dark:text-purple-200 border border-purple-200 dark:border-purple-800/50 transition-all shadow-xs font-medium flex items-center gap-1"
+                      onClick={() => handleSelectMissingOption(currentMissingOptions.field, opt.value, opt.label)}
+                    >
+                      {opt.icon && <span>{opt.icon}</span>}
+                      <span>{opt.label}</span>
+                      {opt.sublabel && <span className="text-[8px] opacity-70">({opt.sublabel})</span>}
+                    </Button>
+                  ))}
+                  {currentMissingOptions.allowCustomInput && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="text-[10px] h-7 px-2.5 rounded-full bg-white dark:bg-slate-850 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/40 border border-dashed border-amber-300 dark:border-amber-700 transition-all shadow-xs font-medium"
+                      onClick={() => {
+                        const customVal = prompt(`Enter custom ${currentMissingOptions.fieldLabel || currentMissingOptions.field}:`);
+                        if (customVal && customVal.trim()) {
+                          const val = currentMissingOptions.field === 'amount' ? parseFloat(customVal.trim()) : customVal.trim();
+                          if (currentMissingOptions.field === 'amount' && (isNaN(val as number) || (val as number) <= 0)) {
+                            alert('Please enter a valid positive amount.');
+                            return;
+                          }
+                          handleSelectMissingOption(
+                            currentMissingOptions.field,
+                            val,
+                            currentMissingOptions.field === 'amount' ? `₹${Number(val).toLocaleString('en-IN')}` : String(val)
+                          );
+                        }
+                      }}
+                    >
+                      ➕ Custom {currentMissingOptions.fieldLabel || 'Value'}
+                    </Button>
+                  )}
                 </div>
               </div>
             )}

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useHybridAuth } from '@/contexts/HybridAuthContext';
 import { transactionApi, accountApi, categoryApi, budgetApi, interestRateApi, emiApi, userCustomBankLinksApi } from '@/db/api';
-import { parseSmartChatbotCommand, type SmartChatbotResult } from '@/services/aiService';
+import { parseSmartChatbotCommand, type SmartChatbotResult, recordLearnedTransaction } from '@/services/aiService';
 import { INCOME_CATEGORIES, getIncomeCategoryName } from '@/constants/incomeCategories';
 import { countries } from '@/utils/countries';
 import { getBanksByCountry, getBankLogo } from '@/utils/banks';
@@ -989,6 +989,16 @@ export default function VoiceTransactPage() {
       
       setDraft(updatedDraft);
       setMissingFields(clientMissing);
+
+      recordLearnedTransaction({
+        transaction_type: updatedDraft.transaction_type,
+        amount: updatedDraft.amount,
+        from_account_id: updatedDraft.from_account_id,
+        to_account_id: updatedDraft.to_account_id,
+        category: updatedDraft.category,
+        description: updatedDraft.description,
+        transaction_date: updatedDraft.transaction_date,
+      });
       
       friendlyQuestion = isComplete 
         ? "Awesome! Everything is ready now. Would you like to confirm and save this transaction?"
@@ -1278,6 +1288,16 @@ export default function VoiceTransactPage() {
           transaction_date: item.transaction_date || today
         };
 
+        recordLearnedTransaction({
+          transaction_type: transactionPayload.transaction_type,
+          amount: transactionPayload.amount,
+          from_account_id: transactionPayload.from_account_id,
+          to_account_id: transactionPayload.to_account_id,
+          category: transactionPayload.category,
+          description: transactionPayload.description,
+          transaction_date: transactionPayload.transaction_date,
+        });
+
         await transactionApi.createTransaction(transactionPayload);
 
         // Fetch updated account balance for all associated accounts
@@ -1373,6 +1393,16 @@ export default function VoiceTransactPage() {
         description: draft.description || draft.category || getIncomeCategoryName(draft.income_category || 'others'),
         transaction_date: draft.transaction_date || new Date().toISOString().slice(0, 10)
       };
+
+      recordLearnedTransaction({
+        transaction_type: transactionPayload.transaction_type,
+        amount: transactionPayload.amount,
+        from_account_id: transactionPayload.from_account_id,
+        to_account_id: transactionPayload.to_account_id,
+        category: transactionPayload.category,
+        description: transactionPayload.description,
+        transaction_date: transactionPayload.transaction_date,
+      });
       
       const newTx = await transactionApi.createTransaction(transactionPayload);
 

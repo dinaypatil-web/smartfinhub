@@ -1,6 +1,16 @@
 // Custom robust SSE parser implementation
 
-const APP_ID = import.meta.env.VITE_APP_ID || 'smartfinhub';
+import {
+  predictFromLearning,
+  generateMissingFieldOptions,
+  recordLearnedTransaction,
+  buildLearnedProfileFromHistory,
+  type MissingOptionsConfig
+} from './aiLearningService';
+
+export { recordLearnedTransaction, buildLearnedProfileFromHistory, generateMissingFieldOptions, type MissingOptionsConfig };
+
+const APP_ID = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_APP_ID) || 'smartfinhub';
 const AI_API_URL = 'https://api-integrations.appmedo.com/app-7wraacwkpcld/api-rLob8RdzAOl9/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse';
 
 export interface AIMessage {
@@ -461,6 +471,7 @@ export interface SmartChatbotResult {
   batchTransactions?: BatchTransactionItem[];
   isComplete: boolean;
   missingFields: string[];
+  missingOptions?: MissingOptionsConfig | null;
   reply?: string;
   clarificationQuestion: string;
   extraContext?: any;
@@ -942,6 +953,7 @@ export function tryLocalHeuristicFallback(
       extractedInfo: {},
       isComplete: true,
       missingFields: [],
+      missingOptions: null,
       reply,
       clarificationQuestion: reply,
       extraContext: { accounts }
@@ -959,6 +971,7 @@ export function tryLocalHeuristicFallback(
       extractedInfo: {},
       isComplete: true,
       missingFields: [],
+      missingOptions: null,
       reply,
       clarificationQuestion: reply,
       extraContext: { categories }
@@ -970,13 +983,14 @@ export function tryLocalHeuristicFallback(
   const defaultCashAcc = accounts.find(a => a.account_type === 'cash')?.id || accounts.find(a => a.account_type === 'bank')?.id || accounts[0]?.id || null;
   const defaultIncomeAcc = accounts.find(a => a.account_type === 'bank')?.id || accounts[0]?.id || null;
 
+  // Learn from history and memory
+  const learnedInfo = predictFromLearning(command, accounts, categories, transactions);
+
   // Check if the overall command mentions a common account or date for the whole batch
-  const overallAccId = resolveAccountFromText(command, accounts, null);
+  const overallAccId = resolveAccountFromText(command, accounts, null) || learnedInfo.predictedFromAccountId;
   const overallDate = parseDateFromText(command, currentDate);
 
   // Split command into candidate transaction segments.
-  // CRITICAL: NEVER split on '&' (e.g. "Food & Dining", "Marks & Spencer", "tea & snacks").
-  // Split on 'and' or commas when followed by transaction actions, merchant/category + amount, or currency amounts.
   const lines = command.trim().split(/\r?\n|;/).map(l => l.trim()).filter(Boolean);
   const segments: string[] = [];
 
@@ -991,7 +1005,6 @@ export function tryLocalHeuristicFallback(
   const extractedBatch: BatchTransactionItem[] = [];
 
   for (const rawSeg of segments) {
-    // Strip leading list numbering like "1.", "1)", "2 -", "#1", "*", "-" or leading "and "
     const seg = rawSeg.replace(/^\s*(?:\d+[\.\)\-:]+|[#*•\-]|and\b)\s*/i, '').trim();
     if (!seg) continue;
 
@@ -999,23 +1012,20 @@ export function tryLocalHeuristicFallback(
 
     // Extract amounts using robust boundary regex
     const amountMatches = [...seg.matchAll(/(?:(?:₹|rs\.?|inr)\s*)?(\b\d+(?:,\d+)*(?:\.\d{1,2})?\b)/gi)];
-    if (!amountMatches || amountMatches.length === 0) continue;
-
     let matchedAmount: number | null = null;
-    for (const match of amountMatches) {
-      const valStr = match[1].replace(/,/g, '');
-      const num = parseFloat(valStr);
-      // Skip year like 2024..2035 unless currency or payment keyword is explicitly attached
-      if (num >= 2020 && num <= 2035 && !match[0].match(/₹|rs|inr/i) && !segText.match(/salary|rent|fees|amount|spent|paid/i)) {
-        continue;
-      }
-      if (num > 0) {
-        matchedAmount = num;
-        break;
+    if (amountMatches && amountMatches.length > 0) {
+      for (const match of amountMatches) {
+        const valStr = match[1].replace(/,/g, '');
+        const num = parseFloat(valStr);
+        if (num >= 2020 && num <= 2035 && !match[0].match(/₹|rs|inr/i) && !segText.match(/salary|rent|fees|amount|spent|paid/i)) {
+          continue;
+        }
+        if (num > 0) {
+          matchedAmount = num;
+          break;
+        }
       }
     }
-
-    if (!matchedAmount || isNaN(matchedAmount) || matchedAmount <= 0) continue;
 
     // Detect withdrawal
     const isWithdrawal = segText.includes('withdrew') ||
@@ -1035,7 +1045,6 @@ export function tryLocalHeuristicFallback(
     );
 
     // Detect income vs expense
-    // WARNING: "credit card" does NOT mean income
     const cleanedForIncome = segText.replace(/credit\s*card|creditcard|\bcc\b/g, '');
     const isIncome = !isWithdrawal && !isTransfer && (
       cleanedForIncome.includes('salary') ||
@@ -1049,11 +1058,50 @@ export function tryLocalHeuristicFallback(
       cleanedForIncome.includes('cashback')
     );
 
-    // Account for this segment
-    const segAccId = resolveAccountFromText(seg, accounts, null) || overallAccId;
+    const txType: 'expense' | 'income' | 'withdrawal' | 'transfer' = 
+      isWithdrawal ? 'withdrawal' : isTransfer ? 'transfer' : isIncome ? 'income' : 'expense';
 
     // Date extraction: check segment first, then overall command date
     const segDate = parseDateFromText(seg, overallDate);
+
+    // If amount is missing, check if this segment expresses transaction intent
+    if (!matchedAmount || isNaN(matchedAmount) || matchedAmount <= 0) {
+      const hasTxIntent = /spent|paid|bought|purchased|ordered|recharged|withdrew|withdraw|transferred|transfer|received|salary|income|petrol|fuel|groceries|grocery|coffee|tea|dinner|lunch|shopping|rent|bill|tickets|ticket|movie|doctor|medicine|pharmacy|zomato|swiggy|uber|ola|starbucks|dmart|recharge/i.test(segText);
+      if (hasTxIntent) {
+        const cleanDesc = cleanDescriptionFromText(seg, null, txType);
+        const expCat = learnedInfo.predictedCategory || resolveCategoryFromText(seg, categories, transactions);
+        const explicitAcc = resolveAccountFromText(seg, accounts, null) || overallAccId;
+        const missingOpts = generateMissingFieldOptions('amount', accounts, categories, {
+          transaction_type: txType,
+          category: expCat
+        });
+        const reply = `I've prepared a draft for **${cleanDesc}** on ${segDate}. How much was the amount?`;
+        return {
+          intent: 'transaction',
+          extractedInfo: {
+            transaction_type: txType,
+            amount: null,
+            from_account_id: explicitAcc || learnedInfo.predictedFromAccountId || null,
+            to_account_id: isWithdrawal ? defaultCashAcc : null,
+            category: isWithdrawal || isTransfer || isIncome ? null : expCat,
+            income_category: isIncome ? resolveIncomeCategoryFromText(seg) : null,
+            description: cleanDesc,
+            transaction_date: segDate
+          },
+          batchTransactions: [],
+          isComplete: false,
+          missingFields: ['amount'],
+          missingOptions: missingOpts,
+          reply,
+          clarificationQuestion: reply
+        };
+      }
+      continue;
+    }
+
+    // Account for this segment
+    const explicitAccId = resolveAccountFromText(seg, accounts, null);
+    const segAccId = explicitAccId || overallAccId;
 
     if (isWithdrawal) {
       const cleanDesc = cleanDescriptionFromText(seg, null, 'withdrawal');
@@ -1093,7 +1141,7 @@ export function tryLocalHeuristicFallback(
         transaction_date: segDate
       });
     } else {
-      const expCat = resolveCategoryFromText(seg, categories, transactions);
+      const expCat = learnedInfo.predictedCategory || resolveCategoryFromText(seg, categories, transactions);
       const cleanDesc = cleanDescriptionFromText(seg, expCat, 'expense');
       extractedBatch.push({
         transaction_type: 'expense',
@@ -1127,6 +1175,7 @@ export function tryLocalHeuristicFallback(
       batchTransactions: extractedBatch,
       isComplete: true,
       missingFields: [],
+      missingOptions: null,
       reply,
       clarificationQuestion: reply
     };
@@ -1134,14 +1183,66 @@ export function tryLocalHeuristicFallback(
 
   if (extractedBatch.length === 1) {
     const single = extractedBatch[0];
+    const isSingleExpense = single.transaction_type === 'expense';
+
+    const explicitAccId = resolveAccountFromText(command, accounts, null);
+    const learnedAccId = learnedInfo.predictedFromAccountId;
+    const isLearnedAcc = !explicitAccId && Boolean(learnedAccId);
+
+    // 1. Check if Paying Account is missing (Expense with multiple accounts, no explicit mention, and no learned account)
+    const eligibleExpenseAccounts = accounts.filter(a => ['bank', 'cash', 'credit_card'].includes(a.account_type));
+    if (isSingleExpense && !explicitAccId && !isLearnedAcc && eligibleExpenseAccounts.length > 1) {
+      const missingOpts = generateMissingFieldOptions('from_account_id', accounts, categories, single);
+      const reply = `I've prepared an expense of ₹${single.amount.toLocaleString('en-IN')} for **${single.description || single.category}** on ${single.transaction_date}. Which account was used for this payment?`;
+      return {
+        intent: 'transaction',
+        extractedInfo: {
+          ...single,
+          from_account_id: null
+        },
+        batchTransactions: [single],
+        isComplete: false,
+        missingFields: ['from_account_id'],
+        missingOptions: missingOpts,
+        reply,
+        clarificationQuestion: reply
+      };
+    }
+
+    // 2. Check if Category is missing (Generic spent/paid with no merchant/category in text and no learned category)
+    const hasCategoryInText = CATEGORY_TAXONOMY.some(g => g.keywords.some(k => text.includes(k))) ||
+                             categories.some(c => text.includes(c.name.toLowerCase()));
+    if (isSingleExpense && !hasCategoryInText && !learnedInfo.predictedCategory && !text.match(/grocer|food|shop|fuel|petrol|util|bill|rent|movie|med/i)) {
+      const missingOpts = generateMissingFieldOptions('category', accounts, categories, single);
+      const reply = `I've recorded ₹${single.amount.toLocaleString('en-IN')} spent on ${single.transaction_date}. Which category should this be filed under?`;
+      return {
+        intent: 'transaction',
+        extractedInfo: {
+          ...single,
+          category: null
+        },
+        batchTransactions: [single],
+        isComplete: false,
+        missingFields: ['category'],
+        missingOptions: missingOpts,
+        reply,
+        clarificationQuestion: reply
+      };
+    }
+
+    // 3. Complete single transaction
+    const learnedNote = isLearnedAcc
+      ? ` (auto-selected **${accounts.find(a => a.id === single.from_account_id)?.account_name}** from past patterns)`
+      : '';
     const catName = single.transaction_type === 'expense' ? single.category : single.transaction_type === 'income' ? single.income_category : null;
-    const reply = `I've prepared a ${single.transaction_type} of ₹${single.amount.toLocaleString('en-IN')}${catName ? ` for ${catName}` : ''}${single.description ? ` (${single.description})` : ''} on ${single.transaction_date}. Form is auto-filled and ready!`;
+    const reply = `I've prepared a ${single.transaction_type} of ₹${single.amount.toLocaleString('en-IN')}${catName ? ` for **${catName}**` : ''}${single.description ? ` (${single.description})` : ''}${learnedNote} on ${single.transaction_date}. Form is ready!`;
     return {
       intent: 'transaction',
       extractedInfo: single,
       batchTransactions: [single],
       isComplete: true,
       missingFields: [],
+      missingOptions: null,
       reply,
       clarificationQuestion: reply
     };
@@ -1553,6 +1654,16 @@ export async function parseSmartChatbotCommand(
             parsedResult.extractedInfo.income_category = 'others';
           }
         }
+      }
+
+      // Generate missing options if missing fields exist
+      if (parsedResult.missingFields && parsedResult.missingFields.length > 0 && !parsedResult.missingOptions) {
+        parsedResult.missingOptions = generateMissingFieldOptions(
+          parsedResult.missingFields[0],
+          accounts,
+          categories,
+          parsedResult.extractedInfo || {}
+        );
       }
 
       // Normalize reply and clarificationQuestion so neither is ever blank/null
