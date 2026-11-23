@@ -167,6 +167,16 @@ export default function Settings() {
         }
       }
 
+      if (res.success) {
+        saveAIProviderConfig({
+          provider: aiProvider,
+          geminiApiKey,
+          geminiModel: (aiProvider === 'gemini' && res.detectedModel) ? res.detectedModel : geminiModel,
+          groqApiKey,
+          groqModel: (aiProvider === 'groq' && res.detectedModel) ? res.detectedModel : groqModel,
+        });
+      }
+
       toast({
         title: res.success ? 'Connection Successful' : 'Connection Failed',
         description: res.message,
@@ -496,6 +506,7 @@ export default function Settings() {
               onValueChange={(val: AIProviderType) => {
                 setAiProvider(val);
                 setTestResult(null);
+                saveAIProviderConfig({ provider: val });
               }}
             >
               <SelectTrigger id="ai_provider" className="bg-background">
@@ -554,7 +565,14 @@ export default function Settings() {
                     type={showGeminiKey ? 'text' : 'password'}
                     placeholder="AIzaSy..."
                     value={geminiApiKey}
-                    onChange={(e) => setGeminiApiKey(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setGeminiApiKey(val);
+                      saveAIProviderConfig({ geminiApiKey: val, provider: 'gemini' });
+                      if (val.trim() && aiProvider !== 'gemini') {
+                        setAiProvider('gemini');
+                      }
+                    }}
                     className="pr-10 font-mono text-sm"
                   />
                   <button
@@ -592,12 +610,19 @@ export default function Settings() {
                     type="text"
                     placeholder="gemini-2.5-flash"
                     value={geminiModel}
-                    onChange={(e) => setGeminiModel(e.target.value.trim().replace(/^models\//, ''))}
+                    onChange={(e) => {
+                      const val = e.target.value.trim().replace(/^models\//, '');
+                      setGeminiModel(val);
+                      saveAIProviderConfig({ geminiModel: val });
+                    }}
                     className="font-mono text-sm bg-background flex-1"
                   />
                   <Select
                     value={geminiModel}
-                    onValueChange={(val) => setGeminiModel(val)}
+                    onValueChange={(val) => {
+                      setGeminiModel(val);
+                      saveAIProviderConfig({ geminiModel: val });
+                    }}
                   >
                     <SelectTrigger className="w-[140px] bg-background">
                       <SelectValue placeholder="Presets" />
@@ -619,7 +644,10 @@ export default function Settings() {
                     <button
                       key={m}
                       type="button"
-                      onClick={() => setGeminiModel(m)}
+                      onClick={() => {
+                        setGeminiModel(m);
+                        saveAIProviderConfig({ geminiModel: m });
+                      }}
                       className={`text-[11px] px-2 py-0.5 rounded-full border transition-all ${
                         geminiModel === m
                           ? 'bg-primary text-primary-foreground border-primary font-medium'
@@ -664,7 +692,14 @@ export default function Settings() {
                     type={showGroqKey ? 'text' : 'password'}
                     placeholder="gsk_..."
                     value={groqApiKey}
-                    onChange={(e) => setGroqApiKey(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setGroqApiKey(val);
+                      saveAIProviderConfig({ groqApiKey: val, provider: 'groq' });
+                      if (val.trim() && aiProvider !== 'groq') {
+                        setAiProvider('groq');
+                      }
+                    }}
                     className="pr-10 font-mono text-sm"
                   />
                   <button
@@ -702,12 +737,19 @@ export default function Settings() {
                     type="text"
                     placeholder="llama3-70b-8192"
                     value={groqModel}
-                    onChange={(e) => setGroqModel(e.target.value.trim())}
+                    onChange={(e) => {
+                      const val = e.target.value.trim();
+                      setGroqModel(val);
+                      saveAIProviderConfig({ groqModel: val });
+                    }}
                     className="font-mono text-sm bg-background flex-1"
                   />
                   <Select
                     value={groqModel}
-                    onValueChange={(val) => setGroqModel(val)}
+                    onValueChange={(val) => {
+                      setGroqModel(val);
+                      saveAIProviderConfig({ groqModel: val });
+                    }}
                   >
                     <SelectTrigger className="w-[140px] bg-background">
                       <SelectValue placeholder="Presets" />
@@ -729,7 +771,10 @@ export default function Settings() {
                     <button
                       key={m}
                       type="button"
-                      onClick={() => setGroqModel(m)}
+                      onClick={() => {
+                        setGroqModel(m);
+                        saveAIProviderConfig({ groqModel: m });
+                      }}
                       className={`text-[11px] px-2 py-0.5 rounded-full border transition-all ${
                         groqModel === m
                           ? 'bg-primary text-primary-foreground border-primary font-medium'

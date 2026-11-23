@@ -112,7 +112,14 @@ export function getAIProviderConfig(): AIProviderConfig {
     }
 
     if (savedProvider && ['gemini', 'groq', 'builtin'].includes(savedProvider)) {
-      provider = savedProvider;
+      const explicitBuiltin = localStorage.getItem('smartfin_explicit_builtin') === 'true';
+      if (savedProvider === 'builtin' && !explicitBuiltin && (geminiApiKey || groqApiKey)) {
+        // User has cloud keys configured; prioritize cloud instead of accidental stale builtin
+        provider = geminiApiKey ? 'gemini' : 'groq';
+        localStorage.setItem('smartfin_ai_provider', provider);
+      } else {
+        provider = savedProvider;
+      }
     } else if (geminiApiKey) {
       provider = 'gemini';
     } else if (groqApiKey) {
@@ -131,6 +138,39 @@ export function getAIProviderConfig(): AIProviderConfig {
   }
 
   return { provider, geminiApiKey, geminiModel, groqApiKey, groqModel };
+}
+
+export function saveAIProviderConfig(config: Partial<AIProviderConfig>): void {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+
+  if (config.provider) {
+    localStorage.setItem('smartfin_ai_provider', config.provider);
+    if (config.provider === 'builtin') {
+      localStorage.setItem('smartfin_explicit_builtin', 'true');
+    } else {
+      localStorage.removeItem('smartfin_explicit_builtin');
+    }
+  }
+  if (config.geminiApiKey !== undefined) {
+    const trimmed = config.geminiApiKey.trim();
+    localStorage.setItem('smartfin_gemini_api_key', trimmed);
+    if (trimmed && localStorage.getItem('smartfin_ai_provider') === 'builtin' && localStorage.getItem('smartfin_explicit_builtin') !== 'true') {
+      localStorage.setItem('smartfin_ai_provider', 'gemini');
+    }
+  }
+  if (config.geminiModel !== undefined) {
+    localStorage.setItem('smartfin_gemini_model', config.geminiModel.trim().replace(/^models\//, ''));
+  }
+  if (config.groqApiKey !== undefined) {
+    const trimmed = config.groqApiKey.trim();
+    localStorage.setItem('smartfin_groq_api_key', trimmed);
+    if (trimmed && localStorage.getItem('smartfin_ai_provider') === 'builtin' && localStorage.getItem('smartfin_explicit_builtin') !== 'true' && !localStorage.getItem('smartfin_gemini_api_key')) {
+      localStorage.setItem('smartfin_ai_provider', 'groq');
+    }
+  }
+  if (config.groqModel !== undefined) {
+    localStorage.setItem('smartfin_groq_model', config.groqModel.trim());
+  }
 }
 
 export async function fetchGeminiAvailableModels(apiKey: string): Promise<string[]> {
@@ -178,14 +218,6 @@ export async function fetchGroqAvailableModels(apiKey: string): Promise<string[]
   return fallbackList;
 }
 
-export function saveAIProviderConfig(config: Partial<AIProviderConfig>) {
-  if (typeof window === 'undefined' || !window.localStorage) return;
-  if (config.provider) localStorage.setItem('smartfin_ai_provider', config.provider);
-  if (config.geminiApiKey !== undefined) localStorage.setItem('smartfin_gemini_api_key', config.geminiApiKey.trim());
-  if (config.geminiModel) localStorage.setItem('smartfin_gemini_model', config.geminiModel.trim());
-  if (config.groqApiKey !== undefined) localStorage.setItem('smartfin_groq_api_key', config.groqApiKey.trim());
-  if (config.groqModel) localStorage.setItem('smartfin_groq_model', config.groqModel.trim());
-}
 
 export async function testAIProviderConnection(
   provider: AIProviderType,
@@ -340,6 +372,130 @@ export async function testAIProviderConnection(
   }
 
   return { success: false, message: 'Unknown AI provider' };
+}
+
+async function callGeminiJSON(
+  apiKey: string,
+  model: string,
+  contents: any[],
+  systemInstruction?: string
+): Promise<string> {
+  let cleanModel = (model || DEFAULT_GEMINI_MODEL).trim().replace(/^models\//, '');
+  if (DEPRECATED_GEMINI_MODELS.includes(cleanModel)) {
+    cleanModel = DEFAULT_GEMINI_MODEL;
+  }
+
+  const makeUrl = (m: string) => `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const body: any = {
+    contents,
+    generationConfig: {
+      temperature: 0.1,
+      responseMimeType: 'application/json'
+    }
+  };
+  if (systemInstruction) {
+    body.systemInstruction = {
+      parts: [{ text: systemInstruction }]
+    };
+  }
+
+  let response = await fetch(makeUrl(cleanModel), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+
+  if (!response.ok) {
+    const errorJson = await response.json().catch(() => ({}));
+    const message = errorJson.error?.message || response.statusText || 'Gemini API call failed';
+
+    // Auto-heal if model is deprecated or not found
+    if (response.status === 404 || message.includes('not found') || message.includes('no longer available')) {
+      console.warn(`Model ${cleanModel} failed (${message}). Auto-healing model discovery...`);
+      const available = await fetchGeminiAvailableModels(apiKey);
+      const fallbackModel = available.find(m => m.includes('2.5-flash') || m.includes('flash')) || available[0];
+      if (fallbackModel && fallbackModel !== cleanModel) {
+        cleanModel = fallbackModel;
+        saveAIProviderConfig({ geminiModel: fallbackModel });
+        response = await fetch(makeUrl(cleanModel), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+      }
+    }
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      const finalMsg = err.error?.message || message;
+      throw new Error(`Gemini API Error (${response.status}): ${finalMsg}`);
+    }
+  }
+
+  const data = await response.json();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  return text;
+}
+
+async function callGroqJSON(
+  apiKey: string,
+  model: string,
+  messages: Array<{ role: string; content: string }>
+): Promise<string> {
+  let targetModel = (model || DEFAULT_GROQ_MODEL).trim();
+  if (DEPRECATED_GROQ_MODELS.includes(targetModel)) {
+    targetModel = DEFAULT_GROQ_MODEL;
+  }
+
+  const url = 'https://api.groq.com/openai/v1/chat/completions';
+  const makeBody = (m: string) => ({
+    model: m,
+    messages,
+    temperature: 0.1,
+    response_format: { type: 'json_object' }
+  });
+
+  let response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify(makeBody(targetModel))
+  });
+
+  if (!response.ok) {
+    const errJson = await response.json().catch(() => ({}));
+    const message = errJson.error?.message || response.statusText || 'Groq API call failed';
+
+    if (response.status === 400 || response.status === 404 || message.includes('does not exist') || message.includes('do not have access')) {
+      console.warn(`Groq model ${targetModel} failed (${message}). Auto-healing model discovery...`);
+      const available = await fetchGroqAvailableModels(apiKey);
+      const fallbackModel = available.find(m => m.includes('70b') || m.includes('llama3') || m.includes('8b')) || available[0];
+      if (fallbackModel && fallbackModel !== targetModel) {
+        targetModel = fallbackModel;
+        saveAIProviderConfig({ groqModel: fallbackModel });
+        response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify(makeBody(targetModel))
+        });
+      }
+    }
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      const finalMsg = err.error?.message || message;
+      throw new Error(`Groq API Error (${response.status}): ${finalMsg}`);
+    }
+  }
+
+  const data = await response.json();
+  const text = data.choices?.[0]?.message?.content || '';
+  return text;
 }
 
 async function callGeminiStream(
@@ -700,7 +856,22 @@ export async function generateFinancialAnalysis(
       onComplete();
       return;
     } catch (e: any) {
-      console.warn('Gemini generateFinancialAnalysis failed, falling back to local analysis engine:', e);
+      console.warn('Gemini generateFinancialAnalysis failed, trying secondary cloud provider if available:', e);
+      if (config.groqApiKey) {
+        try {
+          await callGroqStream(
+            config.groqApiKey,
+            config.groqModel,
+            [{ role: 'user', content: prompt }],
+            false,
+            onChunk
+          );
+          onComplete();
+          return;
+        } catch (err2: any) {
+          console.warn('Groq secondary failover also failed:', err2);
+        }
+      }
     }
   } else if (config.provider === 'groq' && config.groqApiKey) {
     try {
@@ -714,7 +885,23 @@ export async function generateFinancialAnalysis(
       onComplete();
       return;
     } catch (e: any) {
-      console.warn('Groq generateFinancialAnalysis failed, falling back to local analysis engine:', e);
+      console.warn('Groq generateFinancialAnalysis failed, trying secondary cloud provider if available:', e);
+      if (config.geminiApiKey) {
+        try {
+          await callGeminiStream(
+            config.geminiApiKey,
+            config.geminiModel,
+            [{ role: 'user', parts: [{ text: prompt }] }],
+            undefined,
+            undefined,
+            onChunk
+          );
+          onComplete();
+          return;
+        } catch (err2: any) {
+          console.warn('Gemini secondary failover also failed:', err2);
+        }
+      }
     }
   }
 
@@ -909,7 +1096,22 @@ Be realistic and practical. Focus on sustainable changes.`;
         onComplete();
         return;
       } catch (e: any) {
-        console.warn('Gemini generateBudgetOptimization failed, falling back to local optimization engine:', e);
+        console.warn('Gemini generateBudgetOptimization failed, trying secondary cloud provider if available:', e);
+        if (config.groqApiKey) {
+          try {
+            await callGroqStream(
+              config.groqApiKey,
+              config.groqModel,
+              [{ role: 'user', content: prompt }],
+              false,
+              onChunk
+            );
+            onComplete();
+            return;
+          } catch (err2: any) {
+            console.warn('Groq secondary failover also failed:', err2);
+          }
+        }
       }
     } else if (config.provider === 'groq' && config.groqApiKey) {
       try {
@@ -923,7 +1125,23 @@ Be realistic and practical. Focus on sustainable changes.`;
         onComplete();
         return;
       } catch (e: any) {
-        console.warn('Groq generateBudgetOptimization failed, falling back to local optimization engine:', e);
+        console.warn('Groq generateBudgetOptimization failed, trying secondary cloud provider if available:', e);
+        if (config.geminiApiKey) {
+          try {
+            await callGeminiStream(
+              config.geminiApiKey,
+              config.geminiModel,
+              [{ role: 'user', parts: [{ text: prompt }] }],
+              undefined,
+              undefined,
+              onChunk
+            );
+            onComplete();
+            return;
+          } catch (err2: any) {
+            console.warn('Gemini secondary failover also failed:', err2);
+          }
+        }
       }
     }
 
@@ -1007,6 +1225,8 @@ export interface SmartChatbotResult {
   reply?: string;
   clarificationQuestion: string;
   extraContext?: any;
+  engineUsed?: 'gemini' | 'groq' | 'builtin';
+  fallbackReason?: string;
 }
 
 // Helper to resolve an account from natural language text, ID, or keywords
@@ -2012,61 +2232,108 @@ export async function parseSmartChatbotCommand(
 
     const config = getAIProviderConfig();
     let fullResponseText = '';
+    let cloudUsed: 'gemini' | 'groq' | null = null;
+    let cloudFailReason = '';
+
+    const executeGemini = async (): Promise<string> => {
+      const contentsPayload = [];
+      for (const msg of chatHistory) {
+        contentsPayload.push({
+          role: msg.role === 'model' ? 'model' : 'user',
+          parts: [{ text: msg.content }]
+        });
+      }
+      contentsPayload.push({
+        role: 'user',
+        parts: [{ text: prompt }]
+      });
+      return await callGeminiJSON(config.geminiApiKey, config.geminiModel, contentsPayload);
+    };
+
+    const executeGroq = async (): Promise<string> => {
+      const messages: Array<{ role: string; content: string }> = [];
+      for (const msg of chatHistory) {
+        messages.push({
+          role: msg.role === 'model' ? 'assistant' : 'user',
+          content: msg.content
+        });
+      }
+      messages.push({
+        role: 'user',
+        content: prompt
+      });
+      return await callGroqJSON(config.groqApiKey, config.groqModel, messages);
+    };
 
     if (config.provider === 'gemini' && config.geminiApiKey) {
       try {
-        const contentsPayload = [];
-        for (const msg of chatHistory) {
-          contentsPayload.push({
-            role: msg.role === 'model' ? 'model' : 'user',
-            parts: [{ text: msg.content }]
-          });
+        fullResponseText = await executeGemini();
+        if (fullResponseText && fullResponseText.trim()) cloudUsed = 'gemini';
+      } catch (err: any) {
+        cloudFailReason = `Gemini (${config.geminiModel}): ${err.message || 'Call failed'}`;
+        console.warn('Gemini parseSmartChatbotCommand failed, checking secondary cloud provider:', err);
+        if (config.groqApiKey) {
+          try {
+            fullResponseText = await executeGroq();
+            if (fullResponseText && fullResponseText.trim()) cloudUsed = 'groq';
+          } catch (err2: any) {
+            cloudFailReason += `; Groq failover: ${err2.message || 'Call failed'}`;
+            console.warn('Groq secondary failover also failed:', err2);
+          }
         }
-        contentsPayload.push({
-          role: 'user',
-          parts: [{ text: prompt }]
-        });
-
-        fullResponseText = await callGeminiStream(
-          config.geminiApiKey,
-          config.geminiModel,
-          contentsPayload,
-          undefined,
-          'application/json',
-          onChunk
-        );
-      } catch (err) {
-        console.warn('Gemini parseSmartChatbotCommand failed, falling back to local NLP engine:', err);
       }
     } else if (config.provider === 'groq' && config.groqApiKey) {
       try {
-        const messages: Array<{ role: string; content: string }> = [];
-        for (const msg of chatHistory) {
-          messages.push({
-            role: msg.role === 'model' ? 'assistant' : 'user',
-            content: msg.content
-          });
+        fullResponseText = await executeGroq();
+        if (fullResponseText && fullResponseText.trim()) cloudUsed = 'groq';
+      } catch (err: any) {
+        cloudFailReason = `Groq (${config.groqModel}): ${err.message || 'Call failed'}`;
+        console.warn('Groq parseSmartChatbotCommand failed, checking secondary cloud provider:', err);
+        if (config.geminiApiKey) {
+          try {
+            fullResponseText = await executeGemini();
+            if (fullResponseText && fullResponseText.trim()) cloudUsed = 'gemini';
+          } catch (err2: any) {
+            cloudFailReason += `; Gemini failover: ${err2.message || 'Call failed'}`;
+            console.warn('Gemini secondary failover also failed:', err2);
+          }
         }
-        messages.push({
-          role: 'user',
-          content: prompt
-        });
-
-        fullResponseText = await callGroqStream(
-          config.groqApiKey,
-          config.groqModel,
-          messages,
-          true,
-          onChunk
-        );
-      } catch (err) {
-        console.warn('Groq parseSmartChatbotCommand failed, falling back to local NLP engine:', err);
       }
+    } else if (config.provider === 'builtin' && (config.geminiApiKey || config.groqApiKey)) {
+      if (config.geminiApiKey) {
+        try {
+          fullResponseText = await executeGemini();
+          if (fullResponseText && fullResponseText.trim()) cloudUsed = 'gemini';
+        } catch (e: any) {
+          cloudFailReason = e.message || 'Gemini failed';
+          if (config.groqApiKey) {
+            try {
+              fullResponseText = await executeGroq();
+              if (fullResponseText && fullResponseText.trim()) cloudUsed = 'groq';
+            } catch {}
+          }
+        }
+      } else if (config.groqApiKey) {
+        try {
+          fullResponseText = await executeGroq();
+          if (fullResponseText && fullResponseText.trim()) cloudUsed = 'groq';
+        } catch (e: any) {
+          cloudFailReason = e.message || 'Groq failed';
+        }
+      }
+    }
+
+    if (onChunk && fullResponseText) {
+      onChunk('Processing AI response...');
     }
 
     if (!fullResponseText || !fullResponseText.trim()) {
       const fallbackResult = tryLocalHeuristicFallback(command, accounts, categories, currentDate, transactions);
       if (fallbackResult) {
+        fallbackResult.engineUsed = 'builtin';
+        if (cloudFailReason) {
+          fallbackResult.fallbackReason = cloudFailReason;
+        }
         onComplete(fallbackResult);
       } else {
         onError('Could not parse transaction from command');
@@ -2086,6 +2353,7 @@ export async function parseSmartChatbotCommand(
       }
       
       const parsedResult: SmartChatbotResult = JSON.parse(cleanedText);
+      parsedResult.engineUsed = cloudUsed || 'gemini';
 
       // Sanitize & enforce non-blank categories and valid accounts for batch transactions
       if (parsedResult.batchTransactions && Array.isArray(parsedResult.batchTransactions)) {
@@ -2524,28 +2792,63 @@ Do not include any extra text, commentary, or markdown formatting outside the JS
     const config = getAIProviderConfig();
     let fullResponseText = '';
 
+    const executeGemini = async (): Promise<string> => {
+      return await callGeminiJSON(
+        config.geminiApiKey,
+        config.geminiModel,
+        [{ role: 'user', parts: [{ text: prompt }] }]
+      );
+    };
+
+    const executeGroq = async (): Promise<string> => {
+      return await callGroqJSON(
+        config.groqApiKey,
+        config.groqModel,
+        [{ role: 'user', content: prompt }]
+      );
+    };
+
     if (config.provider === 'gemini' && config.geminiApiKey) {
       try {
-        fullResponseText = await callGeminiStream(
-          config.geminiApiKey,
-          config.geminiModel,
-          [{ role: 'user', parts: [{ text: prompt }] }],
-          undefined,
-          'application/json'
-        );
+        fullResponseText = await executeGemini();
       } catch (e) {
-        console.warn('Gemini generateTransactionAIInsight failed, using heuristic:', e);
+        console.warn('Gemini generateTransactionAIInsight failed, trying secondary cloud provider:', e);
+        if (config.groqApiKey) {
+          try {
+            fullResponseText = await executeGroq();
+          } catch (err2) {
+            console.warn('Groq secondary failover also failed:', err2);
+          }
+        }
       }
     } else if (config.provider === 'groq' && config.groqApiKey) {
       try {
-        fullResponseText = await callGroqStream(
-          config.groqApiKey,
-          config.groqModel,
-          [{ role: 'user', content: prompt }],
-          true
-        );
+        fullResponseText = await executeGroq();
       } catch (e) {
-        console.warn('Groq generateTransactionAIInsight failed, using heuristic:', e);
+        console.warn('Groq generateTransactionAIInsight failed, trying secondary cloud provider:', e);
+        if (config.geminiApiKey) {
+          try {
+            fullResponseText = await executeGemini();
+          } catch (err2) {
+            console.warn('Gemini secondary failover also failed:', err2);
+          }
+        }
+      }
+    } else if (config.provider === 'builtin' && (config.geminiApiKey || config.groqApiKey)) {
+      if (config.geminiApiKey) {
+        try {
+          fullResponseText = await executeGemini();
+        } catch {
+          if (config.groqApiKey) {
+            try {
+              fullResponseText = await executeGroq();
+            } catch {}
+          }
+        }
+      } else if (config.groqApiKey) {
+        try {
+          fullResponseText = await executeGroq();
+        } catch {}
       }
     }
 
