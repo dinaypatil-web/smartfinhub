@@ -39,10 +39,10 @@ export default function ChangePassword({ trigger }: ChangePasswordProps) {
       return;
     }
 
-    if (newPassword.length < 6) {
+    if (newPassword.length < 8 || !/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/[0-9!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(newPassword)) {
       toast({
-        title: 'Error',
-        description: 'Password must be at least 6 characters',
+        title: 'Weak Password',
+        description: 'New password must be at least 8 characters long and include uppercase, lowercase, and a number or symbol.',
         variant: 'destructive',
       });
       return;

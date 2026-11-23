@@ -403,9 +403,9 @@ export default function BackupRestore() {
               <div className="flex items-start gap-2 text-sm">
                 <Shield className="h-4 w-4 text-amber-500 mt-0.5" />
                 <div>
-                  <p className="font-medium text-amber-600 dark:text-amber-500">Security Notice:</p>
+                  <p className="font-medium text-amber-600 dark:text-amber-500">Security & Privacy Notice (DPDP Act 2023):</p>
                   <p className="text-muted-foreground mt-1">
-                    Backup files contain sensitive financial data. Store them securely and never share them with others.
+                    Exported backup files contain unencrypted personal financial records (accounts, transactions, balances, and budgets). Store this file in an encrypted folder or secure offline storage. Never transmit this file over untrusted or unencrypted channels.
                   </p>
                 </div>
               </div>

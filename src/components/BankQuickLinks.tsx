@@ -66,6 +66,26 @@ export default function BankQuickLinks({ bankName, country, accountId, userId }:
     return 'web';
   };
 
+  const isSafeUrl = (targetUrl?: string | null): boolean => {
+    if (!targetUrl || typeof targetUrl !== 'string') return false;
+    const trimmed = targetUrl.trim().toLowerCase();
+    if (
+      trimmed.startsWith('javascript:') ||
+      trimmed.startsWith('data:') ||
+      trimmed.startsWith('vbscript:') ||
+      trimmed.startsWith('file:')
+    ) {
+      return false;
+    }
+    try {
+      const parsed = new URL(targetUrl, window.location.origin);
+      const protocol = parsed.protocol.toLowerCase();
+      return ['http:', 'https:', 'upi:', 'intent:'].includes(protocol) || /^[a-z0-9+.-]+:$/.test(protocol);
+    } catch {
+      return false;
+    }
+  };
+
   const openBankLink = (type: 'web' | 'ios' | 'android') => {
     const webUrl = customLinks[0]?.web_url || bankLink?.web_url;
     const iosAppUrl = customLinks[0]?.ios_app_url || bankLink?.ios_app_url;
@@ -84,8 +104,14 @@ export default function BankQuickLinks({ bankName, country, accountId, userId }:
         break;
     }
     
-    if (url) {
+    if (url && isSafeUrl(url)) {
       window.open(url, '_blank', 'noopener,noreferrer');
+    } else if (url) {
+      toast({
+        title: 'Blocked Insecure Link',
+        description: 'The requested link contains an invalid or disallowed protocol.',
+        variant: 'destructive',
+      });
     } else {
       toast({
         title: 'Link not available',
@@ -107,8 +133,14 @@ export default function BankQuickLinks({ bankName, country, accountId, userId }:
       url = link.web_url;
     }
     
-    if (url) {
+    if (url && isSafeUrl(url)) {
       window.open(url, '_blank', 'noopener,noreferrer');
+    } else if (url) {
+      toast({
+        title: 'Blocked Insecure Link',
+        description: 'The custom link contains an invalid or disallowed protocol.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -118,6 +150,33 @@ export default function BankQuickLinks({ bankName, country, accountId, userId }:
         toast({
           title: 'Error',
           description: 'Please provide at least one link (Web, iOS, or Android).',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      if (newLink.web_url && !isSafeUrl(newLink.web_url)) {
+        toast({
+          title: 'Invalid Web URL',
+          description: 'Web URL must be a valid HTTP or HTTPS address.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      if (newLink.ios_app_url && !isSafeUrl(newLink.ios_app_url)) {
+        toast({
+          title: 'Invalid iOS App URL',
+          description: 'iOS App link must be a valid secure URL or App Store link.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      if (newLink.android_app_url && !isSafeUrl(newLink.android_app_url)) {
+        toast({
+          title: 'Invalid Android App URL',
+          description: 'Android App link must be a valid secure URL or Play Store link.',
           variant: 'destructive',
         });
         return;
@@ -168,32 +227,32 @@ export default function BankQuickLinks({ bankName, country, accountId, userId }:
     const platform = detectPlatform();
     
     // Try deep link first for mobile platforms
-    if (platform === 'ios' && deepLinkIos) {
+    if (platform === 'ios' && deepLinkIos && isSafeUrl(deepLinkIos)) {
       window.location.href = deepLinkIos;
       // Fallback to app store after a delay if deep link fails
       setTimeout(() => {
-        if (iosAppUrl) {
+        if (iosAppUrl && isSafeUrl(iosAppUrl)) {
           window.open(iosAppUrl, '_blank', 'noopener,noreferrer');
         }
       }, 1500);
-    } else if (platform === 'android' && deepLinkAndroid) {
+    } else if (platform === 'android' && deepLinkAndroid && isSafeUrl(deepLinkAndroid)) {
       window.location.href = deepLinkAndroid;
       // Fallback to play store after a delay if deep link fails
       setTimeout(() => {
-        if (androidAppUrl) {
+        if (androidAppUrl && isSafeUrl(androidAppUrl)) {
           window.open(androidAppUrl, '_blank', 'noopener,noreferrer');
         }
       }, 1500);
-    } else if (platform === 'ios' && iosAppUrl) {
+    } else if (platform === 'ios' && iosAppUrl && isSafeUrl(iosAppUrl)) {
       window.open(iosAppUrl, '_blank', 'noopener,noreferrer');
-    } else if (platform === 'android' && androidAppUrl) {
+    } else if (platform === 'android' && androidAppUrl && isSafeUrl(androidAppUrl)) {
       window.open(androidAppUrl, '_blank', 'noopener,noreferrer');
-    } else if (webUrl) {
+    } else if (webUrl && isSafeUrl(webUrl)) {
       window.open(webUrl, '_blank', 'noopener,noreferrer');
     } else {
       toast({
         title: 'Link not available',
-        description: 'No webpage or mobile app link is configured for this bank.',
+        description: 'No valid or verified webpage or mobile app link is configured for this bank.',
         variant: 'destructive',
       });
     }

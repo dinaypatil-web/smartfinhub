@@ -60,6 +60,28 @@ export const profileApi = {
 
     if (error) throw error;
     return Array.isArray(data) ? data : [];
+  },
+
+  async deleteUserAccount(userId: string): Promise<boolean> {
+    const { data, error } = await supabase.rpc('delete_user_account_data', { p_user_id: userId });
+    if (error) {
+      console.warn('RPC delete_user_account_data failed, falling back to sequential cascade delete:', error.message);
+      // Fallback: sequential cascading deletions if RPC not yet deployed
+      await supabase.from('credit_card_repayment_allocations').delete().eq('user_id', userId);
+      await supabase.from('credit_card_advance_payments').delete().eq('user_id', userId);
+      await supabase.from('credit_card_statement_lines').delete().eq('user_id', userId);
+      await supabase.from('loan_emi_payments').delete().eq('user_id', userId);
+      await supabase.from('emi_transactions').delete().eq('user_id', userId);
+      await supabase.from('transactions').delete().eq('user_id', userId);
+      await supabase.from('budgets').delete().eq('user_id', userId);
+      await supabase.from('user_custom_bank_links').delete().eq('user_id', userId);
+      await supabase.from('expense_categories').delete().eq('user_id', userId);
+      await supabase.from('accounts').delete().eq('user_id', userId);
+      const { error: profileError } = await supabase.from('profiles').delete().eq('id', userId);
+      if (profileError) throw profileError;
+      return true;
+    }
+    return !!data;
   }
 };
 
@@ -223,6 +245,19 @@ export const accountApi = {
   },
 
   async adjustBalance(accountId: string, adjustment: number): Promise<void> {
+    if (!accountId || adjustment === 0) return;
+
+    // Prefer atomic database-level RPC to prevent concurrency race conditions
+    try {
+      const { error } = await supabase.rpc('adjust_account_balance', {
+        p_account_id: accountId,
+        p_adjustment: adjustment,
+      });
+      if (!error) return;
+    } catch {
+      // Fallback if RPC has not been migrated on the current database
+    }
+
     const account = await this.getAccountById(accountId);
     if (!account) return;
 

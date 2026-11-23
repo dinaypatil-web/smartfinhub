@@ -15,10 +15,18 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 const MOJOAUTH_API_KEY = Deno.env.get('MOJOAUTH_API_KEY');
 const MOJOAUTH_BASE_URL = 'https://api.mojoauth.com';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+const ALLOWED_ORIGIN_REGEX = /^https?:\/\/(localhost(:\d+)?|127\.0\.0\.1(:\d+)?|([a-z0-9-]+\.)*vercel\.app)$/i;
+
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get('origin') || '';
+  const allowOrigin = ALLOWED_ORIGIN_REGEX.test(origin) ? origin : '*';
+  return {
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Vary': 'Origin',
+  };
+}
 
 interface SendOTPRequest {
   action: 'send';
@@ -38,16 +46,33 @@ interface ResendOTPRequest {
 
 type MojoAuthRequest = SendOTPRequest | VerifyOTPRequest | ResendOTPRequest;
 
+// Regex for international E.164 phone numbers (e.g. +919876543210, 8 to 15 digits)
+const E164_PHONE_REGEX = /^\+[1-9]\d{7,14}$/;
+// State ID sanitization (alphanumeric, underscores, hyphens up to 128 chars)
+const STATE_ID_REGEX = /^[a-zA-Z0-9_-]{8,128}$/;
+// OTP validation (numeric, 4 to 8 digits)
+const OTP_REGEX = /^\d{4,8}$/;
+
 serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  // Enforce POST method
+  if (req.method !== 'POST') {
+    return new Response(JSON.stringify({ success: false, error: 'Method not allowed' }), {
+      status: 405,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
   try {
     // Check if API key is configured
     if (!MOJOAUTH_API_KEY) {
-      throw new Error('MojoAuth API key not configured');
+      throw new Error('MojoAuth API key not configured on server');
     }
 
     // Parse request body
@@ -61,9 +86,9 @@ serve(async (req) => {
       case 'send': {
         const { phone } = body as SendOTPRequest;
         
-        // Validate phone number
-        if (!phone || !phone.startsWith('+')) {
-          throw new Error('Invalid phone number format. Must be in E.164 format (e.g., +1234567890)');
+        // Validate phone number format
+        if (!phone || !E164_PHONE_REGEX.test(phone.trim())) {
+          throw new Error('Invalid phone number format. Must be valid E.164 (e.g., +919876543210)');
         }
 
         // Send OTP via MojoAuth
@@ -73,7 +98,7 @@ serve(async (req) => {
             'Content-Type': 'application/json',
             'X-API-Key': MOJOAUTH_API_KEY,
           },
-          body: JSON.stringify({ phone }),
+          body: JSON.stringify({ phone: phone.trim() }),
         });
         break;
       }
@@ -81,9 +106,12 @@ serve(async (req) => {
       case 'verify': {
         const { state_id, otp } = body as VerifyOTPRequest;
         
-        // Validate inputs
-        if (!state_id || !otp) {
-          throw new Error('Missing state_id or otp');
+        // Strict input validation
+        if (!state_id || !STATE_ID_REGEX.test(state_id.trim())) {
+          throw new Error('Invalid state_id parameter format');
+        }
+        if (!otp || !OTP_REGEX.test(otp.trim())) {
+          throw new Error('Invalid OTP format. Must be 4-8 digits');
         }
 
         // Verify OTP via MojoAuth
@@ -93,7 +121,7 @@ serve(async (req) => {
             'Content-Type': 'application/json',
             'X-API-Key': MOJOAUTH_API_KEY,
           },
-          body: JSON.stringify({ state_id, otp }),
+          body: JSON.stringify({ state_id: state_id.trim(), otp: otp.trim() }),
         });
         break;
       }
@@ -101,9 +129,9 @@ serve(async (req) => {
       case 'resend': {
         const { state_id } = body as ResendOTPRequest;
         
-        // Validate input
-        if (!state_id) {
-          throw new Error('Missing state_id');
+        // Strict input validation
+        if (!state_id || !STATE_ID_REGEX.test(state_id.trim())) {
+          throw new Error('Invalid state_id parameter format');
         }
 
         // Resend OTP via MojoAuth
@@ -113,7 +141,7 @@ serve(async (req) => {
             'Content-Type': 'application/json',
             'X-API-Key': MOJOAUTH_API_KEY,
           },
-          body: JSON.stringify({ state_id }),
+          body: JSON.stringify({ state_id: state_id.trim() }),
         });
         break;
       }
@@ -122,24 +150,19 @@ serve(async (req) => {
         throw new Error(`Invalid action: ${action}`);
     }
 
-    // Check if MojoAuth request was successful first
+    // Check if MojoAuth request was successful
     if (!mojoAuthResponse.ok) {
-      // Try to parse error response
-      let errorMessage = `MojoAuth API error: ${mojoAuthResponse.statusText}`;
+      let errorMessage = `MojoAuth API error (${mojoAuthResponse.status})`;
       try {
         const responseText = await mojoAuthResponse.text();
-        // Try to parse as JSON first
         try {
           const errorData = JSON.parse(responseText);
           errorMessage = errorData.message || errorData.error || errorMessage;
-        } catch (jsonError) {
-          // If not JSON, use the text as error message
-          if (responseText) {
-            errorMessage = `MojoAuth API error: ${responseText}`;
-          }
+        } catch {
+          if (responseText) errorMessage = `MojoAuth API error: ${responseText}`;
         }
-      } catch (textError) {
-        // Use default error message
+      } catch {
+        // Fallback
       }
       throw new Error(errorMessage);
     }
@@ -151,7 +174,7 @@ serve(async (req) => {
       responseData = JSON.parse(responseText);
     } catch (parseError) {
       console.error('Failed to parse MojoAuth response as JSON:', parseError);
-      throw new Error(`Invalid response from MojoAuth API. Please check your API key and try again.`);
+      throw new Error(`Invalid response received from authentication service`);
     }
 
     // Return success response
@@ -169,7 +192,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message || 'An error occurred while processing your request',
+        error: error.message || 'An error occurred while processing your authentication request',
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

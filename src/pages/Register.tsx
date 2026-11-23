@@ -74,10 +74,10 @@ export default function Register() {
       return;
     }
 
-    if (password.length < 6) {
+    if (password.length < 8 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) {
       toast({
-        title: 'Error',
-        description: 'Password must be at least 6 characters',
+        title: 'Weak Password',
+        description: 'Password must be at least 8 characters long and include uppercase, lowercase, and a number or symbol.',
         variant: 'destructive',
       });
       return;
@@ -128,6 +128,10 @@ export default function Register() {
     setLoading(true);
 
     try {
+      if (!accessToken || !accessToken.trim()) {
+        throw new Error('Phone verification token is missing or invalid.');
+      }
+
       const tempPassword = `phone_${Date.now()}_${Math.random().toString(36).substring(7)}`;
       const encryptionSalt = await encryption.createNewKey(tempPassword);
       const phoneEmail = `${phoneNumber.replace(/\+/g, '')}@mojoauth.local`;

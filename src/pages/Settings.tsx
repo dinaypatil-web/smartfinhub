@@ -32,7 +32,7 @@ import { supabase } from '@/db/supabase';
 import ChangePassword from '@/components/ChangePassword';
 
 export default function Settings() {
-  const { user, profile, refreshProfile } = useAuth();
+  const { user, profile, refreshProfile, signOut } = useAuth();
   const { theme, setTheme } = useTheme();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -46,6 +46,11 @@ export default function Settings() {
   const [newPhone, setNewPhone] = useState('');
   const [password, setPassword] = useState('');
   const [updatingPhone, setUpdatingPhone] = useState(false);
+
+  // Account Erasure (DPDP Act 2023) state
+  const [showDeleteAccountDialog, setShowDeleteAccountDialog] = useState(false);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   // AI Configuration state
   const [aiProvider, setAiProvider] = useState<AIProviderType>('builtin');
@@ -330,6 +335,39 @@ export default function Settings() {
       });
     } finally {
       setUpdatingPhone(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmationText !== 'DELETE') {
+      toast({
+        title: 'Confirmation Mismatch',
+        description: 'Please type DELETE exactly to confirm account erasure.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!user) return;
+    setDeletingAccount(true);
+    try {
+      await profileApi.deleteUserAccount(user.id);
+      toast({
+        title: 'Account & Data Erased',
+        description: 'All your personal and financial data has been permanently deleted in accordance with India\'s DPDP Act 2023.',
+      });
+      setShowDeleteAccountDialog(false);
+      await signOut();
+      window.location.href = '/login';
+    } catch (err: any) {
+      console.error('Account erasure error:', err);
+      toast({
+        title: 'Erasure Failed',
+        description: err.message || 'Failed to erase account data. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeletingAccount(false);
     }
   };
 
@@ -905,6 +943,42 @@ export default function Settings() {
         </CardContent>
       </Card>
 
+      {/* Privacy & Right to Erasure (DPDP Act 2023) */}
+      <Card className="border-red-200 dark:border-red-900/50 animate-slide-up">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Shield className="h-5 w-5 text-red-500" />
+            <CardTitle className="text-red-600 dark:text-red-400">Privacy & Data Erasure (DPDP Act 2023)</CardTitle>
+          </div>
+          <CardDescription>
+            Exercise your rights under India's Digital Personal Data Protection Act 2023, including complete personal data erasure.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="bg-muted/50 rounded-lg p-3 text-xs text-muted-foreground space-y-1">
+            <p>• <strong>Data Minimization:</strong> When using Cloud AI (Gemini/Groq), financial identifiers and transaction descriptions are automatically masked to safeguard your privacy.</p>
+            <p>• <strong>Local Processing:</strong> Using the Built-in Engine ensures all calculations and categorization happen strictly on your device.</p>
+            <p>• <strong>Right to Erasure (Section 12):</strong> You have the legal right to completely erase your personal and financial data from our systems.</p>
+          </div>
+
+          <div className="pt-2 border-t border-border flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-foreground">Permanently Delete Account & All Data</p>
+              <p className="text-xs text-muted-foreground">Irreversibly deletes all accounts, transactions, budgets, statements, and your profile.</p>
+            </div>
+            <Button 
+              variant="destructive" 
+              onClick={() => {
+                setDeleteConfirmationText('');
+                setShowDeleteAccountDialog(true);
+              }}
+            >
+              Delete Account
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Phone Update Dialog */}
       <Dialog open={showPhoneDialog} onOpenChange={setShowPhoneDialog}>
         <DialogContent>
@@ -974,6 +1048,57 @@ export default function Settings() {
             <Button onClick={handlePhoneUpdate} disabled={updatingPhone}>
               {updatingPhone && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Update Phone Number
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Account Deletion Dialog (DPDP Act 2023 Right to Erasure) */}
+      <Dialog open={showDeleteAccountDialog} onOpenChange={setShowDeleteAccountDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+              Confirm Permanent Account Erasure
+            </DialogTitle>
+            <DialogDescription>
+              This action is permanent and cannot be undone. In accordance with India's DPDP Act 2023, all your personal data, bank accounts, transactions, and settings will be permanently erased.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 p-3 text-sm text-red-700 dark:text-red-300">
+              <p className="font-semibold">Warning: This cannot be reversed.</p>
+              <p className="text-xs mt-1">If you proceed, all your financial records and profile data will be permanently wiped from the database.</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="confirmDelete">Type <strong>DELETE</strong> below to confirm:</Label>
+              <Input
+                id="confirmDelete"
+                value={deleteConfirmationText}
+                onChange={(e) => setDeleteConfirmationText(e.target.value)}
+                placeholder="DELETE"
+                disabled={deletingAccount}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteAccountDialog(false)}
+              disabled={deletingAccount}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteAccount}
+              disabled={deleteConfirmationText !== 'DELETE' || deletingAccount}
+            >
+              {deletingAccount && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Erase Everything
             </Button>
           </DialogFooter>
         </DialogContent>

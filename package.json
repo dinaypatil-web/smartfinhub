@@ -43,6 +43,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "date-fns": "^3.6.0",
+    "dompurify": "^3.5.0",
     "embla-carousel-react": "^8.6.0",
     "eventsource-parser": "^3.0.6",
     "framer-motion": "^14.7.1",
@@ -75,6 +76,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.3.4",
     "@tailwindcss/container-queries": "^0.1.1",
+    "@types/dompurify": "^3.2.0",
     "@types/lodash": "^4.17.20",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",

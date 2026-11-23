@@ -2049,15 +2049,26 @@ export async function parseSmartChatbotCommand(
   const { command, accounts, categories, transactions, chatHistory, currentDate } = params;
 
   try {
-    const accountsContext = accounts.map(a => `- ID: "${a.id}", Name: "${a.account_name}", Type: "${a.account_type}", Balance: ${a.balance}, Currency: "${a.currency}"`).join('\n');
+    // DPDP Act 2023 Compliance - Data Minimization: Mask sensitive identifiers before sending to cloud models
+    const accountsContext = accounts.map(a => {
+      const maskedNumber = a.last_4_digits ? `••••${a.last_4_digits}` : '••••';
+      return `- ID: "${a.id}", Name: "${a.account_name}", Type: "${a.account_type}", Balance: ${a.balance}, AccountNumber: "${maskedNumber}", Currency: "${a.currency}"`;
+    }).join('\n');
     const categoriesContext = categories.map(c => `- Name: "${c.name}", Icon: "${c.icon}"`).join('\n');
     
-    // Map transactions list to highly readable text for the LLM
-    const transactionsContext = transactions.slice(0, 100).map(t => {
+    // DPDP Act 2023: Limit transaction history to recent 30 items and redact PII patterns (PAN, card/account numbers, emails, phones)
+    const transactionsContext = transactions.slice(0, 30).map(t => {
       const fromName = accounts.find(a => a.id === t.from_account_id)?.account_name || 'N/A';
       const toName = accounts.find(a => a.id === t.to_account_id)?.account_name || 'N/A';
       const catName = t.category || t.income_category || 'Uncategorized';
-      return `- Date: ${t.transaction_date}, Type: ${t.transaction_type}, Amount: ₹${t.amount}, Category: ${catName}, Description: "${t.description || ''}", From: "${fromName}", To: "${toName}"`;
+      const rawDesc = String(t.description || '');
+      const sanitizedDesc = rawDesc
+        .replace(/\b[A-Z]{5}[0-9]{4}[A-Z]\b/gi, '[REDACTED_PAN]')
+        .replace(/\b\d{12,19}\b/g, '[REDACTED_ACC]')
+        .replace(/\b\d{10}\b/g, '[REDACTED_PHONE]')
+        .replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g, '[REDACTED_EMAIL]');
+
+      return `- Date: ${t.transaction_date}, Type: ${t.transaction_type}, Amount: ₹${t.amount}, Category: ${catName}, Description: "${sanitizedDesc}", From: "${fromName}", To: "${toName}"`;
     }).join('\n');
 
     const prompt = `You are a highly intelligent Smart AI Chatbot for the SmartFinHub personal finance app.

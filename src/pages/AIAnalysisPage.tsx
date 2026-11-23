@@ -7,6 +7,7 @@ import { useHybridAuth } from '@/contexts/HybridAuthContext';
 import { transactionApi, accountApi, budgetApi } from '@/db/api';
 import { generateFinancialAnalysis, generateBudgetOptimization, type AIAnalysisData } from '@/services/aiService';
 import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import { useToast } from '@/hooks/use-toast';
 
 export default function AIAnalysisPage() {
@@ -246,14 +247,14 @@ export default function AIAnalysisPage() {
           setAnalysis(fullText);
           const now = Date.now();
           if (now - lastParsedTime > 300) {
-            const html = marked.parse(fullText) as string;
-            setAnalysisHtml(html);
+            const rawHtml = marked.parse(fullText) as string;
+            setAnalysisHtml(DOMPurify.sanitize(rawHtml));
             lastParsedTime = now;
           }
         },
         () => {
-          const html = marked.parse(fullText) as string;
-          setAnalysisHtml(html);
+          const rawHtml = marked.parse(fullText) as string;
+          setAnalysisHtml(DOMPurify.sanitize(rawHtml));
           setIsLoadingAnalysis(false);
           toast({
             title: 'Analysis Complete',
@@ -318,14 +319,14 @@ export default function AIAnalysisPage() {
           setOptimization(fullText);
           const now = Date.now();
           if (now - lastParsedTime > 300) {
-            const html = marked.parse(fullText) as string;
-            setOptimizationHtml(html);
+            const rawHtml = marked.parse(fullText) as string;
+            setOptimizationHtml(DOMPurify.sanitize(rawHtml));
             lastParsedTime = now;
           }
         },
         () => {
-          const html = marked.parse(fullText) as string;
-          setOptimizationHtml(html);
+          const rawHtml = marked.parse(fullText) as string;
+          setOptimizationHtml(DOMPurify.sanitize(rawHtml));
           setIsLoadingOptimization(false);
           toast({
             title: 'Optimization Complete',

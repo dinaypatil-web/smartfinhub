@@ -133,10 +133,14 @@ export default function Login() {
     }
   };
 
-  const handlePhoneAuthSuccess = async (phoneNumber: string, _accessToken: string) => {
+  const handlePhoneAuthSuccess = async (phoneNumber: string, accessToken: string) => {
     setLoading(true);
 
     try {
+      if (!accessToken || !accessToken.trim()) {
+        throw new Error('Phone verification token is missing or invalid.');
+      }
+
       const profile = await profileApi.getProfileByPhone(phoneNumber);
 
       if (!profile) {
