@@ -8,8 +8,17 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Phone, Mail, Shield, Sun, Moon, Monitor, Palette, Bot, Sparkles, Key, CheckCircle2, AlertCircle, Eye, EyeOff, Zap, ExternalLink } from 'lucide-react';
-import { getAIProviderConfig, saveAIProviderConfig, testAIProviderConnection, type AIProviderType } from '@/services/aiService';
+import { Loader2, Phone, Mail, Shield, Sun, Moon, Monitor, Palette, Bot, Sparkles, Key, CheckCircle2, AlertCircle, Eye, EyeOff, Zap, ExternalLink, RefreshCw, Cpu } from 'lucide-react';
+import { 
+  getAIProviderConfig, 
+  saveAIProviderConfig, 
+  testAIProviderConnection, 
+  fetchGeminiAvailableModels, 
+  fetchGroqAvailableModels, 
+  DEFAULT_GEMINI_MODEL, 
+  DEFAULT_GROQ_MODEL, 
+  type AIProviderType 
+} from '@/services/aiService';
 import { countries } from '@/utils/countries';
 import {
   Dialog,
@@ -41,12 +50,24 @@ export default function Settings() {
   // AI Configuration state
   const [aiProvider, setAiProvider] = useState<AIProviderType>('builtin');
   const [geminiApiKey, setGeminiApiKey] = useState('');
-  const [geminiModel, setGeminiModel] = useState('gemini-1.5-flash');
+  const [geminiModel, setGeminiModel] = useState(DEFAULT_GEMINI_MODEL);
   const [groqApiKey, setGroqApiKey] = useState('');
-  const [groqModel, setGroqModel] = useState('llama-3.3-70b-versatile');
+  const [groqModel, setGroqModel] = useState(DEFAULT_GROQ_MODEL);
+  const [geminiAvailableModels, setGeminiAvailableModels] = useState<string[]>([
+    'gemini-2.5-flash',
+    'gemini-2.5-pro',
+    'gemini-2.5-flash-lite'
+  ]);
+  const [groqAvailableModels, setGroqAvailableModels] = useState<string[]>([
+    'llama3-70b-8192',
+    'llama3-8b-8192',
+    'mixtral-8x7b-32768',
+    'gemma2-9b-it'
+  ]);
   const [showGeminiKey, setShowGeminiKey] = useState(false);
   const [showGroqKey, setShowGroqKey] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
+  const [discoveringModels, setDiscoveringModels] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [savingAI, setSavingAI] = useState(false);
 
@@ -54,10 +75,74 @@ export default function Settings() {
     const config = getAIProviderConfig();
     setAiProvider(config.provider);
     setGeminiApiKey(config.geminiApiKey);
-    setGeminiModel(config.geminiModel || 'gemini-1.5-flash');
+    setGeminiModel(config.geminiModel || DEFAULT_GEMINI_MODEL);
     setGroqApiKey(config.groqApiKey);
-    setGroqModel(config.groqModel || 'llama-3.3-70b-versatile');
+    setGroqModel(config.groqModel || DEFAULT_GROQ_MODEL);
+
+    if (config.geminiApiKey) {
+      fetchGeminiAvailableModels(config.geminiApiKey).then(models => {
+        if (models && models.length > 0) setGeminiAvailableModels(models);
+      }).catch(() => {});
+    }
+    if (config.groqApiKey) {
+      fetchGroqAvailableModels(config.groqApiKey).then(models => {
+        if (models && models.length > 0) setGroqAvailableModels(models);
+      }).catch(() => {});
+    }
   }, []);
+
+  const handleDiscoverModels = async (provider: 'gemini' | 'groq') => {
+    const key = provider === 'gemini' ? geminiApiKey.trim() : groqApiKey.trim();
+    if (!key) {
+      toast({
+        title: 'API Key Required',
+        description: `Please enter your ${provider === 'gemini' ? 'Google Gemini' : 'Groq'} API key before discovering models.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setDiscoveringModels(true);
+    try {
+      if (provider === 'gemini') {
+        const models = await fetchGeminiAvailableModels(key);
+        setGeminiAvailableModels(models);
+        if (!models.includes(geminiModel)) {
+          const preferred = models.find(m => m.includes('2.5-flash') || m.includes('flash')) || models[0];
+          if (preferred) {
+            setGeminiModel(preferred);
+            saveAIProviderConfig({ geminiModel: preferred });
+          }
+        }
+        toast({
+          title: 'Models Discovered',
+          description: `Found ${models.length} active Gemini models for your account.`,
+        });
+      } else {
+        const models = await fetchGroqAvailableModels(key);
+        setGroqAvailableModels(models);
+        if (!models.includes(groqModel)) {
+          const preferred = models.find(m => m.includes('70b') || m.includes('llama3') || m.includes('8b')) || models[0];
+          if (preferred) {
+            setGroqModel(preferred);
+            saveAIProviderConfig({ groqModel: preferred });
+          }
+        }
+        toast({
+          title: 'Models Discovered',
+          description: `Found ${models.length} active Groq models for your account.`,
+        });
+      }
+    } catch (err: any) {
+      toast({
+        title: 'Discovery Failed',
+        description: err.message || 'Could not fetch models list',
+        variant: 'destructive',
+      });
+    } finally {
+      setDiscoveringModels(false);
+    }
+  };
 
   const handleTestConnection = async () => {
     setTestingConnection(true);
@@ -67,6 +152,21 @@ export default function Settings() {
       const activeModel = aiProvider === 'gemini' ? geminiModel : groqModel;
       const res = await testAIProviderConnection(aiProvider, activeKey, activeModel);
       setTestResult(res);
+
+      if (res.detectedModel) {
+        if (aiProvider === 'gemini') {
+          setGeminiModel(res.detectedModel);
+          if (!geminiAvailableModels.includes(res.detectedModel)) {
+            setGeminiAvailableModels(prev => [res.detectedModel!, ...prev]);
+          }
+        } else if (aiProvider === 'groq') {
+          setGroqModel(res.detectedModel);
+          if (!groqAvailableModels.includes(res.detectedModel)) {
+            setGroqAvailableModels(prev => [res.detectedModel!, ...prev]);
+          }
+        }
+      }
+
       toast({
         title: res.success ? 'Connection Successful' : 'Connection Failed',
         description: res.message,
@@ -468,19 +568,68 @@ export default function Settings() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="gemini_model" className="text-xs">
-                  Model
-                </Label>
-                <Select value={geminiModel} onValueChange={setGeminiModel}>
-                  <SelectTrigger id="gemini_model" className="bg-background">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="gemini-1.5-flash">gemini-1.5-flash (Fastest & Free)</SelectItem>
-                    <SelectItem value="gemini-2.0-flash">gemini-2.0-flash (Next-Gen Flash)</SelectItem>
-                    <SelectItem value="gemini-1.5-pro">gemini-1.5-pro (High Reasoning)</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="gemini_model" className="text-xs font-medium flex items-center gap-1.5">
+                    <Cpu className="h-3.5 w-3.5 text-primary" />
+                    Model Name / Identifier
+                  </Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs px-2 text-primary hover:text-primary hover:bg-primary/10"
+                    onClick={() => handleDiscoverModels('gemini')}
+                    disabled={discoveringModels || !geminiApiKey.trim()}
+                  >
+                    <RefreshCw className={`h-3 w-3 mr-1 ${discoveringModels ? 'animate-spin' : ''}`} />
+                    Auto-Discover Models
+                  </Button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="gemini_model"
+                    type="text"
+                    placeholder="gemini-2.5-flash"
+                    value={geminiModel}
+                    onChange={(e) => setGeminiModel(e.target.value.trim().replace(/^models\//, ''))}
+                    className="font-mono text-sm bg-background flex-1"
+                  />
+                  <Select
+                    value={geminiModel}
+                    onValueChange={(val) => setGeminiModel(val)}
+                  >
+                    <SelectTrigger className="w-[140px] bg-background">
+                      <SelectValue placeholder="Presets" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {geminiAvailableModels.map((m) => (
+                        <SelectItem key={m} value={m}>
+                          {m} {m === 'gemini-2.5-flash' ? '(Recommended)' : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Quick Selection Pills */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  <span className="text-[11px] text-muted-foreground mr-1">Suggested:</span>
+                  {['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash-lite'].map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setGeminiModel(m)}
+                      className={`text-[11px] px-2 py-0.5 rounded-full border transition-all ${
+                        geminiModel === m
+                          ? 'bg-primary text-primary-foreground border-primary font-medium'
+                          : 'bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground border-border'
+                      }`}
+                    >
+                      {m} {m === 'gemini-2.5-flash' ? '★' : ''}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           )}
@@ -529,18 +678,68 @@ export default function Settings() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="groq_model" className="text-xs">
-                  Model
-                </Label>
-                <Select value={groqModel} onValueChange={setGroqModel}>
-                  <SelectTrigger id="groq_model" className="bg-background">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="llama-3.3-70b-versatile">llama-3.3-70b-versatile (Recommended)</SelectItem>
-                    <SelectItem value="llama-3.1-8b-instant">llama-3.1-8b-instant (Fastest)</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="groq_model" className="text-xs font-medium flex items-center gap-1.5">
+                    <Cpu className="h-3.5 w-3.5 text-primary" />
+                    Model Name / Identifier
+                  </Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs px-2 text-primary hover:text-primary hover:bg-primary/10"
+                    onClick={() => handleDiscoverModels('groq')}
+                    disabled={discoveringModels || !groqApiKey.trim()}
+                  >
+                    <RefreshCw className={`h-3 w-3 mr-1 ${discoveringModels ? 'animate-spin' : ''}`} />
+                    Auto-Discover Models
+                  </Button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="groq_model"
+                    type="text"
+                    placeholder="llama3-70b-8192"
+                    value={groqModel}
+                    onChange={(e) => setGroqModel(e.target.value.trim())}
+                    className="font-mono text-sm bg-background flex-1"
+                  />
+                  <Select
+                    value={groqModel}
+                    onValueChange={(val) => setGroqModel(val)}
+                  >
+                    <SelectTrigger className="w-[140px] bg-background">
+                      <SelectValue placeholder="Presets" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {groqAvailableModels.map((m) => (
+                        <SelectItem key={m} value={m}>
+                          {m} {m === 'llama3-70b-8192' ? '(Recommended)' : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Quick Selection Pills */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  <span className="text-[11px] text-muted-foreground mr-1">Suggested:</span>
+                  {['llama3-70b-8192', 'llama3-8b-8192', 'mixtral-8x7b-32768', 'gemma2-9b-it'].map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setGroqModel(m)}
+                      className={`text-[11px] px-2 py-0.5 rounded-full border transition-all ${
+                        groqModel === m
+                          ? 'bg-primary text-primary-foreground border-primary font-medium'
+                          : 'bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground border-border'
+                      }`}
+                    >
+                      {m} {m === 'llama3-70b-8192' ? '★' : ''}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           )}

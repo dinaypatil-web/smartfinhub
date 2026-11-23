@@ -49,6 +49,23 @@ export interface AIAnalysisData {
 
 export type AIProviderType = 'gemini' | 'groq' | 'builtin';
 
+export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
+export const DEFAULT_GROQ_MODEL = 'llama3-70b-8192';
+
+export const DEPRECATED_GEMINI_MODELS = [
+  'gemini-1.5-flash',
+  'gemini-2.0-flash',
+  'gemini-1.5-pro',
+  'models/gemini-1.5-flash',
+  'models/gemini-2.0-flash',
+  'models/gemini-1.5-pro'
+];
+
+export const DEPRECATED_GROQ_MODELS = [
+  'llama-3.3-70b-versatile',
+  'llama-3.1-8b-instant'
+];
+
 export interface AIProviderConfig {
   provider: AIProviderType;
   geminiApiKey: string;
@@ -60,9 +77,9 @@ export interface AIProviderConfig {
 export function getAIProviderConfig(): AIProviderConfig {
   let provider: AIProviderType = 'builtin';
   let geminiApiKey = '';
-  let geminiModel = 'gemini-1.5-flash';
+  let geminiModel = DEFAULT_GEMINI_MODEL;
   let groqApiKey = '';
-  let groqModel = 'llama-3.3-70b-versatile';
+  let groqModel = DEFAULT_GROQ_MODEL;
 
   if (typeof window !== 'undefined' && window.localStorage) {
     const savedProvider = localStorage.getItem('smartfin_ai_provider') as AIProviderType | null;
@@ -72,9 +89,27 @@ export function getAIProviderConfig(): AIProviderConfig {
     const savedGroqModel = localStorage.getItem('smartfin_groq_model');
 
     if (savedGeminiKey) geminiApiKey = savedGeminiKey.trim();
-    if (savedGeminiModel) geminiModel = savedGeminiModel.trim();
     if (savedGroqKey) groqApiKey = savedGroqKey.trim();
-    if (savedGroqModel) groqModel = savedGroqModel.trim();
+
+    if (savedGeminiModel) {
+      const clean = savedGeminiModel.trim().replace(/^models\//, '');
+      if (DEPRECATED_GEMINI_MODELS.includes(clean)) {
+        geminiModel = DEFAULT_GEMINI_MODEL;
+        localStorage.setItem('smartfin_gemini_model', DEFAULT_GEMINI_MODEL);
+      } else {
+        geminiModel = clean;
+      }
+    }
+
+    if (savedGroqModel) {
+      const clean = savedGroqModel.trim();
+      if (DEPRECATED_GROQ_MODELS.includes(clean)) {
+        groqModel = DEFAULT_GROQ_MODEL;
+        localStorage.setItem('smartfin_groq_model', DEFAULT_GROQ_MODEL);
+      } else {
+        groqModel = clean;
+      }
+    }
 
     if (savedProvider && ['gemini', 'groq', 'builtin'].includes(savedProvider)) {
       provider = savedProvider;
@@ -98,6 +133,51 @@ export function getAIProviderConfig(): AIProviderConfig {
   return { provider, geminiApiKey, geminiModel, groqApiKey, groqModel };
 }
 
+export async function fetchGeminiAvailableModels(apiKey: string): Promise<string[]> {
+  const fallbackList = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash-lite'];
+  if (!apiKey || !apiKey.trim()) return fallbackList;
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey.trim())}`;
+    const res = await fetch(url);
+    if (!res.ok) return fallbackList;
+    const data = await res.json();
+    if (Array.isArray(data.models)) {
+      const available = data.models
+        .filter((m: any) => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent'))
+        .map((m: any) => String(m.name || '').replace(/^models\//, ''))
+        .filter(Boolean);
+      if (available.length > 0) return available;
+    }
+  } catch (err) {
+    console.warn('Failed to dynamically fetch Gemini models, using fallbacks:', err);
+  }
+  return fallbackList;
+}
+
+export async function fetchGroqAvailableModels(apiKey: string): Promise<string[]> {
+  const fallbackList = ['llama3-70b-8192', 'llama3-8b-8192', 'mixtral-8x7b-32768', 'gemma2-9b-it'];
+  if (!apiKey || !apiKey.trim()) return fallbackList;
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/models', {
+      headers: {
+        'Authorization': `Bearer ${apiKey.trim()}`
+      }
+    });
+    if (!res.ok) return fallbackList;
+    const data = await res.json();
+    if (Array.isArray(data.data)) {
+      const available = data.data
+        .filter((m: any) => m.active !== false && !m.id.includes('whisper') && !m.id.includes('embed'))
+        .map((m: any) => String(m.id))
+        .filter(Boolean);
+      if (available.length > 0) return available;
+    }
+  } catch (err) {
+    console.warn('Failed to dynamically fetch Groq models, using fallbacks:', err);
+  }
+  return fallbackList;
+}
+
 export function saveAIProviderConfig(config: Partial<AIProviderConfig>) {
   if (typeof window === 'undefined' || !window.localStorage) return;
   if (config.provider) localStorage.setItem('smartfin_ai_provider', config.provider);
@@ -111,7 +191,7 @@ export async function testAIProviderConnection(
   provider: AIProviderType,
   apiKey: string,
   model?: string
-): Promise<{ success: boolean; message: string }> {
+): Promise<{ success: boolean; message: string; detectedModel?: string }> {
   if (provider === 'builtin') {
     return {
       success: true,
@@ -129,7 +209,11 @@ export async function testAIProviderConnection(
   const trimmedKey = apiKey.trim();
 
   if (provider === 'gemini') {
-    const targetModel = model || 'gemini-1.5-flash';
+    let targetModel = (model || DEFAULT_GEMINI_MODEL).trim().replace(/^models\//, '');
+    if (DEPRECATED_GEMINI_MODELS.includes(targetModel)) {
+      targetModel = DEFAULT_GEMINI_MODEL;
+    }
+
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(targetModel)}:generateContent?key=${encodeURIComponent(trimmedKey)}`;
       const res = await fetch(url, {
@@ -142,13 +226,40 @@ export async function testAIProviderConnection(
       if (res.ok) {
         return {
           success: true,
-          message: `Successfully connected to Google Gemini (${targetModel})!`
+          message: `Successfully connected to Google Gemini (${targetModel})!`,
+          detectedModel: targetModel
         };
       }
+
       const err = await res.json().catch(() => ({}));
+      const errMsg = err.error?.message || `Gemini test failed with HTTP ${res.status}`;
+
+      // Auto-heal if model not found or deprecated
+      if (res.status === 404 || errMsg.includes('not found') || errMsg.includes('no longer available')) {
+        const available = await fetchGeminiAvailableModels(trimmedKey);
+        const candidate = available.find(m => m.includes('2.5-flash') || m.includes('flash')) || available[0];
+        if (candidate && candidate !== targetModel) {
+          const retryRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(candidate)}:generateContent?key=${encodeURIComponent(trimmedKey)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ role: 'user', parts: [{ text: 'Respond with: OK' }] }]
+            })
+          });
+          if (retryRes.ok) {
+            saveAIProviderConfig({ geminiModel: candidate });
+            return {
+              success: true,
+              message: `Successfully connected! Model '${targetModel}' was deprecated; auto-upgraded to active '${candidate}'.`,
+              detectedModel: candidate
+            };
+          }
+        }
+      }
+
       return {
         success: false,
-        message: err.error?.message || `Gemini test failed with HTTP ${res.status}`
+        message: errMsg
       };
     } catch (e: any) {
       return {
@@ -159,7 +270,11 @@ export async function testAIProviderConnection(
   }
 
   if (provider === 'groq') {
-    const targetModel = model || 'llama-3.3-70b-versatile';
+    let targetModel = (model || DEFAULT_GROQ_MODEL).trim();
+    if (DEPRECATED_GROQ_MODELS.includes(targetModel)) {
+      targetModel = DEFAULT_GROQ_MODEL;
+    }
+
     try {
       const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
@@ -176,13 +291,45 @@ export async function testAIProviderConnection(
       if (res.ok) {
         return {
           success: true,
-          message: `Successfully connected to Groq Cloud (${targetModel})!`
+          message: `Successfully connected to Groq Cloud (${targetModel})!`,
+          detectedModel: targetModel
         };
       }
+
       const err = await res.json().catch(() => ({}));
+      const errMsg = err.error?.message || `Groq test failed with HTTP ${res.status}`;
+
+      // Auto-heal if model does not exist or user lacks access
+      if (res.status === 400 || res.status === 404 || errMsg.includes('does not exist') || errMsg.includes('do not have access')) {
+        const available = await fetchGroqAvailableModels(trimmedKey);
+        const candidate = available.find(m => m.includes('70b') || m.includes('llama3') || m.includes('8b')) || available[0];
+        if (candidate && candidate !== targetModel) {
+          const retryRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${trimmedKey}`
+            },
+            body: JSON.stringify({
+              model: candidate,
+              messages: [{ role: 'user', content: 'Respond with OK' }],
+              max_tokens: 5
+            })
+          });
+          if (retryRes.ok) {
+            saveAIProviderConfig({ groqModel: candidate });
+            return {
+              success: true,
+              message: `Successfully connected! Model '${targetModel}' is unavailable on your key; auto-switched to active '${candidate}'.`,
+              detectedModel: candidate
+            };
+          }
+        }
+      }
+
       return {
         success: false,
-        message: err.error?.message || `Groq test failed with HTTP ${res.status}`
+        message: errMsg
       };
     } catch (e: any) {
       return {
@@ -203,7 +350,12 @@ async function callGeminiStream(
   responseMimeType?: string,
   onChunk?: (text: string) => void
 ): Promise<string> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?key=${encodeURIComponent(apiKey)}&alt=sse`;
+  let cleanModel = (model || DEFAULT_GEMINI_MODEL).trim().replace(/^models\//, '');
+  if (DEPRECATED_GEMINI_MODELS.includes(cleanModel)) {
+    cleanModel = DEFAULT_GEMINI_MODEL;
+  }
+
+  const makeUrl = (m: string) => `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:streamGenerateContent?key=${encodeURIComponent(apiKey)}&alt=sse`;
   const body: any = {
     contents,
     generationConfig: {
@@ -219,7 +371,7 @@ async function callGeminiStream(
     };
   }
 
-  const response = await fetch(url, {
+  let response = await fetch(makeUrl(cleanModel), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
@@ -228,7 +380,28 @@ async function callGeminiStream(
   if (!response.ok) {
     const errorJson = await response.json().catch(() => ({}));
     const message = errorJson.error?.message || response.statusText || 'Gemini API call failed';
-    throw new Error(`Gemini API Error (${response.status}): ${message}`);
+
+    // Auto-heal if model is deprecated or not found
+    if (response.status === 404 || message.includes('not found') || message.includes('no longer available')) {
+      console.warn(`Model ${cleanModel} failed (${message}). Attempting auto-healing model discovery...`);
+      const available = await fetchGeminiAvailableModels(apiKey);
+      const fallbackModel = available.find(m => m.includes('2.5-flash') || m.includes('flash')) || available[0];
+      if (fallbackModel && fallbackModel !== cleanModel) {
+        cleanModel = fallbackModel;
+        saveAIProviderConfig({ geminiModel: fallbackModel });
+        response = await fetch(makeUrl(cleanModel), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+      }
+    }
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      const finalMsg = err.error?.message || message;
+      throw new Error(`Gemini API Error (${response.status}): ${finalMsg}`);
+    }
   }
 
   const reader = response.body?.getReader();
@@ -275,30 +448,62 @@ async function callGroqStream(
   responseFormatJson?: boolean,
   onChunk?: (text: string) => void
 ): Promise<string> {
-  const url = 'https://api.groq.com/openai/v1/chat/completions';
-  const body: any = {
-    model,
-    messages,
-    temperature: 0.2,
-    stream: true
-  };
-  if (responseFormatJson) {
-    body.response_format = { type: 'json_object' };
+  let targetModel = (model || DEFAULT_GROQ_MODEL).trim();
+  if (DEPRECATED_GROQ_MODELS.includes(targetModel)) {
+    targetModel = DEFAULT_GROQ_MODEL;
   }
 
-  const response = await fetch(url, {
+  const url = 'https://api.groq.com/openai/v1/chat/completions';
+  const makeBody = (m: string) => {
+    const b: any = {
+      model: m,
+      messages,
+      temperature: 0.2,
+      stream: true
+    };
+    if (responseFormatJson) {
+      b.response_format = { type: 'json_object' };
+    }
+    return b;
+  };
+
+  let response = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`
     },
-    body: JSON.stringify(body)
+    body: JSON.stringify(makeBody(targetModel))
   });
 
   if (!response.ok) {
     const errJson = await response.json().catch(() => ({}));
     const message = errJson.error?.message || response.statusText || 'Groq API call failed';
-    throw new Error(`Groq API Error (${response.status}): ${message}`);
+
+    // Auto-heal if model does not exist or user lacks access
+    if (response.status === 400 || response.status === 404 || message.includes('does not exist') || message.includes('do not have access')) {
+      console.warn(`Groq model ${targetModel} failed (${message}). Attempting auto-healing model discovery...`);
+      const available = await fetchGroqAvailableModels(apiKey);
+      const fallbackModel = available.find(m => m.includes('70b') || m.includes('llama3') || m.includes('8b')) || available[0];
+      if (fallbackModel && fallbackModel !== targetModel) {
+        targetModel = fallbackModel;
+        saveAIProviderConfig({ groqModel: fallbackModel });
+        response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify(makeBody(targetModel))
+        });
+      }
+    }
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      const finalMsg = err.error?.message || message;
+      throw new Error(`Groq API Error (${response.status}): ${finalMsg}`);
+    }
   }
 
   const reader = response.body?.getReader();
